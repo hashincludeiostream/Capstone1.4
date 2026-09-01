@@ -1,0 +1,138 @@
+/* Salons Page Styles */
+.salons-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.salons-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.salons-header h1 {
+    color: #8B008B;
+    font-size: 42px;
+    margin-bottom: 15px;
+}
+
+.search-filters {
+    background-color: #FFE4E1;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 40px;
+}
+
+.filter-form {
+    display: grid;
+    grid-template-columns: 2fr 1fr auto;
+    gap: 20px;
+    align-items: end;
+}
+
+.filter-form .form-group {
+    margin-bottom: 0;
+}
+
+.btn-filter {
+    background-color: #C9A96E;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+    font-weight: 500;
+}
+
+.btn-filter:hover {
+    background-color: #FF1493;
+}
+
+.salons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.salon-card {
+    background-color: var(--white);
+    border-radius: var(--border-radius-medium);
+    box-shadow: var(--shadow-medium);
+    overflow: hidden;
+    transition: transform 0.3s;
+    border: 2px solid var(--border-color);
+    padding: 30px;
+    text-align: center;
+}
+
+.salon-card:hover {
+    transform: translateY(-5px);
+}
+
+.salon-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.salon-card h3 {
+    font-size: 20px;
+    color: #8B008B;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.salon-location {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.salon-description {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 15px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.salon-rating {
+    font-size: 18px;
+    color: #C9A96E;
+    margin-bottom: 15px;
+}
+
+.salon-card .btn-view-all {
+    margin: 0;
+}
+
+.no-salons {
+    text-align: center;
+    padding: 60px 20px;
+    background-color: #FFE4E1;
+    border-radius: 15px;
+    border: 2px solid #FFC0CB;
+}
+
+.no-salons p {
+    font-size: 18px;
+    color: #666;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .filter-form {
+        grid-template-columns: 1fr;
+    }
+    
+    .salons-grid {
+        grid-template-columns: 1fr;
+    }
+}

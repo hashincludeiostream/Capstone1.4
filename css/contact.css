@@ -1,0 +1,167 @@
+/* Contact Page Styles */
+.contact-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.contact-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.contact-header h1 {
+    color: #8B008B;
+    font-size: 42px;
+    margin-bottom: 15px;
+}
+
+.contact-section {
+    background-color: #FFE4E1;
+    padding: 60px 20px;
+}
+
+.contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px;
+    text-align: center;
+}
+
+.contact-info h3,
+.business-hours h3,
+.social-media h3 {
+    font-size: 24px;
+    color: #8B008B;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: #666;
+}
+
+.contact-item i {
+    font-size: 18px;
+    color: #C9A96E;
+    width: 20px;
+}
+
+.hours-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: #666;
+    padding: 10px 0;
+    border-bottom: 1px solid #FFB6C1;
+}
+
+.hours-item:last-child {
+    border-bottom: none;
+}
+
+.social-links {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.social-link {
+    display: inline-block;
+    padding: 12px 20px;
+    background-color: #f4a0b5;
+    color: white;
+    text-decoration: none;
+    border-radius: 25px;
+    transition: background-color 0.3s;
+    font-weight: 500;
+}
+
+.social-link:hover {
+    background-color: #FF1493;
+}
+
+.social-link.facebook {
+    background-color: #1877F2;
+}
+
+.social-link.facebook:hover {
+    background-color: #166FE5;
+}
+
+.social-link.instagram {
+    background: linear-gradient(45deg, #F58529, #DD2A7B, #8134AF, #515BD4);
+}
+
+.social-link.instagram:hover {
+    background: linear-gradient(45deg, #E07424, #C2246A, #722D9E, #4A4BC3);
+}
+
+.social-link.tiktok {
+    background-color: #000000;
+}
+
+.social-link.tiktok:hover {
+    background-color: #333333;
+}
+
+.contact-form-section {
+    background-color: white;
+    padding: 60px 20px;
+}
+
+.contact-form-section h3 {
+    font-size: 32px;
+    color: #8B008B;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.contact-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.contact-form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.contact-form label {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.contact-form input,
+.contact-form textarea {
+    width: 100%;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .contact-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .contact-item {
+        justify-content: flex-start;
+    }
+    
+    .hours-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}

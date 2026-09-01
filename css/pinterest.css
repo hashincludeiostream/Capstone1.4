@@ -1,0 +1,425 @@
+/* Pinterest-style Layout CSS */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Playfair Display', serif;
+    background-color: #ffffff;
+    color: #333;
+}
+
+/* Pinterest-style Sidebar */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 280px;
+    height: 100vh;
+    background-color: #ffffff;
+    border-right: 3px solid #C9A96E;
+    padding: 20px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+/* Owner Dashboard Sidebar Specific Styles */
+.nav-section-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(139, 0, 139, 0.6);
+    padding: 15px 15px 8px;
+    margin-top: 8px;
+}
+
+.nav-badge {
+    margin-left: auto;
+    background: linear-gradient(135deg, #FF1493 0%, #8B008B 100%);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    line-height: 1.4;
+}
+
+.admin-logout-item {
+    border-top: 1px solid #FFC0CB;
+    margin-top: 14px;
+    padding-top: 18px;
+}
+
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 30px;
+    padding: 10px;
+    border-radius: 25px;
+    transition: background-color 0.3s;
+    cursor: pointer;
+}
+
+.sidebar-logo:hover {
+    background-color: #FFE4E1;
+}
+
+.sidebar-logo img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.sidebar-logo h1 {
+    font-size: 20px;
+    color: #8B008B;
+    font-weight: bold;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    border-radius: 25px;
+    text-decoration: none;
+    color: #333;
+    font-size: 16px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.sidebar-nav-item:hover {
+    background-color: #FFE4E1;
+    color: #8B008B;
+}
+
+.sidebar-nav-item.active {
+    background-color: #FFB6C1;
+    color: #8B008B;
+    font-weight: 600;
+}
+
+.sidebar-nav-item span {
+    font-size: 20px;
+}
+
+.sidebar-user {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid #FFC0CB;
+}
+
+.sidebar-user-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    border-radius: 25px;
+    text-decoration: none;
+    color: #333;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.sidebar-user-item:hover {
+    background-color: #FFE4E1;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8B008B 0%, #FF1493 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Main Content Area */
+.main-content {
+    margin-left: 280px;
+    padding: 20px 40px;
+    min-height: 100vh;
+    background-color: #ffffff;
+}
+
+/* Search Bar */
+.search-container {
+    max-width: 800px;
+    margin: 0 auto 30px;
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    background-color: #FFE4E1;
+    border: 2px solid #FFC0CB;
+    border-radius: 25px;
+    padding: 15px 20px;
+    gap: 15px;
+}
+
+.search-bar input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    outline: none;
+    color: #333;
+}
+
+.search-bar input::placeholder {
+    color: #666;
+}
+
+.search-bar button {
+    background: linear-gradient(135deg, #FF1493 0%, #8B008B 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 16px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.search-bar button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 20, 147, 0.3);
+}
+
+/* Category Filters */
+.category-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.category-filter {
+    padding: 10px 20px;
+    border-radius: 25px;
+    border: 2px solid #FFC0CB;
+    background: white;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.3s;
+    font-size: 14px;
+    color: #333;
+}
+
+.category-filter:hover {
+    border-color: #8B008B;
+    background-color: #FFE4E1;
+}
+
+.category-filter.active {
+    background: linear-gradient(135deg, #8B008B 0%, #FF1493 100%);
+    color: white;
+    border-color: #8B008B;
+}
+
+/* Masonry Grid */
+.masonry-grid {
+    column-count: 5;
+    column-gap: 16px;
+}
+
+@media (max-width: 1400px) {
+    .masonry-grid {
+        column-count: 4;
+    }
+}
+
+@media (max-width: 1100px) {
+    .masonry-grid {
+        column-count: 3;
+    }
+}
+
+@media (max-width: 800px) {
+    .masonry-grid {
+        column-count: 2;
+    }
+}
+
+@media (max-width: 500px) {
+    .masonry-grid {
+        column-count: 1;
+    }
+}
+
+/* Pinterest Card */
+.pin-card {
+    break-inside: avoid;
+    margin-bottom: 16px;
+    border-radius: 15px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    position: relative;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.pin-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(139, 0, 139, 0.2);
+}
+
+.pin-image {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.pin-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(139, 0, 139, 0.4);
+    opacity: 0;
+    transition: opacity 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pin-card:hover .pin-overlay {
+    opacity: 1;
+}
+
+.pin-save-btn {
+    background: linear-gradient(135deg, #FF1493 0%, #8B008B 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.pin-save-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 20, 147, 0.4);
+}
+
+.pin-info {
+    padding: 12px;
+    background-color: white;
+}
+
+.pin-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #8B008B;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pin-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.pin-rating {
+    color: #C9A96E;
+}
+
+/* Mobile Menu */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1001;
+    background: white;
+    border: 2px solid #FFC0CB;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    color: #8B008B;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 60px 15px 15px;
+    }
+
+    .mobile-menu-btn {
+        display: flex;
+    }
+
+    .masonry-grid {
+        column-count: 2;
+    }
+}
+
+@media (max-width: 400px) {
+    .masonry-grid {
+        column-count: 1;
+    }
+}
+
+/* Varying heights for masonry effect */
+.pin-card:nth-child(5n+1) .pin-image {
+    min-height: 200px;
+    max-height: 300px;
+}
+
+.pin-card:nth-child(5n+2) .pin-image {
+    min-height: 250px;
+    max-height: 400px;
+}
+
+.pin-card:nth-child(5n+3) .pin-image {
+    min-height: 180px;
+    max-height: 280px;
+}
+
+.pin-card:nth-child(5n+4) .pin-image {
+    min-height: 300px;
+    max-height: 450px;
+}
+
+.pin-card:nth-child(5n+5) .pin-image {
+    min-height: 220px;
+    max-height: 350px;
+}

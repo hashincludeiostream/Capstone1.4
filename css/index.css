@@ -1,0 +1,808 @@
+/* Landing Page Styles */
+.landing-page {
+    background-color: var(--background-light);
+    min-height: calc(100vh - 100px);
+}
+
+.content-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 20px 60px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    text-align: center;
+}
+
+.welcome-text {
+    font-family: var(--font-secondary);
+    font-size: 36px;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    text-align: justify;
+}
+
+.main-headline {
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 20px;
+    line-height: 1.2;
+    text-align: left;
+}
+
+.responsive-text {
+    display: block;
+    margin-top: -10px;
+}
+
+.nail-text {
+    display: block;
+    margin-top: -10px;
+}
+
+.salon-portal-text {
+    display: block;
+    margin-top: -10px;
+}
+
+.description {
+    font-size: 18px;
+    color: var(--text-medium);
+    margin-bottom: 40px;
+    line-height: 1.6;
+    text-align: justify;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 20px;
+}
+
+.nail-image-carousel {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.carousel-container {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    overflow: hidden;
+    border-radius: var(--border-radius-medium);
+}
+
+.carousel-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.carousel-slide.active {
+    opacity: 1;
+}
+
+.carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #C9A96E;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    z-index: 10;
+    transition: background-color 0.3s;
+}
+
+.prev-arrow {
+    left: 10px;
+}
+
+.next-arrow {
+    right: 10px;
+}
+
+.carousel-arrow:hover {
+    background-color: #FF1493;
+}
+
+.main-nail-image {
+    width: 100%;
+    max-width: 600px;
+    height: 600px;
+    object-fit: cover;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.second-image-container {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.second-nail-image {
+    width: 100%;
+    max-width: 300px;
+    height: 300px;
+    object-fit: contain;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+.decorative-elements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.tiny-person {
+    position: absolute;
+    bottom: 20px;
+    left: -20px;
+    width: 30px;
+    height: 40px;
+    background-color: #FFB6C1;
+    border-radius: 50% 50% 0 0;
+}
+
+.perfume-bottle {
+    position: absolute;
+    top: 30px;
+    right: -10px;
+    width: 20px;
+    height: 40px;
+    background-color: #C9A96E;
+    border-radius: 5px;
+}
+
+.glitter-dots::before,
+.glitter-dots::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: #FFD700;
+    border-radius: 50%;
+}
+
+.glitter-dots::before {
+    top: 50px;
+    right: 30px;
+}
+
+.glitter-dots::after {
+    bottom: 80px;
+    left: 20px;
+}
+
+/* Grow Business Section Styles */
+.grow-business-section {
+    background-color: white;
+    padding: 80px 20px;
+}
+
+.business-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: start;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.business-left {
+    display: flex;
+    flex-direction: column;
+}
+
+.business-right {
+    display: flex;
+    flex-direction: column;
+}
+
+.why-choose-section {
+    background-color: transparent;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.business-text h2 {
+    font-size: 36px;
+    color: #8B008B;
+    margin-top: 40px;
+    margin-bottom: 60px;
+    font-weight: 700;
+}
+
+.business-text p {
+    font-size: 20px;
+    color: #666;
+    margin-bottom: 50px;
+    line-height: 1.6;
+}
+
+.business-text ul {
+    list-style: none;
+    margin-bottom: 30px;
+}
+
+.business-text li {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 15px;
+    padding-left: 25px;
+    position: relative;
+}
+
+.business-text li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #C9A96E;
+    font-weight: bold;
+}
+
+.btn-business {
+    background-color: #f4a0b5;
+    color: white;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 25px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 20px;
+    box-shadow: 0 5px 15px rgba(255, 105, 180, 0.3);
+}
+
+.btn-business:hover {
+    background-color: #FF1493;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 105, 180, 0.4);
+}
+
+.business-image img {
+    width: 100%;
+    height: auto;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+/* Explore Our Salons Section Styles */
+.explore-salons-section {
+    background-color: var(--background-light);
+    padding: 80px 20px;
+}
+
+.salons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.salon-card {
+    background-color: var(--white);
+    border-radius: var(--border-radius-medium);
+    box-shadow: var(--shadow-medium);
+    overflow: hidden;
+    transition: transform 0.3s;
+    border: 2px solid var(--border-color);
+    padding: 30px;
+    text-align: center;
+}
+
+.salon-card:hover {
+    transform: translateY(-5px);
+}
+
+.salon-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.salon-card h3 {
+    font-size: 20px;
+    color: #8B008B;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.salon-location {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.salon-description {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 15px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.salon-rating {
+    font-size: 18px;
+    color: #C9A96E;
+    margin-bottom: 15px;
+}
+
+/* Why Choose Section Styles */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature-item {
+    text-align: center;
+    background-color: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    transition: transform 0.3s;
+    border: 2px solid #FFC0CB;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.feature-item:hover {
+    transform: translateY(-5px);
+}
+
+.feature-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.feature-icon img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 50%;
+}
+
+.feature-item h3 {
+    font-size: 20px;
+    color: #8B008B;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.feature-item p {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.5;
+}
+
+/* Client Says Section Styles */
+.client-says-section {
+    background-color: #FFE4E1 !important;
+    padding: 80px 20px;
+    width: 100%;
+    display: block;
+}
+
+.review-carousel {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+}
+
+.nav-arrow {
+    background-color: #f4a0b5;
+    color: white;
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.nav-arrow:hover {
+    background-color: #FF1493;
+}
+
+.reviews-container {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.review-card {
+    background-color: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    border: 2px solid #FFC0CB;
+    flex: 1;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.stars {
+    margin-bottom: 20px;
+}
+
+.star {
+    font-size: 24px;
+    color: #FFD700;
+    margin: 0 2px;
+}
+
+.review-text {
+    font-size: 18px;
+    color: #666;
+    font-style: italic;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.reviewer-info h4 {
+    font-size: 16px;
+    color: #8B008B;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.review-service {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.review-date {
+    font-size: 14px;
+    color: #999;
+}
+
+/* Popular Services Section Styles */
+.popular-services-section {
+    background-color: white;
+    padding: 80px 20px;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.service-card {
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.3s;
+    border: 2px solid #FFC0CB;
+    text-align: center;
+    flex: 0 0 180px;
+    flex-direction: column;
+    align-items: center;
+}
+
+.service-card:hover {
+    transform: translateY(-5px);
+}
+
+.services-image {
+    width: 80%;
+    height: 80px;
+    object-fit: contain;
+    border-radius: 10px;
+    margin: 0 auto 15px auto;
+    display: block;
+}
+
+.service-card h3 {
+    font-size: 20px;
+    color: #8B008B;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.service-card p {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.services-rating {
+    font-size: 18px;
+    color: #C9A96E;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* FAQ Section Styles */
+.faq-section {
+    background-color: white;
+    padding: 80px 20px;
+}
+
+.faq-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.faq-item {
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.3s;
+    border: 2px solid #FFC0CB;
+    padding: 30px;
+    text-align: left;
+    flex: 1 1 200px;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.faq-item:hover {
+    transform: translateY(-5px);
+}
+
+.faq-item h3 {
+    font-size: 18px;
+    color: #8B008B;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.faq-item p {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+/* Contact Main Section Styles */
+.contact-main-section {
+    background-color: white;
+    padding: 80px 20px;
+}
+
+.contact-main-section .social-media-section {
+    text-align: center;
+    margin-bottom: 40px;
+    background-color: transparent;
+}
+
+.contact-main-section .social-links {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    align-items: center;
+    flex-direction: row-reverse;
+}
+
+.contact-main-section .social-link {
+    display: inline-block;
+    text-decoration: none;
+    transition: transform 0.3s;
+}
+
+.contact-main-section .social-link:hover {
+    transform: scale(1.1);
+}
+
+.social-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.contact-main-section .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+}
+
+.contact-main-section .contact-info {
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    border: 2px solid #FFC0CB;
+    padding: 30px;
+}
+
+.contact-main-section .contact-form-section {
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    border: 2px solid #FFC0CB;
+    padding: 30px;
+}
+
+.contact-main-section .contact-form-section h3 {
+    font-size: 24px;
+    color: #8B008B;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.contact-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.contact-form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.contact-form label {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.contact-form input,
+.contact-form textarea {
+    width: 100%;
+}
+
+.btn-send {
+    background-color: #f4a0b5;
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    font-size: 16px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-weight: 500;
+    display: block;
+    margin: 30px auto 0;
+}
+
+.btn-send:hover {
+    background-color: #FF1493;
+}
+
+.contact-info h3,
+.business-hours h3 {
+    font-size: 24px;
+    color: #8B008B;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: #666;
+}
+
+.contact-item i {
+    font-size: 18px;
+    color: #C9A96E;
+    width: 20px;
+}
+
+.hours-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: #666;
+    padding: 10px 0;
+    border-bottom: 1px solid #FFB6C1;
+}
+
+.hours-item:last-child {
+    border-bottom: none;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .content-container {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+    
+    .cta-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .business-content {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+    
+    .business-text h2 {
+        font-size: 28px;
+    }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+    
+    .review-carousel {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .nav-arrow {
+        position: static;
+        transform: none;
+    }
+    
+    .contact-main-section .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+    
+    .contact-item {
+        justify-content: flex-start;
+    }
+    
+    .hours-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .salons-grid,
+    .services-grid {
+        grid-template-columns: 1fr 1fr;
+        flex-direction: column;
+        gap: 30px;
+        max-width: 1200px;
+        margin: 0 auto;
+        justify-content: center;
+    }
+    
+    .faq-grid {
+        grid-template-columns: 1fr;
+    }
+}

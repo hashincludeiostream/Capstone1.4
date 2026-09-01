@@ -1,0 +1,32 @@
+# Backup folder
+backup/
+
+# Uploads folder
+uploads/
+
+# IDE and system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Database credentials (if they exist in config files)
+config.local.php
+
+# Environment variables
+.env
+
+# Node modules
+node_modules/
+
+# Build output
+dist/
+
+# Package manager files
+package-lock.json
+bun.lock

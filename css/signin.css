@@ -1,0 +1,208 @@
+/* Sign In Page Styles */
+.signin-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 40px;
+    padding: 20px;
+    flex-wrap: wrap;
+}
+
+.signin-form-section {
+    background-color: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    width: 100%;
+}
+
+.brand-section {
+    background-color: #FFE4E1;
+    padding: 60px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin: 20px;
+    aspect-ratio: 1;
+    max-width: 90vh;
+    max-height: 90vh;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(139, 0, 139, 0.2);
+}
+
+.signin-form-container {
+    max-width: 400px;
+    width: 100%;
+}
+
+.signin-title {
+    font-size: 32px;
+    color: #8B008B;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.signin-form {
+    margin-bottom: 30px;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.remember-me input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.remember-me label {
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+}
+
+.forgot-password {
+    color: #C9A96E;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.forgot-password:hover {
+    text-decoration: underline;
+}
+
+.signin-btn {
+    width: 100%;
+    background-color: #C9A96E;
+    color: white;
+    border: none;
+    padding: 15px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-weight: 500;
+}
+
+.signin-btn:hover {
+    background-color: #FF1493;
+}
+
+.create-account-link {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.create-account-link a {
+    color: #C9A96E;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.create-account-link a:hover {
+    text-decoration: underline;
+}
+
+.quick-access {
+    text-align: center;
+}
+
+.quick-access h3 {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.quick-access-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.quick-btn {
+    background-color: white;
+    border: 2px solid #FFC0CB;
+    padding: 15px;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: transform 0.3s;
+    font-size: 14px;
+    color: #666;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    text-align: left;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.quick-btn:hover {
+    border-color: #C9A96E;
+    color: #C9A96E;
+}
+
+.customer-btn {
+    background: linear-gradient(135deg, #FFE4E1, #FFC0CB);
+    border-color: #FFB6C1;
+    color: #8B008B;
+}
+
+.customer-btn:hover {
+    background: linear-gradient(135deg, #FFC0CB, #FFB6C1);
+    border-color: #C9A96E;
+    color: #8B008B;
+}
+
+.salon-btn {
+    background: linear-gradient(135deg, #E6E6FA, #DDA0DD);
+    border-color: #DDA0DD;
+    color: #4B0082;
+}
+
+.salon-btn:hover {
+    background: linear-gradient(135deg, #DDA0DD, #DA70D6);
+    border-color: #BA55D3;
+    color: #4B0082;
+}
+
+.admin-btn {
+    background: linear-gradient(135deg, #C9A96E, #FFD700);
+    border-color: #FFD700;
+    color: #B8860B;
+}
+
+.admin-btn:hover {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    border-color: #FF8C00;
+    color: #B8860B;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .signin-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .brand-section {
+        display: none;
+    }
+    
+    .signin-form-section {
+        padding: 40px 20px;
+        max-width: 100%;
+    }
+}

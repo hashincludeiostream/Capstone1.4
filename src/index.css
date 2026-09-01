@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-heading: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-script: 'Dancing Script', cursive;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #2D1A28;
+    background-color: #FDF7FA;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .font-serif-display {
+    font-family: var(--font-serif);
+  }
+
+  .font-garamond {
+    font-family: var(--font-heading);
+  }
+
+  .font-script {
+    font-family: var(--font-script);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #fdf5fa;
+}
+::-webkit-scrollbar-thumb {
+  background: #f0bcd8;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d81b60;
+}
+
+/* Masonry grid multi-column helpers */
+.masonry-columns-1 {
+  column-count: 1;
+}
+.masonry-columns-2 {
+  column-count: 2;
+}
+.masonry-columns-3 {
+  column-count: 3;
+}
+.masonry-columns-4 {
+  column-count: 4;
+}
+
+.break-inside-avoid {
+  break-inside: avoid;
+}
