@@ -19,7 +19,7 @@ interface CustomerDashboardProps {
   currentUser: User;
   salons: Salon[];
   onOpenBooking: () => void;
-  onOpenLeaveReview: (salon: Salon) => void;
+  onOpenLeaveReview: (salon: Salon, technicianId?: number | null, technicianName?: string) => void;
   onSelectSalon: (salon: Salon) => void;
 }
 
@@ -249,7 +249,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       )}
                       {appt.status === 'completed' && salon && (
                         <button
-                          onClick={() => onOpenLeaveReview(salon)}
+                          onClick={() => onOpenLeaveReview(salon, appt.technician_id, appt.technician_name)}
                           className="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer"
                         >
                           Leave Review

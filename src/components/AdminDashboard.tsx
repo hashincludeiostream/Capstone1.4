@@ -34,9 +34,6 @@ import {
 } from 'lucide-react';
 import { Salon, User, Reel, Review, Announcement, BusinessCategory } from '../types';
 import {
-  initialCategories,
-} from '../data/mockDb';
-import {
   AdminReportData,
   generateAdminVisualHtmlReport,
   downloadFile,
@@ -47,10 +44,14 @@ import {
   fetchSalons,
   fetchReels,
   fetchReviews,
+  fetchServices,
+  fetchTechnicians,
   fetchAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  fetchRegistrationRateLimitStatus,
+  updateRegistrationRateLimit,
   updateSalonVerification,
   toggleSalonActive,
   toggleSalonFeatured,
@@ -97,10 +98,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [salons, setSalons] = useState<Salon[]>([]);
   const [reels, setReels] = useState<Reel[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [categories, setCategories] = useState<BusinessCategory[]>(initialCategories);
+  const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [registrationRateLimitEnabled, setRegistrationRateLimitEnabled] = useState(true);
+  const [updatingRegistrationRateLimit, setUpdatingRegistrationRateLimit] = useState(false);
 
   // Filters & Search
   const [userSearch, setUserSearch] = useState('');
@@ -148,13 +153,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [sData, allSalons, allReels, allReviews, allAnnounce, allCats] = await Promise.all([
+      const [sData, allSalons, allReels, allReviews, allAnnounce, allCats, allServices, allTechnicians] = await Promise.all([
         fetchStats(),
-        fetchSalons(),
+        fetchSalons({ includeUnpublished: true }),
         fetchReels(),
         fetchReviews(),
         fetchAnnouncements(),
         fetchCategories(),
+        fetchServices(),
+        fetchTechnicians(),
       ]);
 
       setStats(sData);
@@ -163,6 +170,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setReviews(allReviews);
       setAnnouncements(allAnnounce);
       setCategories(allCats);
+      setServices(allServices);
+      setTechnicians(allTechnicians);
+
+      try {
+        setRegistrationRateLimitEnabled(await fetchRegistrationRateLimitStatus());
+      } catch (error) {
+        console.warn('Failed to load registration rate-limit status:', error);
+      }
 
       const uRes = await fetch(`${API_BASE}/users`);
       if (uRes.ok) {
@@ -184,6 +199,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleRefresh = () => {
     setRefreshing(true);
     loadAllData();
+  };
+
+  const handleToggleRegistrationRateLimit = async () => {
+    setUpdatingRegistrationRateLimit(true);
+    try {
+      const enabled = await updateRegistrationRateLimit(!registrationRateLimitEnabled);
+      setRegistrationRateLimitEnabled(enabled);
+      showToast(enabled ? 'Registration protection enabled' : 'Registration protection disabled');
+    } catch (error) {
+      console.error('Failed to update registration rate-limit:', error);
+      showToast('Unable to update registration protection');
+    } finally {
+      setUpdatingRegistrationRateLimit(false);
+    }
   };
 
   // ----------------------------------------------------
@@ -385,23 +414,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Admin Data Visualization Report Generator
   const adminReportData: AdminReportData = {
-    platformName: 'Nail Glam Hub',
     generatedDate: new Date().toLocaleDateString('en-US', { dateStyle: 'long' }),
     totalSalons: salons.length,
     verifiedSalons: salons.filter((s) => s.verification_status === 'verified').length,
     pendingSalons: pendingSalons.length,
     totalUsers: users.length,
-    totalAppointments: stats?.total_appointments || 48,
-    fulfillmentRate: 96.4,
+    totalAppointments: stats?.total_appointments || 0,
+    fulfillmentRate: stats?.total_appointments
+      ? Math.round(((stats.completed_appointments || 0) / stats.total_appointments) * 1000) / 10
+      : 0,
     totalReviews: reviews.length,
-    averageRating: 4.9,
-    activeAnnouncements: announcements.filter((a) => a.is_active).length,
-    salonsBreakdown: salons.map((s) => ({
+    avgRating: reviews.length > 0
+      ? Number((reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1))
+      : 0,
+    salonsList: salons.map((s) => ({
       name: s.salon_name,
-      city: s.city || 'Metro Manila',
-      status: s.verification_status,
-      rating: s.rating || 4.9,
-      reviewCount: s.review_count || 12,
+      city: s.city || 'Not provided',
+      status: s.verification_status || 'pending',
+      servicesCount: services.filter((service) => service.salon_id === s.id).length,
+      staffCount: technicians.filter((technician) => technician.salon_id === s.id).length,
     })),
   };
 
@@ -428,12 +459,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     csv += `Pending Approvals,${pendingSalons.length}\n`;
     csv += `Registered Users,${users.length}\n`;
     csv += `Total Appointments,${adminReportData.totalAppointments}\n`;
-    csv += `Average Rating,${adminReportData.averageRating}\n\n`;
+    csv += `Average Rating,${adminReportData.avgRating || 'Not rated'}\n\n`;
 
     csv += `--- REGISTERED SALON PARTNERS ---\n`;
     csv += `ID,Salon Name,City,Status,Rating,Reviews,Address\n`;
     salons.forEach((s) => {
-      csv += `${s.id},"${s.salon_name}","${s.city || ''}","${s.verification_status}",${s.rating || 4.9},${s.review_count || 0},"${(s.address || '').replace(/"/g, '""')}"\n`;
+      csv += `${s.id},"${s.salon_name}","${s.city || ''}","${s.verification_status}",${s.avg_rating || 'Not rated'},${s.review_count || 0},"${(s.address || '').replace(/"/g, '""')}"\n`;
     });
 
     const encoded = encodeURI(csv);
@@ -445,6 +476,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     document.body.removeChild(link);
     showToast('Platform CSV Audit exported');
   };
+
+  const activityItems = [
+    {
+      title: 'Database data synchronized',
+      detail: `${salons.length} salons, ${users.length} user accounts, and ${reviews.length} reviews loaded.`,
+      color: 'bg-emerald-500',
+    },
+    {
+      title: 'Salon approval queue updated',
+      detail: `${pendingSalons.length} salon applications currently require review.`,
+      color: 'bg-amber-500',
+    },
+    {
+      title: 'Appointment metrics updated',
+      detail: `${stats?.total_appointments || 0} appointments recorded across all branches.`,
+      color: 'bg-pink-500',
+    },
+    {
+      title: 'Broadcast status synchronized',
+      detail: `${announcements.filter((announcement) => announcement.is_active).length} announcements are currently live.`,
+      color: 'bg-purple-500',
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -522,6 +576,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
+      <div className="bg-white rounded-2xl border border-rose-100 shadow-xs p-4 flex items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900">Registration Rate Protection</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Limit repeated account registrations from the same IP address.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={registrationRateLimitEnabled}
+          aria-label="Toggle registration rate protection"
+          onClick={handleToggleRegistrationRateLimit}
+          disabled={updatingRegistrationRateLimit}
+          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60 ${
+            registrationRateLimitEnabled ? 'bg-emerald-600' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+              registrationRateLimitEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+
       {/* Admin Tab Navigation Bar */}
       <div className="bg-white rounded-2xl p-1.5 border border-pink-100 shadow-xs flex items-center gap-1 overflow-x-auto">
         <button
@@ -586,7 +666,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Radio className="w-4 h-4" />
-          <span>Site Broadcasts ({announcements.length})</span>
+          <span>Promotions & Broadcasts ({announcements.length})</span>
         </button>
       </div>
 
@@ -600,7 +680,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Bookings</p>
               <p className="text-xl sm:text-2xl font-serif font-bold text-gray-900 mt-1">
-                {stats?.total_appointments || 48}
+                {stats?.total_appointments || 0}
               </p>
               <p className="text-[10px] text-emerald-600 font-semibold mt-1">Directory Appointments</p>
             </div>
@@ -608,7 +688,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Fulfillment Rate</p>
               <p className="text-xl sm:text-2xl font-serif font-bold text-rose-700 mt-1">
-                96.4%
+                {adminReportData.fulfillmentRate}%
               </p>
               <p className="text-[10px] text-rose-600 font-semibold mt-1">In-Salon Completion</p>
             </div>
@@ -644,7 +724,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <p className="text-xl sm:text-2xl font-serif font-bold text-pink-700 mt-1">
                 {reviews.length}
               </p>
-              <p className="text-[10px] text-pink-600 font-semibold mt-1">4.9/5.0 ★ Avg Rating</p>
+              <p className="text-[10px] text-pink-600 font-semibold mt-1">
+                {reviews.length > 0
+                  ? `${(reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)}/5.0 Avg Rating`
+                  : 'Not rated yet'}
+              </p>
             </div>
           </div>
 
@@ -757,49 +841,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="space-y-2 text-xs divide-y divide-gray-50">
-                <div className="pt-2 flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                {activityItems.map((item) => (
+                  <div key={item.title} className="pt-2 flex items-start gap-2.5">
+                    <span className={`w-2 h-2 rounded-full ${item.color} mt-1.5 shrink-0`} />
                     <div>
-                      <p className="font-semibold text-gray-900">Database Synchronization & Integrity Verified</p>
-                      <p className="text-gray-500 text-[11px]">All 5 salon schemas, auth tokens, and appointment states verified consistent.</p>
+                      <p className="font-semibold text-gray-900">{item.title}</p>
+                      <p className="text-gray-500 text-[11px]">{item.detail}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-gray-400 shrink-0">Just now</span>
-                </div>
-
-                <div className="pt-2 flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-purple-500 mt-1.5 shrink-0"></span>
-                    <div>
-                      <p className="font-semibold text-gray-900">New Salon Partner Application Received</p>
-                      <p className="text-gray-500 text-[11px]">Opulence Nail & Lash Atelier submitted branch details for Mandaluyong location.</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-gray-400 shrink-0">10m ago</span>
-                </div>
-
-                <div className="pt-2 flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0"></span>
-                    <div>
-                      <p className="font-semibold text-gray-900">Super Admin Authentication Protocol Enforced</p>
-                      <p className="text-gray-500 text-[11px]">Demo role instant switching decommissioned in favor of strict session auth.</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-gray-400 shrink-0">25m ago</span>
-                </div>
-
-                <div className="pt-2 flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-pink-500 mt-1.5 shrink-0"></span>
-                    <div>
-                      <p className="font-semibold text-gray-900">Customer Appointment Booked</p>
-                      <p className="text-gray-500 text-[11px]">Signature Russian E-File Manicure booked at Luxe Glow Nail & Spa Lounge.</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-gray-400 shrink-0">1h ago</span>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1304,10 +1354,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div>
               <h3 className="text-lg font-serif font-bold text-gray-900 flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-rose-700" />
-                <span>Site Announcements & Global Broadcasts</span>
+                <span>Promotions & Global Broadcasts</span>
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Broadcast announcements, promotions, or maintenance alerts shown live across customer and owner portals.
+                Approve, pause, and remove every promotion or announcement shown across customer and owner portals.
               </p>
             </div>
 

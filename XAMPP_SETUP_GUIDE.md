@@ -102,8 +102,10 @@ http://localhost/nailglamhub/
 
 ## 🔑 Default Login Accounts in `database.sql`
 
+The imported local seed accounts use `Demo123!` as the initial password. Change these credentials after local verification.
+
 | Role | Email | Password / Access |
 | :--- | :--- | :--- |
-| **System Administrator** | `admin@nailglamhub.com` | Passcode: `ADMIN2025` |
-| **Salon Owner** | `salon@nailglamhub.com` | Direct access to Luxe Glow Lounge |
-| **Verified Customer** | `customer@nailglamhub.com` | Sophia Rodriguez profile |
+| **System Administrator** | `admin@nailglamhub.com` | Password: `Demo123!`; registration code: `ADMIN2025` |
+| **Salon Owner** | `salon@nailglamhub.com` | Password: `Demo123!`; Luxe Glow Lounge owner |
+| **Verified Customer** | `customer@nailglamhub.com` | Password: `Demo123!`; Sophia Rodriguez profile |

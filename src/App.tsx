@@ -20,9 +20,11 @@ import {
   LayoutGrid,
   User as UserIcon,
 } from 'lucide-react';
-import { User, Salon, Service, BusinessCategory, Promotion, Appointment, Announcement } from './types';
-import { fetchCategories, fetchSalons, fetchPromotions, fetchAnnouncements, updateUser } from './lib/api';
+import { User, Salon, Service, BusinessCategory, Appointment, Announcement } from './types';
+import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser } from './lib/api';
+import { localStorage as safeLocalStorage } from './lib/localStorage';
 
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { HeroSection } from './components/HeroSection';
@@ -38,6 +40,7 @@ import { ReviewsView } from './components/ReviewsView';
 import { LeaveReviewModal } from './components/LeaveReviewModal';
 import { AuthModal } from './components/AuthModal';
 import { RegisterSalonModal } from './components/RegisterSalonModal';
+import { BranchRegistrationModal } from './components/BranchRegistrationModal';
 import { AboutContactModal } from './components/AboutContactModal';
 import { CustomerAuthPage } from './components/auth/CustomerAuthPage';
 import { OwnerAuthPage } from './components/auth/OwnerAuthPage';
@@ -48,34 +51,30 @@ import { LandingPage } from './components/LandingPage';
 import ProfileCustomizationModal from './components/ProfileCustomizationModal';
 import { UserProfile } from './components/UserProfile';
 import { OwnerProfile } from './components/owner/OwnerProfile';
+import { FavoritesView } from './components/FavoritesView';
 
 export const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+};
+
+const AppContent: React.FC = () => {
   // Load persisted state from localStorage
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const savedUser = localStorage.getItem('nailglamhub_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch (err) {
-      console.error('Error loading user from localStorage:', err);
-      localStorage.removeItem('nailglamhub_user');
-      return null;
-    }
+    return safeLocalStorage.getJSON<User>('nailglamhub_user');
   });
   const [activeTab, setActiveTab] = useState<string>(() => {
-    try {
-      const savedTab = localStorage.getItem('nailglamhub_activeTab');
-      return savedTab || 'landing';
-    } catch (err) {
-      console.error('Error loading activeTab from localStorage:', err);
-      return 'landing';
-    }
+    const savedTab = safeLocalStorage.getItem('nailglamhub_activeTab');
+    return savedTab || 'landing';
   });
   const [exploreViewMode, setExploreViewMode] = useState<'grid' | 'map'>('grid');
 
   // Core Data
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +82,30 @@ export const App: React.FC = () => {
   // Search & Filtering
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [favorites, setFavorites] = useState<number[]>([1, 2]);
+  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favoritesOwnerKey, setFavoritesOwnerKey] = useState<string | null>(null);
+
+  const favoritesStorageKey = currentUser?.user_type === 'customer'
+    ? `nailglamhub_favorites_${currentUser.id}`
+    : null;
+
+  useEffect(() => {
+    if (!favoritesStorageKey) {
+      setFavorites([]);
+      setFavoritesOwnerKey(null);
+      return;
+    }
+
+    const savedFavorites = safeLocalStorage.getJSON<number[]>(favoritesStorageKey);
+    setFavorites(Array.isArray(savedFavorites) ? savedFavorites : []);
+    setFavoritesOwnerKey(favoritesStorageKey);
+  }, [favoritesStorageKey]);
+
+  useEffect(() => {
+    if (favoritesStorageKey && favoritesOwnerKey === favoritesStorageKey) {
+      safeLocalStorage.setJSON(favoritesStorageKey, favorites);
+    }
+  }, [favorites, favoritesOwnerKey, favoritesStorageKey]);
 
   // Modals
   const [selectedSalonForDetails, setSelectedSalonForDetails] = useState<Salon | null>(null);
@@ -92,8 +114,12 @@ export const App: React.FC = () => {
   const [bookingService, setBookingService] = useState<Service | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewSalon, setReviewSalon] = useState<Salon | null>(null);
+  const [reviewTechnicianId, setReviewTechnicianId] = useState<number | null>(null);
+  const [reviewTechnicianName, setReviewTechnicianName] = useState<string | undefined>();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [registerSalonModalOpen, setRegisterSalonModalOpen] = useState(false);
+  const [branchRegistrationOpen, setBranchRegistrationOpen] = useState(false);
+  const [ownerBranchRefreshKey, setOwnerBranchRefreshKey] = useState(0);
   const [aboutContactModal, setAboutContactModal] = useState<{ open: boolean; tab: 'about' | 'contact' }>({
     open: false,
     tab: 'about',
@@ -113,22 +139,19 @@ export const App: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cats, slns, promos, anncs] = await Promise.all([
+      const [cats, slns, anncs] = await Promise.all([
         fetchCategories().catch(err => { console.error('Categories fetch error:', err); return []; }),
         fetchSalons().catch(err => { console.error('Salons fetch error:', err); return []; }),
-        fetchPromotions().catch(err => { console.error('Promotions fetch error:', err); return []; }),
         fetchAnnouncements().catch(err => { console.error('Announcements fetch error:', err); return []; }),
       ]);
       setCategories(cats);
       setSalons(slns);
-      setPromotions(promos);
       setAnnouncements(anncs);
     } catch (err) {
       console.error('Error loading data:', err);
       // Set empty arrays as fallback to prevent crashes
       setCategories([]);
       setSalons([]);
-      setPromotions([]);
       setAnnouncements([]);
     } finally {
       setLoading(false);
@@ -152,22 +175,22 @@ export const App: React.FC = () => {
 
   // Persist activeTab to localStorage
   useEffect(() => {
-    localStorage.setItem('nailglamhub_activeTab', activeTab);
+    safeLocalStorage.setItem('nailglamhub_activeTab', activeTab);
   }, [activeTab]);
 
   // Persist currentUser to localStorage
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('nailglamhub_user', JSON.stringify(currentUser));
+      safeLocalStorage.setJSON('nailglamhub_user', currentUser);
       
       // Check if user has seen profile customization popup
-      const hasSeenProfilePopup = localStorage.getItem(`nailglamhub_profile_popup_${currentUser.id}`);
+      const hasSeenProfilePopup = safeLocalStorage.getItem(`nailglamhub_profile_popup_${currentUser.id}`);
       if (!hasSeenProfilePopup && !currentUser.avatar) {
         // Show popup if user hasn't seen it and has no avatar
         setTimeout(() => setProfileCustomizationOpen(true), 1000);
       }
     } else {
-      localStorage.removeItem('nailglamhub_user');
+      safeLocalStorage.removeItem('nailglamhub_user');
     }
   }, [currentUser]);
 
@@ -196,6 +219,12 @@ export const App: React.FC = () => {
   }, [currentUser?.user_type, activeTab]);
 
   const handleToggleFavorite = (salonId: number) => {
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      setActiveTab('login-customer');
+      showToast('Please login as a customer to save favorites.');
+      return;
+    }
+
     setFavorites((prev) =>
       prev.includes(salonId) ? prev.filter((id) => id !== salonId) : [...prev, salonId]
     );
@@ -233,8 +262,10 @@ export const App: React.FC = () => {
     setBookingModalOpen(true);
   };
 
-  const handleOpenLeaveReviewForSalon = (salon: Salon) => {
+  const handleOpenLeaveReviewForSalon = (salon: Salon, technicianId?: number | null, technicianName?: string) => {
     setReviewSalon(salon);
+    setReviewTechnicianId(technicianId || null);
+    setReviewTechnicianName(technicianName);
     setReviewModalOpen(true);
   };
 
@@ -247,7 +278,7 @@ export const App: React.FC = () => {
       showToast('Profile updated successfully!');
       
       // Mark that user has seen the popup
-      localStorage.setItem(`nailglamhub_profile_popup_${currentUser.id}`, 'true');
+      safeLocalStorage.setItem(`nailglamhub_profile_popup_${currentUser.id}`, 'true');
     } catch (error) {
       console.error('Error updating profile:', error);
       showToast('Failed to update profile');
@@ -258,8 +289,37 @@ export const App: React.FC = () => {
     if (!currentUser) return;
     
     // Mark that user has seen the popup
-    localStorage.setItem(`nailglamhub_profile_popup_${currentUser.id}`, 'true');
+    safeLocalStorage.setItem(`nailglamhub_profile_popup_${currentUser.id}`, 'true');
     showToast('You can customize your profile later in settings');
+  };
+
+  // Centralized logout handler
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveTab('landing');
+    safeLocalStorage.removeItem('nailglamhub_user');
+    safeLocalStorage.removeItem('nailglamhub_activeTab');
+    showToast('Signed out successfully');
+  };
+
+  // Centralized navigation handler with validation
+  const handleNavigate = (tab: string) => {
+    // Validate navigation based on user role
+    if (currentUser?.user_type === 'salon_owner') {
+      const allowedTabs = ['owner-dashboard', 'owner-profile', 'explore', 'profile'];
+      if (!allowedTabs.includes(tab) && !tab.startsWith('owner-')) {
+        console.warn(`Navigation to ${tab} not allowed for salon owner`);
+        return;
+      }
+    } else if (currentUser?.user_type === 'admin') {
+      const allowedTabs = ['admin-dashboard', 'admin-salons', 'admin-users', 'profile'];
+      if (!allowedTabs.includes(tab) && !tab.startsWith('admin-')) {
+        console.warn(`Navigation to ${tab} not allowed for admin`);
+        return;
+      }
+    }
+
+    setActiveTab(tab);
   };
 
   // Filter salons for Explore tab
@@ -295,14 +355,9 @@ export const App: React.FC = () => {
           setBookingService(null);
           setBookingModalOpen(true);
         }}
-        onLogout={() => {
-          setCurrentUser(null);
-          setActiveTab('landing');
-          localStorage.removeItem('nailglamhub_user');
-          localStorage.removeItem('nailglamhub_activeTab');
-          showToast('Signed out successfully');
-        }}
-        onOpenRegisterSalon={() => setRegisterSalonModalOpen(true)}
+        onLogout={handleLogout}
+        onOpenRegisterSalon={() => setBranchRegistrationOpen(true)}
+        onNavigate={handleNavigate}
       />
 
       {/* Live Site-Wide Announcements Broadcasted by Super Admin */}
@@ -376,6 +431,8 @@ export const App: React.FC = () => {
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}
+          technicianId={reviewTechnicianId}
+          technicianName={reviewTechnicianName}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           isAdminMode={isAdminMode}
@@ -386,6 +443,7 @@ export const App: React.FC = () => {
           }}
           onOpenAbout={() => setAboutContactModal({ open: true, tab: 'about' })}
           onOpenContact={() => setAboutContactModal({ open: true, tab: 'contact' })}
+          onNavigate={handleNavigate}
         />
 
         {/* Dynamic Center Stage Views */}
@@ -421,32 +479,34 @@ export const App: React.FC = () => {
                 }}
               />
 
-              {/* Active Promotions Strip */}
-              {promotions.length > 0 && !searchQuery && (
+              {/* Admin-approved promotional announcement */}
+              {announcements.filter((announcement) => announcement.type === 'promo' && announcement.is_active)[0] && !searchQuery && (
                 <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 rounded-2xl p-4 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-white shrink-0">
                       <Tag className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-xs uppercase font-bold tracking-wider text-pink-100">
-                        Seasonal Exclusive Promo
-                      </p>
-                      <h4 className="text-sm font-bold">{promotions[0].title}</h4>
+                      <p className="text-xs uppercase font-bold tracking-wider text-pink-100">Admin Promotion</p>
+                      <h4 className="text-sm font-bold">{announcements.find((announcement) => announcement.type === 'promo' && announcement.is_active)?.title}</h4>
+                      <p className="text-xs text-pink-50 mt-0.5">{announcements.find((announcement) => announcement.type === 'promo' && announcement.is_active)?.message}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-mono font-bold bg-white/20 px-2.5 py-1 rounded-lg border border-white/30">
-                      Code: {promotions[0].promo_code || 'SUMMERGLOW20'}
-                    </span>
                     <button
                       onClick={() => {
-                        const promoSalon = salons.find((s) => s.id === promotions[0].salon_id);
-                        if (promoSalon) handleOpenBookingWithSalon(promoSalon);
+                        const promoAnnouncement = announcements.find((announcement) => announcement.type === 'promo' && announcement.is_active);
+                        if (promoAnnouncement?.link_url?.startsWith('tab:')) {
+                          setActiveTab(promoAnnouncement.link_url.replace('tab:', ''));
+                        } else {
+                          setBookingSalon(salons[0] || null);
+                          setBookingService(null);
+                          setBookingModalOpen(true);
+                        }
                       }}
                       className="px-3.5 py-1.5 rounded-lg bg-white text-pink-700 hover:bg-pink-50 text-xs font-bold transition-colors cursor-pointer"
                     >
-                      Redeem Now
+                      {announcements.find((announcement) => announcement.type === 'promo' && announcement.is_active)?.link_text || 'View Promotion'}
                     </button>
                   </div>
                 </div>
@@ -523,6 +583,31 @@ export const App: React.FC = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {/* CUSTOMER FAVORITES */}
+          {activeTab === 'favorites' && (
+            currentUser?.user_type === 'customer' ? (
+              <FavoritesView
+                salons={salons}
+                favoriteSalonIds={favorites}
+                onSelectSalon={(salon) => setSelectedSalonForDetails(salon)}
+                onBookSalon={(salon) => handleOpenBookingWithSalon(salon)}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            ) : (
+              <div className="py-16 text-center bg-white rounded-3xl p-8 border border-pink-100 max-w-lg mx-auto shadow-sm">
+                <Heart className="w-10 h-10 text-pink-400 mx-auto mb-3" />
+                <h2 className="text-xl font-serif font-bold text-gray-900">Customer login required</h2>
+                <p className="text-sm text-gray-500 mt-2">Sign in to save and view your favorite salons.</p>
+                <button
+                  onClick={() => setActiveTab('login-customer')}
+                  className="mt-5 px-4 py-2 rounded-xl bg-pink-600 text-white text-sm font-semibold cursor-pointer"
+                >
+                  Customer Login
+                </button>
+              </div>
+            )
           )}
 
           {/* DEDICATED STORE LOCATIONS MAP TAB */}
@@ -645,6 +730,8 @@ export const App: React.FC = () => {
               <SalonOwnerDashboard
                 currentUser={currentUser}
                 onOpenRegisterSalon={() => setRegisterSalonModalOpen(true)}
+                onOpenRegisterBranch={() => setBranchRegistrationOpen(true)}
+                refreshKey={ownerBranchRefreshKey}
                 initialTab={
                   activeTab === 'owner-services'
                     ? 'services'
@@ -796,8 +883,8 @@ export const App: React.FC = () => {
                   onLogout={() => {
                     setCurrentUser(null);
                     setActiveTab('landing');
-                    localStorage.removeItem('nailglamhub_user');
-                    localStorage.removeItem('nailglamhub_activeTab');
+                    safeLocalStorage.removeItem('nailglamhub_user');
+                    safeLocalStorage.removeItem('nailglamhub_activeTab');
                     showToast('Signed out successfully');
                   }}
                   onNavigateToDashboard={() => setActiveTab('owner-dashboard')}
@@ -810,8 +897,8 @@ export const App: React.FC = () => {
                   onLogout={() => {
                     setCurrentUser(null);
                     setActiveTab('landing');
-                    localStorage.removeItem('nailglamhub_user');
-                    localStorage.removeItem('nailglamhub_activeTab');
+                    safeLocalStorage.removeItem('nailglamhub_user');
+                    safeLocalStorage.removeItem('nailglamhub_activeTab');
                     showToast('Signed out successfully');
                   }}
                   onNavigateToDashboard={() => setActiveTab('admin-dashboard')}
@@ -824,8 +911,8 @@ export const App: React.FC = () => {
                   onLogout={() => {
                     setCurrentUser(null);
                     setActiveTab('landing');
-                    localStorage.removeItem('nailglamhub_user');
-                    localStorage.removeItem('nailglamhub_activeTab');
+                    safeLocalStorage.removeItem('nailglamhub_user');
+                    safeLocalStorage.removeItem('nailglamhub_activeTab');
                     showToast('Signed out successfully');
                   }}
                   onNavigateToDashboard={() => setActiveTab('customer-dashboard')}
@@ -877,7 +964,6 @@ export const App: React.FC = () => {
           {activeTab === 'login-owner' && (
             <OwnerAuthPage
               initialMode="signin"
-              categories={categories}
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Welcome back, Partner ${user.fullname}!`);
@@ -889,7 +975,6 @@ export const App: React.FC = () => {
           {activeTab === 'register-owner' && (
             <OwnerAuthPage
               initialMode="register"
-              categories={categories}
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 loadData();
@@ -989,7 +1074,22 @@ export const App: React.FC = () => {
           onClose={() => setRegisterSalonModalOpen(false)}
           onSuccess={(newSalon) => {
             setSalons((prev) => [newSalon, ...prev]);
+            setOwnerBranchRefreshKey((value) => value + 1);
             showToast(`Registered ${newSalon.salon_name}!`);
+          }}
+        />
+      )}
+
+      {branchRegistrationOpen && currentUser?.user_type === 'salon_owner' && (
+        <BranchRegistrationModal
+          currentUser={currentUser}
+          categories={categories}
+          onClose={() => setBranchRegistrationOpen(false)}
+          onSuccess={(newBranch) => {
+            setSalons((prev) => [newBranch, ...prev]);
+            setOwnerBranchRefreshKey((value) => value + 1);
+            setBranchRegistrationOpen(false);
+            showToast(`Registered ${newBranch.salon_name} under your account`);
           }}
         />
       )}

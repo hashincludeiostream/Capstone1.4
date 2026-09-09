@@ -24,10 +24,10 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
     load();
   }, []);
 
-  const categories = ['All', 'Manicure', 'Pedicure', 'Extensions', 'Nail Art', 'Nail Care'];
+  const categories = ['All', ...Array.from(new Set(services.map((service) => service.category).filter(Boolean))).sort()];
 
   const filtered = services.filter((s) => {
-    const matchCat = categoryFilter === 'All' || s.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    const matchCat = categoryFilter === 'All' || (s.category || '').toLowerCase().includes(categoryFilter.toLowerCase());
     const matchSearch =
       !searchQuery ||
       s.service_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -108,11 +108,13 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
               className="bg-white rounded-3xl border border-pink-100 shadow-xs hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group"
             >
               <div className="relative h-44 bg-pink-50 overflow-hidden">
-                <img
-                  src={service.image_url || 'https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=500&auto=format&fit=crop&q=80'}
-                  alt={service.service_name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {service.image_url ? (
+                  <img
+                    src={service.image_url}
+                    alt={service.service_name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : null}
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/90 backdrop-blur-md text-pink-800 shadow-xs">
                     {service.category}

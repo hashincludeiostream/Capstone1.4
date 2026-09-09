@@ -9,23 +9,51 @@ const dbConfig = {
   charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 };
 
-// Create connection pool
+// Create connection pool with better error handling
 const pool = mysql.createPool(dbConfig);
 
-// Test database connection
-export async function testConnection() {
+// Handle pool errors
+pool.on('connection', (error: any) => {
+  if (error && error.code === 'PROTOCOL_CONNECTION_LOST') {
+    // Connection was closed, will attempt to reconnect automatically
+  }
+});
+
+// Test database connection with retry logic
+export async function testConnection(maxRetries = 3, retryDelay = 2000): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const connection = await pool.getConnection();
+      connection.release();
+      return true;
+    } catch (error) {
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+// Health check function
+export async function healthCheck(): Promise<{ connected: boolean; message: string }> {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully to nailglamhub_db');
+    await connection.ping();
     connection.release();
-    return true;
+    return { connected: true, message: 'Database connection healthy' };
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    console.error('Please ensure MySQL is started in your XAMPP Control Panel and database.sql is imported into phpMyAdmin.');
-    return false;
+    return { 
+      connected: false, 
+      message: `Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    };
   }
 }
 

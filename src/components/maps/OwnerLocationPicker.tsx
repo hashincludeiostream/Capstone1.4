@@ -8,8 +8,6 @@ import {
   Building,
   Car,
   Compass,
-  AlertCircle,
-  HelpCircle,
   Eye,
   Sliders,
   ExternalLink,
@@ -20,12 +18,12 @@ import { updateSalon } from '../../lib/api';
 import {
   DAVAO_LOCATION_PRESETS,
   DavaoLocationPreset,
+  calculateDistanceKm,
   getOpenStreetMapDirectionsUrl,
   getOpenStreetMapViewUrl,
 } from '../../utils/geoUtils';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-// @ts-ignore - CSS import for Leaflet
 import 'leaflet/dist/leaflet.css';
 
 // Extend react-leaflet types to include missing properties
@@ -83,7 +81,7 @@ const createSalonIcon = () => {
 // Component to handle map clicks
 function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({
-    click: (e) => {
+    click: (e: any) => {
       onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });
@@ -137,14 +135,25 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
   const [postalCode, setPostalCode] = useState(salon.postal_code || '');
   const [landmark, setLandmark] = useState(salon.landmark || '');
   const [parkingInfo, setParkingInfo] = useState(salon.parking_info || '');
-  const [latitude, setLatitude] = useState<number>(salon.latitude || 7.0731);
-  const [longitude, setLongitude] = useState<number>(salon.longitude || 125.6128);
+  const [latitude, setLatitude] = useState<number>(salon.latitude || 14.5995);
+  const [longitude, setLongitude] = useState<number>(salon.longitude || 120.9842);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [previewMode, setPreviewMode] = useState<'editor' | 'preview'>('editor');
   const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
+
+  const updateGuidesForPosition = (lat: number, lng: number) => {
+    const nearestPreset = DAVAO_LOCATION_PRESETS.reduce((nearest, preset) => {
+      const nearestDistance = calculateDistanceKm(lat, lng, nearest.lat, nearest.lng);
+      const presetDistance = calculateDistanceKm(lat, lng, preset.lat, preset.lng);
+      return presetDistance < nearestDistance ? preset : nearest;
+    });
+
+    setLandmark(`Near ${nearestPreset.name}: ${nearestPreset.landmark}`);
+    setParkingInfo(nearestPreset.parking);
+  };
 
   // Sync marker position when coordinates change
   useEffect(() => {
@@ -154,13 +163,13 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
   // Sync state when salon prop changes
   useEffect(() => {
     setAddress(salon.address || '');
-    setCity(salon.city || 'Davao City');
-    setProvince(salon.province || 'Davao del Sur');
+    setCity(salon.city || 'Metro Manila');
+    setProvince(salon.province || 'Metro Manila');
     setPostalCode(salon.postal_code || '');
     setLandmark(salon.landmark || '');
     setParkingInfo(salon.parking_info || '');
-    setLatitude(salon.latitude || 7.0731);
-    setLongitude(salon.longitude || 125.6128);
+    setLatitude(salon.latitude || 14.5995);
+    setLongitude(salon.longitude || 120.9842);
   }, [salon]);
 
   // Handle Preset Mall/Hub Selection
@@ -190,12 +199,13 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
         const lng = Math.round(pos.coords.longitude * 10000) / 10000;
         setLatitude(lat);
         setLongitude(lng);
+        updateGuidesForPosition(lat, lng);
         setIsLocating(false);
         if (onShowToast) {
           onShowToast(`Updated coordinates to GPS position (${lat}, ${lng})`);
         }
       },
-      (err) => {
+      () => {
         setIsLocating(false);
         alert('Could not acquire your device GPS position. Please check permissions.');
       },
@@ -205,14 +215,20 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
 
   // Handle map click to set marker position
   const handleMapClick = (lat: number, lng: number) => {
-    setLatitude(Math.round(lat * 10000) / 10000);
-    setLongitude(Math.round(lng * 10000) / 10000);
+    const roundedLat = Math.round(lat * 10000) / 10000;
+    const roundedLng = Math.round(lng * 10000) / 10000;
+    setLatitude(roundedLat);
+    setLongitude(roundedLng);
+    updateGuidesForPosition(roundedLat, roundedLng);
   };
 
   // Handle marker drag end
   const handleMarkerDrag = (lat: number, lng: number) => {
-    setLatitude(Math.round(lat * 10000) / 10000);
-    setLongitude(Math.round(lng * 10000) / 10000);
+    const roundedLat = Math.round(lat * 10000) / 10000;
+    const roundedLng = Math.round(lng * 10000) / 10000;
+    setLatitude(roundedLat);
+    setLongitude(roundedLng);
+    updateGuidesForPosition(roundedLat, roundedLng);
   };
 
   // Save location updates to backend

@@ -28,7 +28,7 @@ if ($method === 'GET') {
             $input['discount_percentage'] ?? 15,
             $input['code'],
             $input['valid_until'] ?? date('Y-m-d', strtotime('+30 days')),
-            $input['banner'] ?? 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80',
+            $input['banner'] ?? null,
             $input['description'] ?? ''
         ]);
         $newId = $pdo->lastInsertId();

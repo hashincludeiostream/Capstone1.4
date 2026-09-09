@@ -8,6 +8,8 @@ interface LeaveReviewModalProps {
   currentUser: User | null;
   onClose: () => void;
   onSuccess: () => void;
+  technicianId?: number | null;
+  technicianName?: string;
 }
 
 export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
@@ -15,6 +17,8 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
   currentUser,
   onClose,
   onSuccess,
+  technicianId,
+  technicianName,
 }) => {
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -30,11 +34,13 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
     setSubmitting(true);
     try {
       await createReview({
-        customer_id: currentUser?.id || 3,
-        customer_name: reviewerName || 'Verified Client',
+        user_id: currentUser?.id,
+        user_name: reviewerName || currentUser?.fullname,
         salon_id: salon.id,
+        technician_id: technicianId || null,
+        technician_name: technicianName || null,
         rating,
-        review_text: reviewText,
+        comment: reviewText,
       });
       setSubmitted(true);
       setTimeout(() => {
@@ -43,7 +49,6 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
       }, 1500);
     } catch (err) {
       console.error('Submit review error:', err);
-    } finally {
       setSubmitting(false);
     }
   };
@@ -74,6 +79,11 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+            {technicianName && (
+              <p className="rounded-xl bg-purple-50 p-2.5 text-center text-xs font-semibold text-purple-800">
+                Reviewing technician: {technicianName}
+              </p>
+            )}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2 text-center">
                 Overall Rating

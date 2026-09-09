@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, LogIn, UserPlus, Shield, Store, User as UserIcon, Check } from 'lucide-react';
 import { User, UserRole } from '../types';
-import { API_BASE } from '../lib/api';
+import { login, register } from '../lib/auth';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -16,6 +16,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'signin' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fullname, setFullname] = useState('');
   const [phone, setPhone] = useState('');
   const [userType, setUserType] = useState<UserRole>('customer');
@@ -27,27 +28,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (role === 'salon_owner') demoEmail = 'salon@nailglamhub.com';
     if (role === 'admin') demoEmail = 'admin@nailglamhub.com';
 
-    executeLogin(demoEmail);
+    executeLogin(demoEmail, 'demo123', role);
   };
 
-  const executeLogin = async (loginEmail: string) => {
+  const executeLogin = async (
+    loginEmail: string,
+    loginPassword = password,
+    loginRole: UserRole = userType,
+  ) => {
     setLoading(true);
     setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Invalid credentials');
+      const result = await login({ email: loginEmail, password: loginPassword, role: loginRole });
+      if (!result.success || !result.user) {
+        setError(result.error || 'Invalid credentials');
         return;
       }
 
-      onLoginSuccess(data.user);
+      onLoginSuccess(result.user);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -64,24 +63,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullname,
-          email,
-          phone,
-          user_type: userType,
-        }),
+      const result = await register({
+        fullname,
+        email,
+        password,
+        phone,
+        user_type: userType,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Registration failed');
+      if (!result.success || !result.user) {
+        setError(result.error || 'Registration failed');
         return;
       }
 
-      onLoginSuccess(data.user);
+      onLoginSuccess(result.user);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Registration failed');
@@ -206,7 +201,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </label>
               <input
                 type="password"
-                defaultValue="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full p-2.5 rounded-xl border border-pink-200 bg-pink-50/20 text-xs focus:outline-pink-500"
               />
@@ -214,7 +210,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <button
               type="submit"
-              disabled={loading || !email}
+              disabled={loading || !email || !password}
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-pink-500/20 cursor-pointer transition-all flex items-center justify-center gap-1.5"
             >
               <LogIn className="w-4 h-4" />
@@ -283,6 +279,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                className="w-full p-2.5 rounded-xl border border-pink-200 bg-pink-50/20 text-xs focus:outline-pink-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
                 Mobile Number
               </label>
               <input
@@ -296,7 +306,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <button
               type="submit"
-              disabled={loading || !fullname || !email}
+              disabled={loading || !fullname || !email || !password}
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-pink-500/20 cursor-pointer transition-all flex items-center justify-center gap-1.5"
             >
               <UserPlus className="w-4 h-4" />

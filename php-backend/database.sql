@@ -2,6 +2,7 @@
 -- Designed for XAMPP / MySQL / MariaDB (phpMyAdmin)
 -- Database Name: nailglamhub_db
 
+DROP DATABASE IF EXISTS `nailglamhub_db`;
 CREATE DATABASE IF NOT EXISTS `nailglamhub_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `nailglamhub_db`;
 
@@ -57,9 +58,9 @@ CREATE TABLE `salons` (
   `phone` VARCHAR(50) DEFAULT NULL,
   `email` VARCHAR(150) DEFAULT NULL,
   `description` TEXT,
-  `logo` VARCHAR(500) DEFAULT NULL,
+  `logo` LONGTEXT DEFAULT NULL,
   `banner` VARCHAR(500) DEFAULT NULL,
-  `avg_rating` DECIMAL(3,2) DEFAULT 5.00,
+  `avg_rating` DECIMAL(3,2) DEFAULT 0.00,
   `review_count` INT DEFAULT 0,
   `is_active` BOOLEAN DEFAULT TRUE,
   `verification_status` ENUM('pending', 'verified', 'rejected') DEFAULT 'verified',
@@ -74,16 +75,20 @@ CREATE TABLE `salons` (
   FOREIGN KEY (`category_id`) REFERENCES `business_categories`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Each row in salons is an independently managed branch under its owner_id.
+
 -- 4. Services Table
 CREATE TABLE `services` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `salon_id` INT NOT NULL,
+  `technician_id` INT DEFAULT NULL,
+  `technician_name` VARCHAR(150) DEFAULT NULL,
   `service_name` VARCHAR(200) NOT NULL,
   `description` TEXT,
   `price` DECIMAL(10,2) NOT NULL,
   `duration_minutes` INT NOT NULL DEFAULT 45,
   `category_name` VARCHAR(100) DEFAULT 'Nail Services',
-  `image` VARCHAR(500) DEFAULT NULL,
+  `image` LONGTEXT DEFAULT NULL,
   `is_popular` BOOLEAN DEFAULT FALSE,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`salon_id`) REFERENCES `salons`(`id`) ON DELETE CASCADE
@@ -95,7 +100,7 @@ CREATE TABLE `technicians` (
   `salon_id` INT NOT NULL,
   `fullname` VARCHAR(150) NOT NULL,
   `specialties` VARCHAR(255) DEFAULT 'Gel Art, Russian Manicure',
-  `rating` DECIMAL(3,2) DEFAULT 4.90,
+  `rating` DECIMAL(3,2) DEFAULT NULL,
   `is_available` BOOLEAN DEFAULT TRUE,
   `avatar` VARCHAR(500) DEFAULT NULL,
   `experience_years` INT DEFAULT 3,
@@ -124,13 +129,17 @@ CREATE TABLE `appointments` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`customer_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`salon_id`) REFERENCES `salons`(`id`) ON DELETE CASCADE
+  FOREIGN KEY (`salon_id`) REFERENCES `salons`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`technician_id`) REFERENCES `technicians`(`id`) ON DELETE SET NULL,
+  INDEX `idx_appointments_schedule` (`salon_id`, `appointment_date`, `appointment_time`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. Reviews Table
 CREATE TABLE `reviews` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `salon_id` INT NOT NULL,
+  `technician_id` INT DEFAULT NULL,
+  `technician_name` VARCHAR(150) DEFAULT NULL,
   `user_id` INT NOT NULL,
   `user_name` VARCHAR(150) NOT NULL,
   `user_avatar` VARCHAR(500) DEFAULT NULL,
@@ -139,7 +148,8 @@ CREATE TABLE `reviews` (
   `service_name` VARCHAR(150) DEFAULT 'Classic Manicure',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`salon_id`) REFERENCES `salons`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`technician_id`) REFERENCES `technicians`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. Working Hours Table
@@ -180,6 +190,7 @@ CREATE TABLE `promotions` (
   `valid_until` DATE NOT NULL,
   `banner` VARCHAR(500) DEFAULT NULL,
   `description` TEXT,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`salon_id`) REFERENCES `salons`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -189,8 +200,11 @@ CREATE TABLE `announcements` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `title` VARCHAR(200) NOT NULL,
   `message` TEXT NOT NULL,
-  `priority` ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
-  `target_audience` ENUM('all', 'customers', 'salon_owners') DEFAULT 'all',
+  `priority` ENUM('info', 'promo', 'alert', 'maintenance', 'low', 'normal', 'high', 'urgent') DEFAULT 'normal',
+  `is_active` TINYINT(1) NOT NULL DEFAULT 0,
+  `target_audience` ENUM('all', 'customers', 'owners', 'salon_owners') DEFAULT 'all',
+  `link_url` VARCHAR(500) DEFAULT NULL,
+  `link_text` VARCHAR(100) DEFAULT NULL,
   `created_by` VARCHAR(150) DEFAULT 'Administrator',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -211,11 +225,12 @@ INSERT INTO `business_categories` (`id`, `category_name`, `description`, `icon`)
 (8, 'Nail Design', 'Custom nail design and seasonal nail styling services', '🎨');
 
 -- Insert Users
-INSERT INTO `users` (`id`, `fullname`, `email`, `phone`, `user_type`, `avatar`, `status`) VALUES
-(1, 'Admin User', 'admin@nailglamhub.com', '09123456789', 'admin', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'active'),
-(2, 'Elena Vance (Salon Owner)', 'salon@nailglamhub.com', '09123456790', 'salon_owner', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80', 'active'),
-(3, 'Sophia Rodriguez', 'customer@nailglamhub.com', '09123456791', 'customer', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', 'active'),
-(4, 'Chloe Monet (Glamour Nails)', 'chloe@glamournails.com', '09198765432', 'salon_owner', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', 'active');
+-- All seeded accounts use Demo123! for initial local testing; change these credentials after import.
+INSERT INTO `users` (`id`, `fullname`, `email`, `phone`, `password`, `user_type`, `avatar`, `status`) VALUES
+(1, 'Admin User', 'admin@nailglamhub.com', '09123456789', '$2y$10$USuWKy4jftKrbNqc0EUZj.t/w6p.9yxqGAUhF/ymNpCKLmmHY02ai', 'admin', NULL, 'active'),
+(2, 'Elena Vance (Salon Owner)', 'salon@nailglamhub.com', '09123456790', '$2y$10$USuWKy4jftKrbNqc0EUZj.t/w6p.9yxqGAUhF/ymNpCKLmmHY02ai', 'salon_owner', NULL, 'active'),
+(3, 'Sophia Rodriguez', 'customer@nailglamhub.com', '09123456791', '$2y$10$USuWKy4jftKrbNqc0EUZj.t/w6p.9yxqGAUhF/ymNpCKLmmHY02ai', 'customer', NULL, 'active'),
+(4, 'Chloe Monet (Glamour Nails)', 'chloe@glamournails.com', '09198765432', '$2y$10$USuWKy4jftKrbNqc0EUZj.t/w6p.9yxqGAUhF/ymHY02ai', 'salon_owner', NULL, 'active');
 
 -- Insert Salons
 INSERT INTO `salons` (`id`, `owner_id`, `salon_name`, `address`, `city`, `province`, `postal_code`, `landmark`, `parking_info`, `phone`, `email`, `description`, `logo`, `banner`, `avg_rating`, `review_count`, `is_active`, `verification_status`, `category_id`, `category_name`, `latitude`, `longitude`, `featured`) VALUES

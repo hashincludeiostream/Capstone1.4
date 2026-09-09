@@ -62,6 +62,7 @@ export interface AdminReportData {
   pendingSalons: number;
   totalUsers: number;
   totalAppointments: number;
+  fulfillmentRate: number;
   totalReviews: number;
   avgRating: number;
   salonsList: Array<{
@@ -631,12 +632,12 @@ export function generateAdminVisualHtmlReport(data: AdminReportData): string {
     </h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px;">
       <div style="background: #fdf4ff; border: 1px solid #f5d0fe; padding: 14px; border-radius: 10px;">
-        <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #86198f;">1. Accelerated Salon Onboarding</h4>
-        <p style="margin: 0; font-size: 11px; color: #701a75; line-height: 1.5;">Targeting high-density beauty hubs across Makati, BGC, and Quezon City to expand luxury nail salon coverage.</p>
+        <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #86198f;">1. Salon Onboarding Review</h4>
+        <p style="margin: 0; font-size: 11px; color: #701a75; line-height: 1.5;">Review current salon coverage and pending applications before approving additional marketplace listings.</p>
       </div>
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: 10px;">
-        <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #166534;">2. Verified Badge Quality Standard</h4>
-        <p style="margin: 0; font-size: 11px; color: #14532d; line-height: 1.5;">Ensure all active listings maintain updated sterilization certifications and high-resolution treatment menus.</p>
+        <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #166534;">2. Verification Quality Review</h4>
+        <p style="margin: 0; font-size: 11px; color: #14532d; line-height: 1.5;">Confirm that active listings meet the platform&apos;s verification requirements before keeping them visible to customers.</p>
       </div>
     </div>
 

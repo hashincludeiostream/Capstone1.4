@@ -3,19 +3,13 @@ import {
   X,
   Calendar as CalendarIcon,
   Clock,
-  User as UserIcon,
-  Scissors,
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
   Sparkles,
-  Phone,
-  Mail,
-  FileText,
-  Store,
 } from 'lucide-react';
-import { Salon, Service, Technician, User, Appointment } from '../types';
-import { fetchServices, fetchTechnicians, createAppointment } from '../lib/api';
+import { Salon, Service, Technician, User, Appointment, WorkingHour } from '../types';
+import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, createAppointment } from '../lib/api';
 
 interface BookingWizardProps {
   salons: Salon[];
@@ -40,6 +34,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   );
   const [services, setServices] = useState<Service[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [workingHours, setWorkingHours] = useState<WorkingHour[]>([]);
+  const [bookedAppointments, setBookedAppointments] = useState<Appointment[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
     initialService?.id || null
   );
@@ -68,12 +64,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     async function loadData() {
       if (!selectedSalonId) return;
       setLoading(true);
-      const [servs, techs] = await Promise.all([
+      const [servs, techs, salonDetails, appts] = await Promise.all([
         fetchServices(selectedSalonId),
         fetchTechnicians(selectedSalonId),
+        fetchSalonDetails(selectedSalonId),
+        fetchAppointments({ salon_id: selectedSalonId }),
       ]);
       setServices(servs);
       setTechnicians(techs);
+      setWorkingHours(salonDetails?.working_hours || []);
+      setBookedAppointments(appts);
 
       // Auto-select first service if not already set or invalid
       if (!selectedServiceId || !servs.find((s) => s.id === selectedServiceId)) {
@@ -88,20 +88,60 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const currentService = services.find((s) => s.id === selectedServiceId);
   const currentTech = technicians.find((t) => t.id === selectedStaffId);
 
-  const availableTimeSlots = [
-    '09:30',
-    '10:30',
-    '11:30',
-    '13:00',
-    '14:00',
-    '15:30',
-    '16:30',
-    '17:30',
-    '18:30',
-  ];
+  const availableTimeSlots = React.useMemo(() => {
+    const selectedDate = new Date(`${appointmentDate}T00:00:00`);
+    const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const hours = workingHours.find((item) => item.day_of_week.toLowerCase() === dayName.toLowerCase());
+    if (!hours || hours.is_closed) return [];
+
+    const toMinutes = (value: string) => {
+      const [hour, minute] = value.split(':').map(Number);
+      return hour * 60 + minute;
+    };
+    const toTime = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    const opening = toMinutes(hours.opening_time);
+    const closing = toMinutes(hours.closing_time);
+    const bookedTimes = new Set(
+      bookedAppointments
+        .filter((appointment) => appointment.appointment_date === appointmentDate && ['pending', 'confirmed'].includes(appointment.status))
+        .map((appointment) => appointment.appointment_time)
+    );
+
+    return Array.from({ length: Math.max(0, Math.floor((closing - opening) / 60)) }, (_, index) => toTime(opening + index * 60))
+      .filter((time) => !bookedTimes.has(time));
+  }, [appointmentDate, bookedAppointments, workingHours]);
+
+  useEffect(() => {
+    if (availableTimeSlots.length > 0 && !availableTimeSlots.includes(appointmentTime)) {
+      setAppointmentTime(availableTimeSlots[0]);
+    }
+  }, [appointmentTime, availableTimeSlots]);
 
   const handleSubmitBooking = async () => {
     if (!currentService) return;
+
+    // Basic validation
+    if (!fullName.trim()) {
+      alert('Please enter your full name');
+      return;
+    }
+    if (!phone.trim()) {
+      alert('Please enter your phone number');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+    if (!appointmentDate) {
+      alert('Please select an appointment date');
+      return;
+    }
+    if (!appointmentTime) {
+      alert('Please select an appointment time');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -114,10 +154,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         salon_name: currentSalon?.salon_name,
         service_id: currentService.id,
         service_name: currentService.service_name,
-        service_price: currentService.price,
         service_duration: currentService.duration,
-        staff_id: selectedStaffId,
-        staff_name: currentTech?.name || 'Any Available Specialist',
+        technician_id: selectedStaffId,
+        staff_name: currentTech?.fullname || 'Any Available Specialist',
         appointment_date: appointmentDate,
         appointment_time: appointmentTime,
         status: 'pending',
@@ -131,6 +170,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       }
     } catch (err) {
       console.error('Booking submission error:', err);
+      alert('Failed to submit booking. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -304,8 +344,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
                   Select Available Time Slot
                 </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {availableTimeSlots.map((time) => (
+                {availableTimeSlots.length === 0 ? (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    No available slots for this date. Choose another date.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {availableTimeSlots.map((time) => (
                     <button
                       key={time}
                       type="button"
@@ -319,8 +364,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       <Clock className="w-3.5 h-3.5" />
                       <span>{time}</span>
                     </button>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="p-3.5 rounded-2xl bg-pink-50 border border-pink-100 text-xs text-pink-900 flex items-center gap-2">

@@ -10,9 +10,50 @@ import {
   Promotion,
   AppointmentStatus,
   Announcement,
+  WorkingHour,
+  ReelCommentResponse,
+  PlatformStats,
 } from '../types';
 
-export const API_BASE = (import.meta.env.VITE_API_URL as string) || '/api';
+const configuredApiBase = import.meta.env.VITE_API_URL as string | undefined;
+const staticAppBase = typeof window !== 'undefined'
+  ? (window.location.pathname.endsWith('/')
+    ? window.location.pathname
+    : window.location.pathname.slice(0, window.location.pathname.lastIndexOf('/') + 1))
+  : '/';
+
+export const API_BASE = configuredApiBase || (
+  typeof window !== 'undefined' && window.location.port !== '3001'
+    ? `${staticAppBase}php-backend/api`
+    : '/api'
+);
+
+// Error message mapping for better user feedback
+const getErrorMessage = (error: unknown, context: string): string => {
+  const err = error as Error;
+  
+  if (err.name === 'TypeError' && err.message.includes('fetch')) {
+    return `Network error: Unable to connect to the server. Please check your internet connection and try again.`;
+  }
+  
+  if (err.message?.includes('Failed to fetch')) {
+    return `Server error: Could not load ${context}. The server may be temporarily unavailable. Please try again later.`;
+  }
+  
+  if (err.message?.includes('404')) {
+    return `Not found: The requested ${context} could not be found.`;
+  }
+  
+  if (err.message?.includes('401') || err.message?.includes('403')) {
+    return `Authentication error: You don't have permission to access this ${context}. Please log in again.`;
+  }
+  
+  if (err.message?.includes('500')) {
+    return `Server error: Something went wrong on our end. Please try again later.`;
+  }
+  
+  return err.message || `An error occurred while loading ${context}. Please try again.`;
+};
 
 export async function fetchCategories(): Promise<BusinessCategory[]> {
   try {
@@ -21,23 +62,42 @@ export async function fetchCategories(): Promise<BusinessCategory[]> {
     return await res.json();
   } catch (err) {
     console.warn('API fetchCategories error:', err);
+    const errorMessage = getErrorMessage(err, 'categories');
+    console.error('User-facing error:', errorMessage);
     return [];
   }
 }
 
-export async function fetchSalons(params?: { category?: number; search?: string; owner_id?: number }): Promise<Salon[]> {
+export async function fetchSalons(params?: {
+  category?: number;
+  search?: string;
+  owner_id?: number;
+  includeUnpublished?: boolean;
+}): Promise<Salon[]> {
   try {
     const query = new URLSearchParams();
     if (params?.category) query.set('category', String(params.category));
     if (params?.search) query.set('search', params.search);
     if (params?.owner_id) query.set('owner_id', String(params.owner_id));
+    if (params?.includeUnpublished) query.set('include_unpublished', 'true');
 
     const res = await fetch(`${API_BASE}/salons?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch salons');
-    return await res.json();
+    const salons = await res.json();
+    return (Array.isArray(salons) ? salons : []).map((salon: Salon) => ({
+      ...salon,
+      id: Number(salon.id),
+      owner_id: Number(salon.owner_id),
+      category_id: salon.category_id == null ? undefined : Number(salon.category_id),
+      avg_rating: Number(salon.avg_rating) || 0,
+      review_count: Number(salon.review_count) || 0,
+      is_active: Boolean(Number(salon.is_active)),
+    }));
   } catch (err) {
     console.warn('API fetchSalons error:', err);
-    return [];
+    const errorMessage = getErrorMessage(err, 'salons');
+    console.error('User-facing error:', errorMessage);
+    throw err;
   }
 }
 
@@ -46,7 +106,7 @@ export async function fetchSalonDetails(id: number): Promise<{
   services: Service[];
   technicians: Technician[];
   reviews: Review[];
-  working_hours: any[];
+  working_hours: WorkingHour[];
 } | null> {
   try {
     const res = await fetch(`${API_BASE}/salons/${id}`);
@@ -63,9 +123,17 @@ export async function fetchServices(salonId?: number): Promise<Service[]> {
     const url = salonId ? `${API_BASE}/services?salon_id=${salonId}` : `${API_BASE}/services`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch services');
-    return await res.json();
+    const services = await res.json();
+    return (Array.isArray(services) ? services : []).map((service: Service) => ({
+      ...service,
+      id: Number(service.id),
+      salon_id: Number(service.salon_id),
+      image_url: service.image_url || service.image,
+    }));
   } catch (err) {
     console.warn('API fetchServices error:', err);
+    const errorMessage = getErrorMessage(err, 'services');
+    console.error('User-facing error:', errorMessage);
     return [];
   }
 }
@@ -78,6 +146,8 @@ export async function fetchTechnicians(salonId?: number): Promise<Technician[]> 
     return await res.json();
   } catch (err) {
     console.warn('API fetchTechnicians error:', err);
+    const errorMessage = getErrorMessage(err, 'technicians');
+    console.error('User-facing error:', errorMessage);
     return [];
   }
 }
@@ -93,18 +163,27 @@ export async function fetchAppointments(params?: { customer_id?: number; salon_i
     return await res.json();
   } catch (err) {
     console.warn('API fetchAppointments error:', err);
+    const errorMessage = getErrorMessage(err, 'appointments');
+    console.error('User-facing error:', errorMessage);
     return [];
   }
 }
 
 export async function createAppointment(data: Partial<Appointment>): Promise<{ success: boolean; appointment: Appointment }> {
-  const res = await fetch(`${API_BASE}/appointments`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to create appointment');
-  return await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create appointment');
+    return await res.json();
+  } catch (err) {
+    console.error('API createAppointment error:', err);
+    const errorMessage = getErrorMessage(err, 'appointment');
+    console.error('User-facing error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 export async function updateAppointmentStatus(id: number, status: AppointmentStatus): Promise<boolean> {
@@ -117,6 +196,22 @@ export async function updateAppointmentStatus(id: number, status: AppointmentSta
     return res.ok;
   } catch (err) {
     console.warn('API updateAppointmentStatus error:', err);
+    const errorMessage = getErrorMessage(err, 'appointment status');
+    console.error('User-facing error:', errorMessage);
+    return false;
+  }
+}
+
+export async function updateAppointmentTechnician(id: number, technicianId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/appointments/${id}/technician`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ technician_id: technicianId }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('API updateAppointmentTechnician error:', err);
     return false;
   }
 }
@@ -129,18 +224,27 @@ export async function fetchReviews(salonId?: number): Promise<Review[]> {
     return await res.json();
   } catch (err) {
     console.warn('API fetchReviews error:', err);
+    const errorMessage = getErrorMessage(err, 'reviews');
+    console.error('User-facing error:', errorMessage);
     return [];
   }
 }
 
 export async function createReview(data: Partial<Review>): Promise<Review> {
-  const res = await fetch(`${API_BASE}/reviews`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to submit review');
-  return await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to submit review');
+    return await res.json();
+  } catch (err) {
+    console.error('API createReview error:', err);
+    const errorMessage = getErrorMessage(err, 'review');
+    console.error('User-facing error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 export async function fetchReels(): Promise<Reel[]> {
@@ -155,22 +259,46 @@ export async function fetchReels(): Promise<Reel[]> {
 }
 
 export async function toggleReelLike(reelId: number): Promise<{ likes: number; is_liked: boolean }> {
-  const res = await fetch(`${API_BASE}/reels/${reelId}/like`, { method: 'POST' });
-  return await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/reels/${reelId}/like`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to toggle like');
+    return await res.json();
+  } catch (err) {
+    console.error('API toggleReelLike error:', err);
+    const errorMessage = getErrorMessage(err, 'like');
+    console.error('User-facing error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 export async function toggleReelSave(reelId: number): Promise<{ saves_count: number; is_saved: boolean }> {
-  const res = await fetch(`${API_BASE}/reels/${reelId}/save`, { method: 'POST' });
-  return await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/reels/${reelId}/save`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to toggle save');
+    return await res.json();
+  } catch (err) {
+    console.error('API toggleReelSave error:', err);
+    const errorMessage = getErrorMessage(err, 'save');
+    console.error('User-facing error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
-export async function addReelComment(reelId: number, comment: string, userName?: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/reels/${reelId}/comment`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ comment, user_name: userName }),
-  });
-  return await res.json();
+export async function addReelComment(reelId: number, comment: string, userName?: string): Promise<ReelCommentResponse> {
+  try {
+    const res = await fetch(`${API_BASE}/reels/${reelId}/comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment, user_name: userName }),
+    });
+    if (!res.ok) throw new Error('Failed to add comment');
+    return await res.json();
+  } catch (err) {
+    console.error('API addReelComment error:', err);
+    const errorMessage = getErrorMessage(err, 'comment');
+    console.error('User-facing error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 export async function fetchPromotions(): Promise<Promotion[]> {
@@ -184,7 +312,7 @@ export async function fetchPromotions(): Promise<Promotion[]> {
   }
 }
 
-export async function fetchStats(): Promise<any> {
+export async function fetchStats(): Promise<PlatformStats | null> {
   try {
     const res = await fetch(`${API_BASE}/stats`);
     if (!res.ok) throw new Error('Failed to fetch stats');
@@ -237,6 +365,24 @@ export async function deleteAnnouncement(id: number): Promise<boolean> {
   }
 }
 
+export async function fetchRegistrationRateLimitStatus(): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/settings/registration-rate-limit`);
+  if (!res.ok) throw new Error('Failed to fetch registration rate-limit status');
+  const data = await res.json();
+  return data.enabled === true;
+}
+
+export async function updateRegistrationRateLimit(enabled: boolean): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/settings/registration-rate-limit`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw new Error('Failed to update registration rate-limit status');
+  const data = await res.json();
+  return data.enabled === true;
+}
+
 // Salon Profile & Location Update
 export async function updateSalon(id: number, data: Partial<Salon>): Promise<Salon> {
   const res = await fetch(`${API_BASE}/salons/${id}`, {
@@ -244,8 +390,28 @@ export async function updateSalon(id: number, data: Partial<Salon>): Promise<Sal
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed to update salon');
+  const responseData = await res.json();
+  if (!res.ok) {
+    throw new Error(responseData.error || responseData.details || 'Failed to update salon');
+  }
+  return responseData.salon || responseData;
+}
+
+export async function fetchWorkingHours(salonId: number): Promise<WorkingHour[]> {
+  const res = await fetch(`${API_BASE}/working-hours?salon_id=${salonId}`);
+  if (!res.ok) throw new Error('Failed to fetch working hours');
   return await res.json();
+}
+
+export async function updateWorkingHours(salonId: number, hours: Partial<WorkingHour>[]): Promise<WorkingHour[]> {
+  const res = await fetch(`${API_BASE}/working-hours`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ salon_id: salonId, hours }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update working hours');
+  return data.working_hours;
 }
 
 // Admin Salon Approvals & Moderation
@@ -333,19 +499,24 @@ export async function deleteReview(id: number): Promise<boolean> {
 
 // User Profile Management
 export async function updateUser(id: number, data: Partial<User>): Promise<User> {
-  const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
-  const res = await fetch(`${apiBase}/api/users/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error('Failed to update user');
-  return await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/users/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update user');
+    return await res.json();
+  } catch (err) {
+    console.error('API updateUser error:', err);
+    const errorMessage = getErrorMessage(err, 'user profile');
+    console.error('User-facing error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 export async function fetchUser(id: number): Promise<User> {
-  const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
-  const res = await fetch(`${apiBase}/api/users/${id}`);
+  const res = await fetch(`${API_BASE}/users/${id}`);
   if (!res.ok) throw new Error('Failed to fetch user');
   return await res.json();
 }

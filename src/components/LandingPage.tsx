@@ -181,23 +181,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       <div className="mt-2 text-xs text-gray-500 truncate">{featuredSalon?.address?.split(',')[0] || 'Premium Location'}</div>
                     </div>
                     <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {Number(featuredSalon?.avg_rating || 0).toFixed(1) || '4.9'}</div>
-                      <div className="mt-2 text-xs text-gray-500">Verified Studio</div>
+                      <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {featuredSalon?.review_count ? Number(featuredSalon.avg_rating).toFixed(1) : 'Not rated yet'}</div>
+                      <div className="mt-2 text-xs text-gray-500">{featuredSalon?.review_count ? `${featuredSalon.review_count} reviews` : 'No reviews yet'}</div>
                     </div>
                   </div>
 
                   <div className="mt-4 rounded-2xl bg-pink-950 text-white p-4">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-black uppercase tracking-[0.12em]">Today’s Ritual</span>
-                      <span className="text-[11px] font-bold bg-white/12 rounded-full px-2 py-1">12:30 PM</span>
+                      {featuredService?.duration ? (
+                        <span className="text-[11px] font-bold bg-white/12 rounded-full px-2 py-1">
+                          {featuredService.duration} min
+                        </span>
+                      ) : null}
                     </div>
                     <div className="mt-3 flex items-center gap-3">
                       <span className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
                         <Heart className="w-5 h-5 text-pink-200" />
                       </span>
                       <div>
-                        <div className="text-sm font-bold">{featuredService?.service_name || 'Premium Service'}</div>
-                        <div className="text-[11px] text-pink-100">{featuredService?.category_name || 'Luxury Treatment'}</div>
+                        <div className="text-sm font-bold">{featuredService?.service_name || 'No featured treatment yet'}</div>
+                        <div className="text-[11px] text-pink-100">{featuredService?.category || featuredService?.category_name || 'Choose from the catalog'}</div>
                       </div>
                     </div>
                   </div>
@@ -301,7 +305,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <div className="flex items-center gap-1 text-amber-500">
                   <Star className="w-4 h-4 fill-amber-400" />
-                  <span className="text-[11px] font-black text-gray-700">{salon.avg_rating || '4.9'}</span>
+                  <span className="text-[11px] font-black text-gray-700">{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
                 </div>
               </div>
 

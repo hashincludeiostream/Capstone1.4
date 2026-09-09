@@ -30,9 +30,9 @@ if ($method === 'GET') {
             $input['salon_id'],
             $input['fullname'],
             $input['specialties'] ?? 'Gel Art, Russian Manicure',
-            $input['rating'] ?? 5.0,
+            $input['rating'] ?? null,
             isset($input['is_available']) ? ($input['is_available'] ? 1 : 0) : 1,
-            $input['avatar'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+            $input['avatar'] ?? null,
             $input['experience_years'] ?? 3
         ]);
         $newId = $pdo->lastInsertId();

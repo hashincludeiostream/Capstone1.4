@@ -25,32 +25,52 @@ import {
   Check,
   RefreshCw,
 } from 'lucide-react';
-import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus } from '../types';
+import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour } from '../types';
 import {
   fetchSalons,
   fetchServices,
   fetchTechnicians,
   fetchAppointments,
   fetchReviews,
+  fetchWorkingHours,
   updateAppointmentStatus,
+  updateAppointmentTechnician,
+  updateSalon,
+  updateWorkingHours,
   API_BASE,
 } from '../lib/api';
 import { StoreOverviewReports } from './owner/StoreOverviewReports';
 import { BranchOverview } from './owner/BranchOverview';
 import { OwnerLocationPicker } from './maps/OwnerLocationPicker';
+import { EmptyState } from './EmptyState';
+
+const DEFAULT_WORKING_HOURS: WorkingHour[] = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+].map((day, index) => ({
+  id: index,
+  salon_id: 0,
+  day_of_week: day,
+  opening_time: day === 'Saturday' ? '09:00' : '10:00',
+  closing_time: day === 'Saturday' ? '21:00' : day === 'Sunday' ? '18:00' : '20:00',
+  is_closed: false,
+}));
 
 interface SalonOwnerDashboardProps {
   currentUser: User;
   initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches';
   onOpenRegisterSalon?: () => void;
+  onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
+  refreshKey?: number;
 }
 
 export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   currentUser,
   initialTab = 'overview',
   onOpenRegisterSalon,
+  onOpenRegisterBranch,
   onNavigateTab,
+  refreshKey = 0,
 }) => {
   const [salons, setSalons] = useState<Salon[]>([]);
   const [selectedSalonId, setSelectedSalonId] = useState<number | null>(null);
@@ -61,6 +81,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches'>(initialTab);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const dashboardLoadId = React.useRef(0);
 
   // Sync initialTab when navigation changes from navbar or sidebar
   useEffect(() => {
@@ -88,6 +109,8 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [newServiceDuration, setNewServiceDuration] = useState('60');
   const [newServiceDifficulty, setNewServiceDifficulty] = useState('Intermediate');
   const [newServiceDesc, setNewServiceDesc] = useState('');
+  const [newServiceImage, setNewServiceImage] = useState('');
+  const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
 
   // New Technician Form State
   const [showAddTech, setShowAddTech] = useState(false);
@@ -96,6 +119,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [newTechPhone, setNewTechPhone] = useState('');
   const [newTechSpecialties, setNewTechSpecialties] = useState('');
   const [newTechExp, setNewTechExp] = useState('3');
+  const [editingTechnicianId, setEditingTechnicianId] = useState<number | null>(null);
 
   // Salon Studio Settings State
   const [settingsName, setSettingsName] = useState('');
@@ -104,58 +128,83 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [settingsEmail, setSettingsEmail] = useState('');
   const [settingsDesc, setSettingsDesc] = useState('');
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [workingHours, setWorkingHours] = useState<WorkingHour[]>(DEFAULT_WORKING_HOURS);
 
   const loadDashboardData = async () => {
+    const loadId = ++dashboardLoadId.current;
     setLoading(true);
-    const allSalons = await fetchSalons();
+    try {
+      let allSalons = await fetchSalons({
+        owner_id: currentUser.id,
+        includeUnpublished: true,
+      });
 
-    // Isolation: Salon owners access salons they own. Admins can view all.
-    const userSalons =
-      currentUser.user_type === 'admin'
-        ? allSalons
-        : allSalons.filter((s) => s.owner_id === currentUser.id);
+      if (allSalons.length === 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        allSalons = await fetchSalons({
+          owner_id: currentUser.id,
+          includeUnpublished: true,
+        });
+      }
 
-    setSalons(userSalons);
+      if (loadId !== dashboardLoadId.current) return;
 
-    if (userSalons.length > 0) {
-      const currentId = selectedSalonId && userSalons.some((s) => s.id === selectedSalonId)
-        ? selectedSalonId
-        : userSalons[0].id;
+      // Isolation: Salon owners access salons they own. Admins can view all.
+      const userSalons =
+        currentUser.user_type === 'admin'
+          ? allSalons
+          : allSalons.filter((s) => Number(s.owner_id) === Number(currentUser.id));
 
-      setSelectedSalonId(currentId);
+      setSalons(userSalons);
 
-      const [servs, techs, appts, revs] = await Promise.all([
-        fetchServices(currentId),
-        fetchTechnicians(currentId),
-        fetchAppointments({ salon_id: currentId }),
-        fetchReviews(currentId),
-      ]);
+      if (userSalons.length > 0) {
+        const currentId = selectedSalonId && userSalons.some((s) => s.id === selectedSalonId)
+          ? selectedSalonId
+          : userSalons[0].id;
 
-      setServices(servs);
-      setTechnicians(techs);
-      setAppointments(appts);
-      setReviews(revs);
-      console.log('Loaded reviews for salon:', currentId, revs);
+        setSelectedSalonId(currentId);
 
-      const currentSalon = userSalons.find((s) => s.id === currentId) || userSalons[0];
-      setSettingsName(currentSalon.salon_name);
-      setSettingsAddress(currentSalon.address);
-      setSettingsPhone(currentSalon.phone || '');
-      setSettingsEmail(currentSalon.email || '');
-      setSettingsDesc(currentSalon.description || '');
-    } else {
-      setSelectedSalonId(null);
-      setServices([]);
-      setTechnicians([]);
-      setAppointments([]);
-      setReviews([]);
+        const [servs, techs, appts, revs, hours] = await Promise.all([
+          fetchServices(currentId),
+          fetchTechnicians(currentId),
+          fetchAppointments({ salon_id: currentId }),
+          fetchReviews(currentId),
+          fetchWorkingHours(currentId),
+        ]);
+
+        if (loadId !== dashboardLoadId.current) return;
+
+        setServices(servs);
+        setTechnicians(techs);
+        setAppointments(appts);
+        setReviews(revs);
+        setWorkingHours(hours.length > 0 ? hours : DEFAULT_WORKING_HOURS.map((hour) => ({ ...hour, salon_id: currentId })));
+        console.log('Loaded reviews for salon:', currentId, revs);
+
+        const currentSalon = userSalons.find((s) => s.id === currentId) || userSalons[0];
+        setSettingsName(currentSalon.salon_name);
+        setSettingsAddress(currentSalon.address);
+        setSettingsPhone(currentSalon.phone || '');
+        setSettingsEmail(currentSalon.email || '');
+        setSettingsDesc(currentSalon.description || '');
+      } else {
+        setSelectedSalonId(null);
+        setServices([]);
+        setTechnicians([]);
+        setAppointments([]);
+        setReviews([]);
+      }
+    } catch (error) {
+      console.error('Error loading salon owner data:', error);
+      showToast('Unable to refresh branch data. Showing the last saved branches.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     loadDashboardData();
-  }, [currentUser.id, currentUser.user_type]);
+  }, [currentUser.id, currentUser.user_type, refreshKey]);
 
   // Auto-refresh appointments every 30 seconds to show new bookings
   useEffect(() => {
@@ -206,9 +255,14 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     }
   };
 
-  const handleAssignTechnician = (appointmentId: number, techId: number, techName: string) => {
+  const handleAssignTechnician = async (appointmentId: number, techId: number, techName: string) => {
+    const updated = await updateAppointmentTechnician(appointmentId, techId);
+    if (!updated) {
+      showToast('Unable to save technician assignment');
+      return;
+    }
     setAppointments((prev) =>
-      prev.map((a) => (a.id === appointmentId ? { ...a, staff_id: techId, staff_name: techName } : a))
+      prev.map((a) => (a.id === appointmentId ? { ...a, technician_id: techId, staff_id: techId, staff_name: techName } : a))
     );
     showToast(`Assigned ${techName} to appointment #${appointmentId}`);
   };
@@ -225,33 +279,55 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newServiceName) return;
+    if (!newServiceName || !selectedSalonId) return;
 
     try {
-      const res = await fetch(`${API_BASE}/services`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE}/services${editingServiceId ? `/${editingServiceId}` : ''}`, {
+        method: editingServiceId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           salon_id: selectedSalonId,
           service_name: newServiceName,
-          category: newServiceCategory,
+          category_name: newServiceCategory,
           price: 0,
-          duration: Number(newServiceDuration),
-          difficulty_level: newServiceDifficulty,
+          duration_minutes: Number(newServiceDuration),
           description: newServiceDesc,
+          image: newServiceImage || null,
         }),
       });
+      const responseData = await res.json();
       if (res.ok) {
-        const created = await res.json();
-        setServices((prev) => [...prev, created]);
+        const savedResponse = responseData.service || responseData;
+        const saved = {
+          ...savedResponse,
+          image_url: savedResponse.image_url || savedResponse.image,
+        };
+        setServices((prev) => editingServiceId
+          ? prev.map((service) => service.id === editingServiceId ? saved : service)
+          : [...prev, saved]);
         setShowAddService(false);
         setNewServiceName('');
         setNewServiceDesc('');
-        showToast(`Added ${created.service_name} to treatments menu`);
+        setNewServiceImage('');
+        setEditingServiceId(null);
+        showToast(`${editingServiceId ? 'Updated' : 'Added'} ${saved.service_name} ${editingServiceId ? '' : 'to treatments menu'}`);
+      } else {
+        showToast(responseData.error || 'Unable to save service');
       }
     } catch (err) {
       console.error('Create service error:', err);
+      showToast('Unable to save service');
     }
+  };
+
+  const startEditingService = (service: Service) => {
+    setEditingServiceId(service.id);
+    setNewServiceName(service.service_name);
+    setNewServiceCategory(service.category || service.category_name || 'Manicure');
+    setNewServiceDuration(String(service.duration || service.duration_minutes || 45));
+    setNewServiceDesc(service.description || '');
+    setNewServiceImage(service.image_url || service.image || '');
+    setShowAddService(true);
   };
 
   const handleDeleteService = async (id: number) => {
@@ -271,12 +347,12 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     if (!newTechName) return;
 
     try {
-      const res = await fetch(`${API_BASE}/technicians`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE}/technicians${editingTechnicianId ? `/${editingTechnicianId}` : ''}`, {
+        method: editingTechnicianId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           salon_id: selectedSalonId,
-          name: newTechName,
+          fullname: newTechName,
           email: newTechEmail,
           phone: newTechPhone,
           specialties: newTechSpecialties,
@@ -285,38 +361,51 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       });
       if (res.ok) {
         const created = await res.json();
-        setTechnicians((prev) => [...prev, created]);
+        setTechnicians((prev) => editingTechnicianId
+          ? prev.map((technician) => technician.id === editingTechnicianId ? created : technician)
+          : [...prev, created]);
         setShowAddTech(false);
         setNewTechName('');
         setNewTechEmail('');
         setNewTechPhone('');
         setNewTechSpecialties('');
-        showToast(`Registered specialist ${created.name}`);
+        setEditingTechnicianId(null);
+        showToast(`${editingTechnicianId ? 'Updated' : 'Registered'} specialist ${created.fullname}`);
       }
     } catch (err) {
       console.error('Create technician error:', err);
     }
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const startEditingTechnician = (technician: Technician) => {
+    setEditingTechnicianId(technician.id);
+    setNewTechName(technician.fullname || technician.name || '');
+    setNewTechSpecialties(technician.specialties || '');
+    setNewTechExp(String(technician.experience_years || 0));
+    setShowAddTech(true);
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSalons((prev) =>
-      prev.map((s) =>
-        s.id === selectedSalonId
-          ? {
-              ...s,
-              salon_name: settingsName,
-              address: settingsAddress,
-              phone: settingsPhone,
-              email: settingsEmail,
-              description: settingsDesc,
-            }
-          : s
-      )
-    );
-    setSettingsSaved(true);
-    showToast('Studio profile and business operating hours saved');
-    setTimeout(() => setSettingsSaved(false), 3000);
+    if (!selectedSalonId || !settingsName.trim() || !settingsAddress.trim()) return;
+    try {
+      const updatedSalon = await updateSalon(selectedSalonId, {
+        salon_name: settingsName.trim(),
+        address: settingsAddress.trim(),
+        phone: settingsPhone.trim(),
+        email: settingsEmail.trim(),
+        description: settingsDesc.trim(),
+      });
+      const savedHours = await updateWorkingHours(selectedSalonId, workingHours);
+      setSalons((prev) => prev.map((s) => s.id === selectedSalonId ? updatedSalon : s));
+      setWorkingHours(savedHours);
+      setSettingsSaved(true);
+      showToast('Studio profile saved to the database');
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (err) {
+      console.error('Save studio profile error:', err);
+      showToast('Unable to save studio profile');
+    }
   };
 
   const activeSalon = salons.find((s) => s.id === selectedSalonId) || salons[0];
@@ -358,28 +447,15 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
   if (!loading && salons.length === 0) {
     return (
-      <div className="py-16 px-6 text-center bg-white rounded-3xl border border-purple-100 shadow-sm max-w-xl mx-auto space-y-5">
-        <div className="w-16 h-16 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto shadow-xs">
-          <Store className="w-8 h-8" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-serif font-bold text-gray-900">
-            Welcome, {currentUser.fullname}!
-          </h2>
-          <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-            You do not have any registered salon branches linked to this account yet. Register your first branch to set up services, assign staff, and start receiving appointments.
-          </p>
-        </div>
-        {onOpenRegisterSalon && (
-          <button
-            onClick={onOpenRegisterSalon}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-semibold px-5 py-2.5 rounded-full shadow-md shadow-purple-500/20 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Register Your First Salon Branch</span>
-          </button>
-        )}
-      </div>
+      <EmptyState
+        variant="salon"
+        title="No Salon Branches Yet"
+        description="You do not have any salon branches linked to this owner account yet. Register your first branch to set up services, assign staff, and start receiving appointments."
+        action={{
+          label: "Register Your First Salon Branch",
+          onClick: onOpenRegisterSalon || (() => {})
+        }}
+      />
     );
   }
 
@@ -397,11 +473,13 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       <div className="bg-gradient-to-r from-purple-900 via-pink-900 to-rose-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-white p-1 shadow-md border-2 border-purple-200 overflow-hidden shrink-0">
-            <img
-              src={activeSalon?.logo || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=150&auto=format&fit=crop&q=80'}
-              alt={activeSalon?.salon_name}
-              className="w-full h-full object-cover rounded-xl"
-            />
+            {activeSalon?.logo ? (
+              <img
+                src={activeSalon.logo}
+                alt={activeSalon.salon_name}
+                className="w-full h-full object-cover rounded-xl"
+              />
+            ) : null}
           </div>
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/10 text-purple-200 text-xs font-semibold mb-1">
@@ -553,7 +631,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 setSelectedSalonId(salonId);
                 setActiveTab('overview');
               }}
-              onOpenRegisterSalon={onOpenRegisterSalon || (() => {})}
+              onOpenRegisterSalon={onOpenRegisterBranch || onOpenRegisterSalon || (() => {})}
               onShowToast={showToast}
             />
           )}
@@ -566,7 +644,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               services={services}
               technicians={technicians}
               reviews={reviews}
-              onNavigateToBookings={() => setActiveTab('appointments')}
               showToast={showToast}
             />
           )}
@@ -707,12 +784,12 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                           <div className="flex items-center gap-1.5">
                             <span className="text-gray-500">Specialist:</span>
                             <select
-                              value={appt.staff_id || ''}
+                              value={appt.technician_id || appt.staff_id || ''}
                               onChange={(e) => {
                                 const tId = Number(e.target.value);
                                 const tech = technicians.find((t) => t.id === tId);
                                 if (tech) {
-                                  handleAssignTechnician(appt.id, tech.id, tech.name);
+                                  handleAssignTechnician(appt.id, tech.id, tech.fullname);
                                 }
                               }}
                               className="bg-gray-50 border border-gray-200 text-xs font-semibold rounded-lg px-2 py-1 text-gray-800 focus:outline-none cursor-pointer"
@@ -720,7 +797,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                               <option value="">{appt.staff_name || 'Select Specialist'}</option>
                               {technicians.map((t) => (
                                 <option key={t.id} value={t.id}>
-                                  {t.name} ({t.specialties})
+                                  {t.fullname} ({t.specialties})
                                 </option>
                               ))}
                             </select>
@@ -791,7 +868,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Add New Treatment</span>
+                  <span>{editingServiceId ? 'Edit Treatment' : 'Add New Treatment'}</span>
                 </button>
               </div>
 
@@ -801,7 +878,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   onSubmit={handleCreateService}
                   className="p-5 rounded-2xl bg-purple-50/50 border border-purple-200 space-y-4 animate-in fade-in duration-150"
                 >
-                  <h4 className="text-sm font-bold text-purple-950">Add New Treatment to Menu</h4>
+                  <h4 className="text-sm font-bold text-purple-950">{editingServiceId ? 'Edit Treatment' : 'Add New Treatment to Menu'}</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -862,6 +939,36 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Treatment Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          showToast('Please choose an image smaller than 2 MB');
+                          e.currentTarget.value = '';
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => setNewServiceImage(String(reader.result));
+                        reader.readAsDataURL(file);
+                      }}
+                      className="w-full rounded-xl bg-white border border-purple-200 p-2 text-xs"
+                    />
+                    {newServiceImage && (
+                      <img
+                        src={newServiceImage}
+                        alt="Treatment preview"
+                        className="mt-2 h-24 w-24 rounded-xl object-cover border border-purple-200"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Description
                     </label>
                     <textarea
@@ -876,7 +983,10 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowAddService(false)}
+                      onClick={() => {
+                        setShowAddService(false);
+                        setEditingServiceId(null);
+                      }}
                       className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs text-gray-700 cursor-pointer"
                     >
                       Cancel
@@ -885,7 +995,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       type="submit"
                       className="px-4 py-1.5 rounded-xl bg-purple-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
                     >
-                      Save Service
+                      {editingServiceId ? 'Update Service' : 'Save Service'}
                     </button>
                   </div>
                 </form>
@@ -920,13 +1030,22 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteService(s.id)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                      title="Delete service"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => startEditingService(s)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                        title="Edit service"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteService(s.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Delete service"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -961,7 +1080,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   onSubmit={handleCreateTechnician}
                   className="p-5 rounded-2xl bg-purple-50/50 border border-purple-200 space-y-3 animate-in fade-in duration-150"
                 >
-                  <h4 className="text-sm font-bold text-purple-950">Register New Staff Member</h4>
+                  <h4 className="text-sm font-bold text-purple-950">{editingTechnicianId ? 'Edit Staff Member' : 'Register New Staff Member'}</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Name</label>
@@ -998,7 +1117,10 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowAddTech(false)}
+                      onClick={() => {
+                        setShowAddTech(false);
+                        setEditingTechnicianId(null);
+                      }}
                       className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs text-gray-700 cursor-pointer"
                     >
                       Cancel
@@ -1007,7 +1129,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       type="submit"
                       className="px-4 py-1.5 rounded-xl bg-purple-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
                     >
-                      Save Specialist
+                      {editingTechnicianId ? 'Update Specialist' : 'Save Specialist'}
                     </button>
                   </div>
                 </form>
@@ -1039,6 +1161,13 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">{t.specialties}</p>
                     </div>
+                    <button
+                      onClick={() => startEditingTechnician(t)}
+                      className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                      title="Edit technician"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1063,7 +1192,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* TAB 7: STUDIO PROFILE & HOURS SETTINGS */}
           {activeTab === 'settings' && activeSalon && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div>
+                    <div>
                 <h3 className="text-base font-serif font-bold text-gray-900 flex items-center gap-2">
                   <Store className="w-4 h-4 text-purple-700" />
                   Studio Profile, Contact & Business Hours
@@ -1075,7 +1204,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
               <form onSubmit={handleSaveSettings} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                    <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Salon Business Name
                     </label>
@@ -1088,7 +1217,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     />
                   </div>
 
-                  <div>
+                    <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Store Address / Location
                     </label>
@@ -1101,7 +1230,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     />
                   </div>
 
-                  <div>
+                    <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Contact Phone
                     </label>
@@ -1113,7 +1242,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     />
                   </div>
 
-                  <div>
+                    <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Business Email
                     </label>
@@ -1144,23 +1273,34 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     <Clock className="w-3.5 h-3.5 text-purple-700" />
                     Standard Operating Schedule
                   </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div className="p-2 bg-white rounded-xl border border-gray-200">
-                      <span className="font-bold text-gray-800 block">Mon - Fri</span>
-                      <span className="text-gray-500 text-[11px]">10:00 AM - 8:00 PM</span>
-                    </div>
-                    <div className="p-2 bg-white rounded-xl border border-gray-200">
-                      <span className="font-bold text-gray-800 block">Saturday</span>
-                      <span className="text-purple-700 font-semibold text-[11px]">09:00 AM - 9:00 PM</span>
-                    </div>
-                    <div className="p-2 bg-white rounded-xl border border-gray-200">
-                      <span className="font-bold text-gray-800 block">Sunday</span>
-                      <span className="text-gray-500 text-[11px]">10:00 AM - 6:00 PM</span>
-                    </div>
-                    <div className="p-2 bg-white rounded-xl border border-gray-200">
-                      <span className="font-bold text-gray-800 block">Advance Notice</span>
-                      <span className="text-emerald-700 font-semibold text-[11px]">Min 2 hours</span>
-                    </div>
+                  <div className="space-y-2">
+                    {workingHours.map((hour, index) => (
+                      <div key={hour.day_of_week} className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 text-xs">
+                        <span className="font-bold text-gray-800">{hour.day_of_week}</span>
+                        <label className="flex items-center gap-1.5 text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={hour.is_closed}
+                            onChange={(event) => setWorkingHours((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, is_closed: event.target.checked } : item))}
+                          />
+                          Closed
+                        </label>
+                        <input
+                          type="time"
+                          value={hour.opening_time}
+                          disabled={hour.is_closed}
+                          onChange={(event) => setWorkingHours((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, opening_time: event.target.value } : item))}
+                          className="rounded-lg border border-gray-200 p-1.5 disabled:bg-gray-100"
+                        />
+                        <input
+                          type="time"
+                          value={hour.closing_time}
+                          disabled={hour.is_closed}
+                          onChange={(event) => setWorkingHours((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, closing_time: event.target.value } : item))}
+                          className="rounded-lg border border-gray-200 p-1.5 disabled:bg-gray-100"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 

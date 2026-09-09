@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Heart,
   Briefcase,
-  MapPin,
   TrendingUp,
   Users,
   CalendarCheck,
@@ -16,19 +15,18 @@ import {
   EyeOff,
   ChevronLeft,
 } from 'lucide-react';
-import { User, BusinessCategory } from '../../types';
-import { API_BASE } from '../../lib/api';
+import { User } from '../../types';
+import { validateEmail, validatePassword, validateFullname, validatePhone } from '../../lib/validation';
+import { login, register, formatAuthError } from '../../lib/auth';
 
 interface OwnerAuthPageProps {
   initialMode?: 'signin' | 'register';
-  categories?: BusinessCategory[];
   onLoginSuccess: (user: User) => void;
   onNavigate: (tab: string) => void;
 }
 
 export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
   initialMode = 'signin',
-  categories = [],
   onLoginSuccess,
   onNavigate,
 }) => {
@@ -38,49 +36,42 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
   const [fullname, setFullname] = useState('');
   const [phone, setPhone] = useState('');
 
-  // Salon Business Details (For Owner Registration)
-  const [salonName, setSalonName] = useState('');
-  const [salonAddress, setSalonAddress] = useState('');
-  const [salonPhone, setSalonPhone] = useState('');
-  const [salonCategoryId, setSalonCategoryId] = useState('1');
-  const [salonDescription, setSalonDescription] = useState('');
-
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    setError('');
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || 'Invalid email');
       return;
     }
 
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address (e.g., user@example.com)');
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || 'Invalid password');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: 'salon_owner' }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to sign in as salon owner.');
+      const authResult = await login({ email, password, role: 'salon_owner' });
+      
+      if (!authResult.success) {
+        setError(formatAuthError(authResult.error || 'Login failed', authResult.details));
         return;
       }
 
-      onLoginSuccess(data.user);
-      onNavigate('owner-dashboard');
+      if (authResult.user) {
+        onLoginSuccess(authResult.user);
+        onNavigate('owner-dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Login network error. Please try again.');
     } finally {
@@ -90,44 +81,58 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullname || !email || !password) {
-      setError('Please provide your full name, email, and password.');
+    setError('');
+
+    // Validate fullname
+    const fullnameValidation = validateFullname(fullname);
+    if (!fullnameValidation.isValid) {
+      setError(fullnameValidation.error || 'Invalid full name');
       return;
     }
-    if (!salonName) {
-      setError('Please specify your salon / studio business name.');
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || 'Invalid email');
       return;
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || 'Invalid password');
+      return;
+    }
+
+    // Validate phone (optional but provided)
+    if (phone) {
+      const phoneValidation = validatePhone(phone);
+      if (!phoneValidation.isValid) {
+        setError(phoneValidation.error || 'Invalid phone number');
+        return;
+      }
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullname,
-          email,
-          password,
-          phone,
-          user_type: 'salon_owner',
-          salon_name: salonName,
-          salon_address: salonAddress || 'Metro Manila, Philippines',
-          salon_phone: salonPhone || phone,
-          salon_category_id: salonCategoryId,
-          salon_description: salonDescription,
-        }),
+      const authResult = await register({
+        fullname,
+        email,
+        password,
+        phone,
+        user_type: 'salon_owner',
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Salon Owner registration failed.');
+      
+      if (!authResult.success) {
+        setError(formatAuthError(authResult.error || 'Registration failed', authResult.details));
         return;
       }
 
-      onLoginSuccess(data.user);
-      onNavigate('owner-dashboard');
+      if (authResult.user) {
+        onLoginSuccess(authResult.user);
+        onNavigate('owner-dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Registration error. Please try again.');
     } finally {
@@ -419,102 +424,17 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
                 </div>
               </div>
 
-              {/* Salon Details Section */}
-              <div className="pt-2 border-t border-purple-100 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-purple-700">
-                  Salon Profile & Location
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Salon Business Name *
-                    </label>
-                    <div className="relative">
-                      <Store className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        id="owner-register-salon-name"
-                        type="text"
-                        value={salonName}
-                        onChange={(e) => setSalonName(e.target.value)}
-                        placeholder="e.g. Celestial Gel & Spa Lounge"
-                        required
-                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-purple-200 bg-purple-50/20 text-xs text-gray-900 focus:outline-purple-600"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Primary Service Category
-                    </label>
-                    <select
-                      id="owner-register-category"
-                      value={salonCategoryId}
-                      onChange={(e) => setSalonCategoryId(e.target.value)}
-                      className="w-full p-2 rounded-xl border border-purple-200 bg-purple-50/20 text-xs text-gray-900 focus:outline-purple-600"
-                    >
-                      {categories.length > 0 ? (
-                        categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.category_name}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="1">Nail Services</option>
-                          <option value="2">Manicure</option>
-                          <option value="3">Pedicure</option>
-                          <option value="4">Nail Art</option>
-                          <option value="5">Nail Extensions</option>
-                          <option value="6">Gel Polish</option>
-                          <option value="7">Nail Care</option>
-                          <option value="8">Nail Design</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Studio Address / Mall Location
-                  </label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="owner-register-salon-address"
-                      type="text"
-                      value={salonAddress}
-                      onChange={(e) => setSalonAddress(e.target.value)}
-                      placeholder="e.g. Level 3, Greenbelt 5, Makati City"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-purple-200 bg-purple-50/20 text-xs text-gray-900 focus:outline-purple-600"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Brief Salon Description / Specialties
-                  </label>
-                  <textarea
-                    id="owner-register-salon-desc"
-                    value={salonDescription}
-                    onChange={(e) => setSalonDescription(e.target.value)}
-                    placeholder="Describe your studio's ambiance, hygiene protocols, and signature styles..."
-                    rows={2}
-                    className="w-full p-2.5 rounded-xl border border-purple-200 bg-purple-50/20 text-xs text-gray-900 focus:outline-purple-600"
-                  />
-                </div>
+              <div className="rounded-xl border border-purple-200 bg-purple-50/60 px-3 py-2.5 text-xs text-purple-900">
+                Your owner account will be created without a branch. After signing in, use Register New Branch to submit your first salon location for admin approval.
               </div>
 
               <button
                 id="owner-submit-register-btn"
                 type="submit"
-                disabled={loading || !fullname || !email || !salonName}
+                disabled={loading || !fullname || !email}
                 className="w-full py-3 rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-semibold text-sm shadow-md shadow-purple-900/20 disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
               >
-                <span>{loading ? 'Creating Partner Account...' : 'Register Salon & Launch Dashboard'}</span>
+                <span>{loading ? 'Creating Partner Account...' : 'Create Owner Account & Continue'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

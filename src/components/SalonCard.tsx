@@ -17,16 +17,23 @@ export const SalonCard: React.FC<SalonCardProps> = ({
   isFavorite = false,
   onToggleFavorite,
 }) => {
+  // Safety check for salon data
+  if (!salon) {
+    return null;
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-pink-100 shadow-xs hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group">
       {/* Cover / Image Header */}
       <div className="relative h-48 overflow-hidden bg-pink-50">
-        <img
-          src={salon.banner || salon.logo}
-          alt={salon.salon_name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
-        />
+        {salon.banner || salon.logo ? (
+          <img
+            src={salon.banner || salon.logo || undefined}
+            alt={salon.salon_name || 'Salon'}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Favorite Pin Button */}
@@ -37,7 +44,7 @@ export const SalonCard: React.FC<SalonCardProps> = ({
               onToggleFavorite(salon.id);
             }}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center text-gray-700 hover:text-rose-600 transition-colors shadow-sm cursor-pointer"
-            title="Save to favorites"
+            title={isFavorite ? 'Remove from favorites' : 'Save to favorites'}
           >
             <Heart
               className={`w-4 h-4 ${
@@ -61,18 +68,21 @@ export const SalonCard: React.FC<SalonCardProps> = ({
 
         {/* Salon Logo Overlay */}
         <div className="absolute -bottom-4 left-4 w-12 h-12 rounded-xl bg-white p-0.5 shadow-md border border-pink-100 overflow-hidden">
-          <img
-            src={salon.logo}
-            alt="logo"
-            className="w-full h-full object-cover rounded-lg"
-          />
+          {salon.logo ? (
+            <img
+              src={salon.logo}
+              alt={`${salon.salon_name || 'Salon'} logo`}
+              className="w-full h-full object-cover rounded-lg"
+              loading="lazy"
+            />
+          ) : null}
         </div>
 
         {/* Rating Floating Tag */}
         <div className="absolute bottom-2 right-3 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-xs font-semibold">
           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-          <span>{Number(salon.avg_rating || 0).toFixed(1)}</span>
-          <span className="text-white/60 text-[10px]">({salon.review_count})</span>
+          <span>{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
+          {salon.review_count ? <span className="text-white/60 text-[10px]">({salon.review_count})</span> : null}
         </div>
       </div>
 

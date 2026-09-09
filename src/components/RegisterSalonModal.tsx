@@ -22,13 +22,13 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<number>(1);
-  const [logoUrl, setLogoUrl] = useState('https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&auto=format&fit=crop&q=80');
+  const [logoUrl, setLogoUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!salonName || !address) return;
+    if (!currentUser || currentUser.user_type !== 'salon_owner' || !salonName || !address) return;
 
     setSubmitting(true);
     try {
@@ -36,7 +36,7 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          owner_id: currentUser?.id || 2,
+          owner_id: currentUser.id,
           salon_name: salonName,
           address,
           phone,
@@ -48,16 +48,19 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
       });
 
       if (res.ok) {
-        const newSalon = await res.json();
+        const data = await res.json();
         setDone(true);
         setTimeout(() => {
-          onSuccess(newSalon);
+          onSuccess(data.salon || data);
           onClose();
         }, 1500);
+      } else {
+        const errorData = await res.json();
+        console.error('Register salon error:', errorData);
+        setSubmitting(false);
       }
     } catch (err) {
       console.error('Register salon error:', err);
-    } finally {
       setSubmitting(false);
     }
   };
@@ -150,6 +153,23 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
                 className="w-full p-2.5 rounded-xl border border-pink-200 bg-pink-50/20 text-xs focus:outline-pink-500"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                Branch Email
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="branch@salon.com"
+                  required
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-pink-200 bg-pink-50/20 text-xs focus:outline-pink-500"
+                />
+              </div>
             </div>
 
             <div>

@@ -74,7 +74,10 @@ A modern mobile-web responsive nail salon portal built with React, TypeScript, N
    DB_NAME=nailglamhub_db
    VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
    ADMIN_CODES=ADMIN2025,GLAM_ADMIN,ADMIN,SUPERADMIN
+   ENABLE_REGISTRATION_RATE_LIMIT=true
    ```
+
+   Set `ENABLE_REGISTRATION_RATE_LIMIT=false` during local development if repeated registration testing is needed. Keep it enabled in production.
 
 5. **Start the development server**
    ```bash
@@ -95,15 +98,15 @@ npm start
 
 ### Admin
 - Email: admin@nailglamhub.com
-- Password: (Set during registration with admin code)
+- Password: Demo123! (local seed account; change after import)
 
 ### Salon Owner
 - Email: salon@nailglamhub.com
-- Password: (Set during registration)
+- Password: Demo123! (local seed account; change after import)
 
 ### Customer
 - Email: customer@nailglamhub.com
-- Password: (Set during registration)
+- Password: Demo123! (local seed account; change after import)
 
 ## File Structure
 

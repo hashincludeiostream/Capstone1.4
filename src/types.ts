@@ -37,6 +37,7 @@ export interface Salon {
   maps_place_id?: string;
   maps_embed_url?: string;
   featured?: boolean;
+  monthly_target_bookings?: number;
 }
 
 export interface Service {
@@ -85,8 +86,10 @@ export interface Appointment {
   service_name?: string;
   service_price?: number;
   service_duration?: number;
+  technician_id?: number | null;
   staff_id?: number | null;
   staff_name?: string;
+  total_price?: number;
   appointment_date: string;
   appointment_time: string;
   status: AppointmentStatus;
@@ -97,6 +100,8 @@ export interface Appointment {
 export interface Review {
   id: number;
   salon_id: number;
+  technician_id?: number | null;
+  technician_name?: string;
   user_id: number;
   user_name: string;
   user_avatar?: string;
@@ -181,4 +186,32 @@ export interface Announcement {
   created_at: string;
   link_url?: string;
   link_text?: string;
+}
+
+export interface ReelCommentResponse {
+  id: number;
+  reel_id: number;
+  user_id: number;
+  user_name: string;
+  comment: string;
+  created_at: string;
+}
+
+export interface PlatformStats {
+  total_customers: number;
+  total_salon_owners: number;
+  total_admins: number;
+  total_salons: number;
+  verified_salons: number;
+  pending_salons: number;
+  total_appointments: number;
+  pending_appointments: number;
+  confirmed_appointments: number;
+  completed_appointments: number;
+  total_reviews: number;
+  total_reels: number;
+  total_announcements: number;
+  active_announcements: number;
+  estimated_gmv: number;
+  platform_commission: number;
 }

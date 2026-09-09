@@ -115,12 +115,12 @@ export const ReelsView: React.FC<ReelsViewProps> = ({
     }
   };
 
-  const categories = ['All', 'Russian Manicure', 'Nail Art Hack', '3D Art', 'Cat-Eye', 'Gel-X'];
+  const categories = ['All', ...Array.from(new Set(reels.map((reel) => reel.category).filter(Boolean))).sort()];
 
   const filteredReels =
     selectedCategory === 'All'
       ? reels
-      : reels.filter((r) => r.category.toLowerCase().includes(selectedCategory.toLowerCase()));
+      : reels.filter((r) => (r.category || '').toLowerCase().includes(selectedCategory.toLowerCase()));
 
   return (
     <div className="space-y-6">
@@ -172,22 +172,26 @@ export const ReelsView: React.FC<ReelsViewProps> = ({
             >
               {/* Media Player / Thumbnail Container */}
               <div className="relative aspect-4/5 bg-black overflow-hidden group">
-                <img
-                  src={reel.thumbnail}
-                  alt={reel.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {reel.thumbnail ? (
+                  <img
+                    src={reel.thumbnail}
+                    alt={reel.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : null}
 
                 {/* Dark Vignette Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
                 {/* Top Creator Tag */}
                 <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                  <img
-                    src={reel.salon_logo || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=100&auto=format&fit=crop&q=80'}
-                    alt={reel.salon_name}
-                    className="w-5 h-5 rounded-full object-cover"
-                  />
+                  {reel.salon_logo ? (
+                    <img
+                      src={reel.salon_logo}
+                      alt={reel.salon_name}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                  ) : null}
                   <span className="text-xs font-semibold text-white truncate max-w-[140px]">
                     {reel.salon_name}
                   </span>

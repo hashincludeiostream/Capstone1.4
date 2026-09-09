@@ -35,6 +35,7 @@ interface SidebarProps {
   onOpenAbout: () => void;
   onOpenContact: () => void;
   isAdminMode: boolean;
+  onNavigate?: (tab: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,7 +46,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAbout,
   onOpenContact,
   isAdminMode,
+  onNavigate,
 }) => {
+  const handleNavigation = (tab: string) => {
+    if (onNavigate) {
+      onNavigate(tab);
+    } else {
+      setActiveTab(tab);
+    }
+  };
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
 
@@ -98,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 mt-1">
             <button
               id="sidebar-admin-overview-btn"
-              onClick={() => setActiveTab('admin-dashboard')}
+              onClick={() => handleNavigation('admin-dashboard')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                 activeTab === 'admin-dashboard'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
@@ -111,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               id="sidebar-admin-salons-btn"
-              onClick={() => setActiveTab('admin-salons')}
+              onClick={() => handleNavigation('admin-salons')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                 activeTab === 'admin-salons'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
@@ -124,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               id="sidebar-admin-users-btn"
-              onClick={() => setActiveTab('admin-users')}
+              onClick={() => handleNavigation('admin-users')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                 activeTab === 'admin-users'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
@@ -288,7 +297,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Scissors className="w-4 h-4 text-purple-600" />
-              <span>Services & Pricing</span>
+              <span>Services &amp; Treatments</span>
             </button>
 
             <button
@@ -354,9 +363,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 mt-1">
             <button
               id="sidebar-register-branch-btn"
-              onClick={() => setActiveTab('register-owner')}
+              onClick={() => setActiveTab('owner-branches')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'register-owner'
+                activeTab === 'owner-branches'
                   ? 'bg-purple-700 text-white font-bold'
                   : 'text-purple-900 bg-white hover:bg-purple-100/70 border border-purple-200'
               }`}
@@ -492,6 +501,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <CalendarCheck className="w-4 h-4 text-pink-600" />
                 <span>My Bookings</span>
+              </button>
+
+              <button
+                id="sidebar-favorites-btn"
+                onClick={() => setActiveTab('favorites')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  activeTab === 'favorites'
+                    ? 'bg-pink-100 text-pink-900 font-semibold'
+                    : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
+                }`}
+              >
+                <Heart className="w-4 h-4 text-pink-600" />
+                <span>Favorite Salons</span>
               </button>
 
               <button

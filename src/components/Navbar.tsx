@@ -31,6 +31,7 @@ interface NavbarProps {
   onLogout: () => void;
   onOpenRegisterSalon: () => void;
   isAdminMode: boolean;
+  onNavigate?: (tab: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -42,7 +43,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenRegisterSalon,
   isAdminMode,
+  onNavigate,
 }) => {
+  const handleNavigation = (tab: string) => {
+    if (onNavigate) {
+      onNavigate(tab);
+    } else {
+      setActiveTab(tab);
+    }
+  };
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = React.useState(false);
 
@@ -67,11 +76,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             id="brand-logo-btn"
             onClick={() => {
               if (currentUser?.user_type === 'salon_owner') {
-                setActiveTab('owner-dashboard');
+                handleNavigation('owner-dashboard');
               } else if (currentUser?.user_type === 'admin') {
-                setActiveTab('admin-dashboard');
+                handleNavigation('admin-dashboard');
               } else {
-                setActiveTab('landing');
+                handleNavigation('landing');
               }
             }}
             className="flex items-center gap-3 cursor-pointer group"
@@ -202,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </button>
                           <button
                             onClick={() => {
-                              setActiveTab('register-owner');
+                              onOpenRegisterSalon();
                               setUserDropdownOpen(false);
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer"
@@ -435,7 +444,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full text-left px-4 py-2.5 text-sm font-semibold text-purple-900 hover:bg-purple-50 rounded-lg flex items-center gap-2"
                 >
                   <Scissors className="w-4 h-4 text-purple-600" />
-                  <span>Services & Pricing</span>
+                  <span>Services &amp; Treatments</span>
                 </button>
                 <button
                   onClick={() => {
@@ -503,6 +512,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   Explore Salons
                 </button>
+                {currentUser?.user_type === 'customer' && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('favorites');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-pink-50 rounded-lg flex items-center gap-2"
+                  >
+                    <Heart className="w-4 h-4 text-pink-600" />
+                    <span>Favorite Salons</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setActiveTab('map');

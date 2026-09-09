@@ -94,7 +94,7 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
                 Salon Partner
               </h4>
               <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                Manage appointment calendar, staff roster, pricing menu & promotions.
+                Manage appointment calendar, staff roster, service menu & promotions.
               </p>
             </div>
 

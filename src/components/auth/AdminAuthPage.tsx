@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Shield,
   Lock,
@@ -14,7 +14,9 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { User } from '../../types';
-import { API_BASE } from '../../lib/api';
+import { fetchRegistrationRateLimitStatus, updateRegistrationRateLimit } from '../../lib/api';
+import { validateEmail, validatePassword, validateFullname } from '../../lib/validation';
+import { login, register, formatAuthError } from '../../lib/auth';
 
 interface AdminAuthPageProps {
   initialMode?: 'signin' | 'register';
@@ -33,43 +35,66 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
   const [fullname, setFullname] = useState('');
   const [phone, setPhone] = useState('');
   const [adminCode, setAdminCode] = useState('');
+  const [registrationRateLimitEnabled, setRegistrationRateLimitEnabled] = useState(true);
+  const [updatingRateLimit, setUpdatingRateLimit] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (mode !== 'register') return;
+
+    fetchRegistrationRateLimitStatus()
+      .then(setRegistrationRateLimitEnabled)
+      .catch(() => setError('Unable to load registration protection status.'));
+  }, [mode]);
+
+  const handleToggleRateLimit = async () => {
+    setUpdatingRateLimit(true);
+    try {
+      setRegistrationRateLimitEnabled(
+        await updateRegistrationRateLimit(!registrationRateLimitEnabled)
+      );
+    } catch {
+      setError('Unable to update registration protection.');
+    } finally {
+      setUpdatingRateLimit(false);
+    }
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    setError('');
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || 'Invalid email');
       return;
     }
 
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address (e.g., user@example.com)');
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || 'Invalid password');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: 'admin' }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Admin verification failed. Ensure your account has administrative privileges.');
+      const authResult = await login({ email, password, role: 'admin' });
+      
+      if (!authResult.success) {
+        setError(formatAuthError(authResult.error || 'Login failed', authResult.details));
         return;
       }
 
-      onLoginSuccess(data.user);
-      onNavigate('admin-dashboard');
+      if (authResult.user) {
+        onLoginSuccess(authResult.user);
+        onNavigate('admin-dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Login network error. Please try again.');
     } finally {
@@ -79,40 +104,55 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullname || !email || !password) {
-      setError('Please provide administrator name, email, and password.');
+    setError('');
+
+    // Validate fullname
+    const fullnameValidation = validateFullname(fullname);
+    if (!fullnameValidation.isValid) {
+      setError(fullnameValidation.error || 'Invalid full name');
       return;
     }
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || 'Invalid email');
+      return;
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || 'Invalid password');
+      return;
+    }
+
     if (!adminCode) {
       setError('Administrative authorization code is mandatory for staff account creation.');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullname,
-          email,
-          password,
-          phone,
-          user_type: 'admin',
-          admin_code: adminCode,
-        }),
+      const authResult = await register({
+        fullname,
+        email,
+        password,
+        phone,
+        user_type: 'admin',
+        admin_code: adminCode,
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Administrator authorization failed.');
+      
+      if (!authResult.success) {
+        setError(formatAuthError(authResult.error || 'Registration failed', authResult.details));
         return;
       }
 
-      onLoginSuccess(data.user);
-      onNavigate('admin-dashboard');
+      if (authResult.user) {
+        onLoginSuccess(authResult.user);
+        onNavigate('admin-dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Registration error. Please try again.');
     } finally {
@@ -412,6 +452,32 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-rose-300 bg-rose-50/30 text-sm font-mono text-gray-900 focus:outline-rose-600"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2.5">
+                <div>
+                  <p className="text-xs font-bold text-gray-800">Registration Rate Protection</p>
+                  <p className="text-[11px] text-gray-500">
+                    {registrationRateLimitEnabled ? 'Limits repeated registrations.' : 'Disabled for development testing.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={registrationRateLimitEnabled}
+                  aria-label="Toggle registration rate protection"
+                  onClick={handleToggleRateLimit}
+                  disabled={updatingRateLimit}
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60 ${
+                    registrationRateLimitEnabled ? 'bg-emerald-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                      registrationRateLimitEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
 
               <button

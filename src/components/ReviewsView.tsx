@@ -106,6 +106,9 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ salons, onOpenLeaveRev
                     <div>
                       <h4 className="text-xs font-bold text-gray-900">{rev.customer_name || `Customer #${rev.customer_id}`}</h4>
                       <p className="text-[10px] text-pink-700 font-semibold">{rev.salon_name || 'Salon'}</p>
+                      {rev.technician_name && (
+                        <p className="text-[10px] text-purple-700">Technician: {rev.technician_name}</p>
+                      )}
                     </div>
                   </div>
 

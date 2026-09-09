@@ -74,11 +74,13 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
       <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-pink-100">
         {/* Header / Hero Banner */}
         <div className="relative h-56 sm:h-72 bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 text-white shrink-0">
-          <img
-            src={salon.banner || salon.logo}
-            alt={salon.salon_name}
-            className="w-full h-full object-cover opacity-60"
-          />
+          {salon.banner || salon.logo ? (
+            <img
+              src={salon.banner || salon.logo || undefined}
+              alt={salon.salon_name}
+              className="w-full h-full object-cover opacity-60"
+            />
+          ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
 
           {/* Close button */}
@@ -93,11 +95,13 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
           <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 right-4 sm:right-6 flex items-end justify-between gap-4">
             <div className="flex items-end gap-3 sm:gap-4">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-1 shadow-xl border-2 border-white shrink-0 overflow-hidden">
-                <img
-                  src={salon.logo}
-                  alt={salon.salon_name}
-                  className="w-full h-full object-cover rounded-xl"
-                />
+                {salon.logo ? (
+                  <img
+                    src={salon.logo}
+                    alt={`${salon.salon_name} logo`}
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : null}
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -111,8 +115,8 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                 <div className="flex items-center gap-3 mt-1.5 text-xs sm:text-sm text-pink-100/90">
                   <div className="flex items-center gap-1">
                     <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span className="font-bold">{Number(salon.avg_rating || 0).toFixed(1)}</span>
-                    <span className="text-white/70">({salon.review_count} verified reviews)</span>
+                    <span className="font-bold">{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
+                    <span className="text-white/70">({salon.review_count || 0} verified reviews)</span>
                   </div>
                   <span>•</span>
                   <div className="flex items-center gap-1">
@@ -144,7 +148,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
             }`}
           >
             <Scissors className="w-4 h-4" />
-            <span>Services & Pricing ({salonData.services.length})</span>
+            <span>Services &amp; Treatments ({salonData.services.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('technicians')}
@@ -298,11 +302,17 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                           key={tech.id}
                           className="p-4 rounded-2xl border border-pink-100 bg-pink-50/20 flex gap-3.5 items-start"
                         >
-                          <img
-                            src={tech.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'}
-                            alt={tech.name}
-                            className="w-14 h-14 rounded-full object-cover border-2 border-pink-200 shrink-0"
-                          />
+                          {tech.avatar ? (
+                            <img
+                              src={tech.avatar}
+                              alt={tech.name}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-pink-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center border-2 border-pink-200 shrink-0">
+                              <span className="text-sm font-bold">{tech.name?.charAt(0).toUpperCase()}</span>
+                            </div>
+                          )}
                           <div>
                             <h5 className="text-sm font-bold text-gray-900">{tech.name}</h5>
                             <p className="text-xs text-pink-700 font-medium">
@@ -334,7 +344,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                         Customer Feedback & Experiences
                       </h4>
                       <p className="text-xs text-gray-500">
-                        Rated {Number(salon.avg_rating || 0).toFixed(1)} out of 5 stars by verified clients.
+                        {salon.review_count ? `Rated ${Number(salon.avg_rating).toFixed(1)} out of 5 stars by verified clients.` : 'This salon has not received a rating yet.'}
                       </p>
                     </div>
                     <button

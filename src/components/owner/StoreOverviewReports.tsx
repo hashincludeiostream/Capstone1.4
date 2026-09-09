@@ -1,36 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import {
-  TrendingUp,
   Users,
-  Calendar,
   Sparkles,
   Download,
   Search,
-  Filter,
-  Star,
   Award,
   ArrowUpRight,
   Clock,
-  Scissors,
   CheckCircle2,
-  AlertCircle,
   MessageSquare,
   Send,
-  Heart,
-  ChevronRight,
-  UserCheck,
-  Tag,
-  ShieldCheck,
-  FileSpreadsheet,
-  Percent,
   BarChart3,
   PieChart,
   RefreshCw,
-  Edit3,
   Store,
   CheckCheck,
   FileText,
-  Printer,
+  Edit3,
+  Star,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, Review } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
@@ -47,7 +34,6 @@ interface StoreOverviewReportsProps {
   services: Service[];
   technicians: Technician[];
   reviews: Review[];
-  onNavigateToBookings?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -57,7 +43,6 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
   services,
   technicians,
   reviews,
-  onNavigateToBookings,
   showToast,
 }) => {
   // Time period filter
@@ -101,8 +86,8 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
     const validCount = completedAppts.length + cancelledAppts.length;
     const completionRate = validCount > 0 ? Math.round((completedAppts.length / validCount) * 100) : 0;
 
-    // Monthly Target Bookings
-    const monthlyTarget = 30;
+    // Monthly Target Bookings (configurable per salon)
+    const monthlyTarget = salon.monthly_target_bookings || 30;
     const targetProgress = Math.min(100, Math.round(((completedAppts.length + confirmedAppts.length) / monthlyTarget) * 100));
 
     return {
@@ -116,6 +101,27 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       monthlyTarget,
       targetProgress,
     };
+  }, [appointments]);
+
+  const averageTreatmentsPerClient = useMemo(() => {
+    const clients = new Set(
+      appointments.map((appointment) => appointment.customer_id || appointment.customer_email || appointment.customer_name)
+    );
+    return clients.size > 0 ? (appointments.length / clients.size).toFixed(1) : null;
+  }, [appointments]);
+
+  const cancellationRate = appointments.length > 0
+    ? ((appointments.filter((appointment) => appointment.status === 'cancelled').length / appointments.length) * 100).toFixed(1)
+    : null;
+
+  const peakBookingDay = useMemo(() => {
+    if (appointments.length === 0) return null;
+    const counts = new Map<string, number>();
+    appointments.forEach((appointment) => {
+      const day = new Date(`${appointment.appointment_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
+      counts.set(day, (counts.get(day) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
   }, [appointments]);
 
   // Compute Category Booking Volume Breakdown
@@ -163,13 +169,13 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       if (!clientMap.has(name)) {
         clientMap.set(name, {
           name,
-          email: appt.customer_email || 'client@nailglamhub.com',
-          phone: appt.customer_phone || '0917-000-0000',
+          email: appt.customer_email || 'Not provided',
+          phone: appt.customer_phone || 'Not provided',
           appointments: [],
           completedVisits: 0,
           lastVisitDate: appt.appointment_date,
           favoriteService: appt.service_name || 'Nail Service',
-          preferredTechnician: appt.staff_name || 'Sarah Johnson',
+          preferredTechnician: appt.staff_name || 'Not assigned',
         });
       }
 
@@ -470,7 +476,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             </p>
             <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-medium text-emerald-600">
               <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>+18.4% fulfillment vs last period</span>
+              <span>{stats.totalAppointments > 0 ? 'Current period' : 'No period data yet'}</span>
             </div>
             <p className="text-[11px] text-gray-400 mt-1">
               +{stats.confirmedCount} upcoming confirmed sessions
@@ -491,7 +497,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
               {stats.avgDuration} mins
             </p>
             <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-medium text-purple-600">
-              <span>Avg 1.4 treatments per client</span>
+              <span>{averageTreatmentsPerClient ? `Avg ${averageTreatmentsPerClient} treatments per client` : 'No treatment data yet'}</span>
             </div>
             <p className="text-[11px] text-gray-400 mt-1">
               Specialized Japanese & Russian techniques
@@ -515,7 +521,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
               <span>{stats.completedCount} Completed / {stats.totalAppointments} Booked</span>
             </div>
             <p className="text-[11px] text-gray-400 mt-1">
-              Low no-show cancellation rate (5.2%)
+              {cancellationRate ? `${cancellationRate}% of bookings cancelled` : 'No cancellation data yet'}
             </p>
           </div>
         </div>
@@ -623,7 +629,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
               </span>
             </div>
             <span className="font-semibold text-purple-900">
-              Peak Day: Saturday (42% of weekly visits)
+              {peakBookingDay ? `Peak Day: ${peakBookingDay[0]} (${peakBookingDay[1]} bookings)` : 'Peak Day: Not enough data'}
             </span>
           </div>
         </div>
@@ -641,7 +647,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
           </div>
 
           <div className="space-y-3.5 pt-2">
-            {categoryBreakdown.map((cat, i) => (
+            {categoryBreakdown.filter((cat) => cat.count > 0).map((cat, i) => (
               <div key={i} className="space-y-1">
                 <div className="flex items-center justify-between text-xs font-semibold">
                   <span className="text-gray-700">{cat.name}</span>
@@ -673,7 +679,9 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
               CRM Strategy Insight
             </p>
             <p className="text-gray-600 text-[11px] leading-relaxed">
-              Russian Manicure & Builder Gel services boast the highest repeat booking rate (86% return within 3 weeks).
+              {averageTreatmentsPerClient
+                ? `Clients currently average ${averageTreatmentsPerClient} treatments in the loaded booking history.`
+                : 'Repeat-treatment insight will appear after bookings are recorded.'}
             </p>
           </div>
         </div>
@@ -906,11 +914,17 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
                 <tr key={tech.id} className="hover:bg-pink-50/30 transition-colors">
                   <td className="py-3.5 pr-3">
                     <div className="flex items-center gap-2.5">
-                      <img
-                        src={tech.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80'}
-                        alt={tech.name}
-                        className="w-8 h-8 rounded-full object-cover border border-pink-200 shrink-0"
-                      />
+                      {tech.avatar ? (
+                        <img
+                          src={tech.avatar}
+                          alt={tech.name}
+                          className="w-8 h-8 rounded-full object-cover border border-pink-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center border border-pink-200 shrink-0">
+                          <span className="text-[10px] font-bold">{tech.name?.charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
                       <div>
                         <span className="font-bold text-gray-900 block">{tech.name}</span>
                         <span className="text-[10px] text-gray-400">{tech.experience_years} yrs experience</span>
@@ -929,7 +943,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
                   <td className="py-3.5 pl-3 text-center">
                     <span className="inline-flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[11px]">
                       <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      {tech.rating}
+                      {tech.rating ? tech.rating : 'Not rated yet'}
                     </span>
                   </td>
                 </tr>

@@ -28,7 +28,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { User as UserType, Salon, Appointment, Technician, Service, Review } from '../../types';
-import { fetchAppointments, fetchTechnicians, fetchServices, fetchReviews } from '../../lib/api';
+import { fetchAppointments, fetchTechnicians, fetchServices, fetchReviews, fetchSalons } from '../../lib/api';
+import { LoadingSpinner } from '../LoadingSpinner';
 
 interface OwnerProfileProps {
   currentUser: UserType;
@@ -71,6 +72,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [ownerSalons, setOwnerSalons] = useState<Salon[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
 
   useEffect(() => {
@@ -79,20 +81,29 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
       
       setLoadingStats(true);
       try {
-        // Get the owner's salon
-        const ownerSalon = salons.find(s => s.owner_id === currentUser.id);
-        if (ownerSalon) {
+        const fetchedSalons = await fetchSalons({
+          owner_id: Number(currentUser.id),
+          includeUnpublished: true,
+        });
+        const ownerBranches = fetchedSalons.length > 0
+          ? fetchedSalons
+          : salons.filter((salon) => Number(salon.owner_id) === Number(currentUser.id));
+
+        const branchData = await Promise.all(ownerBranches.map(async (salon) => {
           const [appts, techs, servs, revs] = await Promise.all([
-            fetchAppointments({ salon_id: ownerSalon.id }),
-            fetchTechnicians(ownerSalon.id),
-            fetchServices(ownerSalon.id),
-            fetchReviews(ownerSalon.id),
+            fetchAppointments({ salon_id: salon.id }),
+            fetchTechnicians(salon.id),
+            fetchServices(salon.id),
+            fetchReviews(salon.id),
           ]);
-          setAppointments(appts);
-          setTechnicians(techs);
-          setServices(servs);
-          setReviews(revs);
-        }
+          return { appts, techs, servs, revs };
+        }));
+
+        setOwnerSalons(ownerBranches);
+        setAppointments(branchData.flatMap((branch) => branch.appts));
+        setTechnicians(branchData.flatMap((branch) => branch.techs));
+        setServices(branchData.flatMap((branch) => branch.servs));
+        setReviews(branchData.flatMap((branch) => branch.revs));
       } catch (error) {
         console.error('Error loading business stats:', error);
       } finally {
@@ -101,7 +112,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
     };
 
     loadBusinessStats();
-  }, [currentUser?.id, JSON.stringify(salons)]);
+  }, [currentUser?.id]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -141,7 +152,8 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
 
   const getUserSalon = () => {
     if (!currentUser?.id || !salons || salons.length === 0) return null;
-    return salons.find(s => s.owner_id === currentUser.id);
+    return ownerSalons.find(s => Number(s.owner_id) === Number(currentUser.id))
+      || salons.find(s => Number(s.owner_id) === Number(currentUser.id));
   };
 
   const userSalon = getUserSalon();
@@ -149,7 +161,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
   // Calculate business metrics
   const totalRevenue = appointments
     .filter(a => a.status === 'completed')
-    .reduce((sum, a) => sum + (a.service_price || 0), 0);
+    .reduce((sum, a) => sum + (a.total_price || a.service_price || 0), 0);
   
   const completedAppointments = appointments.filter(a => a.status === 'completed').length;
   const pendingAppointments = appointments.filter(a => a.status === 'pending').length;
@@ -158,7 +170,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
     : '0.0';
 
   if (!currentUser) {
-    return <div className="text-center py-16">Loading profile...</div>;
+    return <LoadingSpinner text="Loading profile..." fullScreen />;
   }
 
   return (
@@ -292,8 +304,8 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-1">
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        <span className="text-sm font-semibold">{userSalon.avg_rating}</span>
-                        <span className="text-xs text-gray-500">({userSalon.review_count} reviews)</span>
+                        <span className="text-sm font-semibold">{userSalon.review_count ? Number(userSalon.avg_rating).toFixed(1) : 'Not rated'}</span>
+                        <span className="text-xs text-gray-500">({userSalon.review_count || 0} reviews)</span>
                       </div>
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                         userSalon.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
@@ -396,8 +408,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
             </h2>
             {loadingStats ? (
               <div className="text-center py-8">
-                <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Loading business data...</p>
+                <LoadingSpinner text="Loading business data..." />
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">

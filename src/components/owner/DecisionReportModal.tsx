@@ -47,8 +47,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
       urgency: 'Immediate',
       urgencyColor: 'bg-amber-100 text-amber-900 border-amber-300',
       description:
-        'Saturdays represent over 40% of weekly booking demand. Stagger technician breaks and introduce 15-minute cleaning buffers to eliminate station bottlenecks and handle 3-4 extra clients per day.',
-      impact: 'Est. +18% appointment fulfillment capacity',
+        `Use the busiest day in the current report (${reportData.stats.totalAppointments > 0 ? 'see booking trend' : 'not available yet'}) to plan technician coverage and cleaning buffers.`,
+      impact: 'Capacity planning based on recorded bookings',
     },
     {
       title: 'Signature Russian Manicure & Gel Bundling',
@@ -57,8 +57,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
       urgency: 'High Impact',
       urgencyColor: 'bg-purple-100 text-purple-900 border-purple-300',
       description:
-        'Russian Manicures and Builder Gel extensions show an 86% repeat rate. Package these with spa cuticle nourishment treatments to boost client lifetime retention.',
-      impact: 'Increases customer retention from 78% to 85%',
+        'Use the treatment mix and repeat-client counts in this report to identify services that merit bundled offers.',
+      impact: 'Promote services supported by recorded booking history',
     },
     {
       title: `Automated Re-engagement for ${reportData.crmSummary.atRiskCount} Inactive Clients`,
@@ -67,8 +67,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
       urgency: 'Action Required',
       urgencyColor: 'bg-rose-100 text-rose-900 border-rose-300',
       description:
-        'Clients who have not booked in over 30 days are at risk of switching salons. Deploy SMS & email promotional codes offering 15% off their next in-salon session.',
-      impact: 'Recovers an estimated 25-30% of churned clients',
+        'Clients with no recent completed visit can be reviewed for a re-engagement campaign using approved salon offers.',
+      impact: 'Re-engage clients identified by recorded visit history',
     },
     {
       title: 'Technician 3D Art Skill Cross-Training',
@@ -218,7 +218,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
                     {reportData.stats.completionRate}%
                   </p>
                   <span className="text-[10px] text-emerald-600 font-semibold block mt-0.5">
-                    Above target (&gt;90%)
+                    {reportData.stats.completionRate >= 90 ? 'At or above 90% benchmark' : 'Below 90% benchmark'}
                   </span>
                 </div>
                 <div className="p-3.5 bg-white border border-gray-200 rounded-2xl text-center shadow-2xs">
@@ -337,7 +337,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
                     <div key={i} className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900">{tech.name}</span>
-                        <span className="text-[10px] text-amber-600 font-bold">★ {tech.rating}</span>
+                        <span className="text-[10px] text-amber-600 font-bold">{tech.rating ? `★ ${tech.rating}` : 'Not rated yet'}</span>
                       </div>
                       <p className="text-[11px] text-gray-500 truncate">{tech.specialties}</p>
                       <div className="flex justify-between pt-1 text-[11px] border-t border-gray-200/60 font-semibold text-purple-950">
@@ -477,7 +477,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
                   </div>
                   <button
                     onClick={() => {
-                      const brief = `Executive Brief - ${reportData.salonName}\n• Completed Visits: ${reportData.stats.completedCount}\n• Fulfillment Rate: ${reportData.stats.completionRate}%\n• Retention: ${reportData.crmSummary.retentionRate}%\n• Peak Load: Saturday\n• Key Action: Re-engage ${reportData.crmSummary.atRiskCount} inactive clients.`;
+                      const brief = `Executive Brief - ${reportData.salonName}\n• Completed Visits: ${reportData.stats.completedCount}\n• Fulfillment Rate: ${reportData.stats.completionRate}%\n• Retention: ${reportData.crmSummary.retentionRate}%\n• Peak Load: See monthly trend\n• Key Action: Review ${reportData.crmSummary.atRiskCount} clients flagged for re-engagement.`;
                       navigator.clipboard.writeText(brief);
                       showToast('Executive brief copied to clipboard');
                     }}

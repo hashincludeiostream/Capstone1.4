@@ -1,8 +1,6 @@
 # Apache URL Rewriting for XAMPP
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /nailglamhub/php-backend/api/
-
     # Allow direct file access if file exists
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
@@ -14,8 +12,12 @@
     RewriteRule ^salons/?$ salons.php [L,QSA]
     RewriteRule ^salons/([0-9]+)/?$ salons.php?id=$1 [L,QSA]
 
+    # Map /working-hours -> working-hours.php
+    RewriteRule ^working-hours/?$ working-hours.php [L,QSA]
+
     # Map /services -> services.php
     RewriteRule ^services/?$ services.php [L,QSA]
+    RewriteRule ^services/([0-9]+)/?$ services.php?id=$1 [L,QSA]
 
     # Map /technicians -> technicians.php
     RewriteRule ^technicians/?$ technicians.php [L,QSA]

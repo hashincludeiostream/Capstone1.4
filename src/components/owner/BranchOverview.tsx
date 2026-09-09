@@ -17,7 +17,7 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { Salon, Appointment, Service, Technician, Review } from '../../types';
-import { fetchAppointments, fetchServices, fetchTechnicians, fetchReviews } from '../../lib/api';
+import { fetchAppointments, fetchServices, fetchTechnicians, fetchReviews, updateSalon } from '../../lib/api';
 
 interface BranchOverviewProps {
   salons: Salon[];
@@ -51,6 +51,14 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
   const [branchMetrics, setBranchMetrics] = useState<BranchMetrics[]>([]);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [sortBy, setSortBy] = useState<'revenue' | 'bookings' | 'rating' | 'name'>('revenue');
+  const [editingSalon, setEditingSalon] = useState<Salon | null>(null);
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsAddress, setSettingsAddress] = useState('');
+  const [settingsPhone, setSettingsPhone] = useState('');
+  const [settingsEmail, setSettingsEmail] = useState('');
+  const [settingsDescription, setSettingsDescription] = useState('');
+  const [settingsLogo, setSettingsLogo] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     loadBranchMetrics();
@@ -129,6 +137,43 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
           return 0;
       }
     });
+  };
+
+  const openSettings = (salon: Salon) => {
+    setEditingSalon(salon);
+    setSettingsName(salon.salon_name);
+    setSettingsAddress(salon.address);
+    setSettingsPhone(salon.phone || '');
+    setSettingsEmail(salon.email || '');
+    setSettingsDescription(salon.description || '');
+    setSettingsLogo(salon.logo || '');
+  };
+
+  const handleSaveSettings = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingSalon || !settingsName.trim() || !settingsAddress.trim()) return;
+
+    setSavingSettings(true);
+    try {
+      const updatedSalon = await updateSalon(editingSalon.id, {
+        salon_name: settingsName.trim(),
+        address: settingsAddress.trim(),
+        phone: settingsPhone.trim(),
+        email: settingsEmail.trim(),
+        description: settingsDescription.trim(),
+        logo: settingsLogo || null,
+      });
+      setBranchMetrics((previous) => previous.map((metric) => (
+        metric.salon.id === updatedSalon.id ? { ...metric, salon: updatedSalon } : metric
+      )));
+      setEditingSalon(null);
+      onShowToast(`${updatedSalon.salon_name} settings saved`);
+    } catch (error) {
+      console.error('Update branch settings error:', error);
+      onShowToast('Unable to save branch settings');
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const aggregated = getAggregatedMetrics();
@@ -275,11 +320,13 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-white p-1 overflow-hidden">
-                      <img
-                        src={branch.salon.logo || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=150&auto=format&fit=crop&q=80'}
-                        alt={branch.salon.salon_name}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
+                      {branch.salon.logo ? (
+                        <img
+                          src={branch.salon.logo}
+                          alt={branch.salon.salon_name}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : null}
                     </div>
                     <div>
                       <h3 className="font-bold text-lg">{branch.salon.salon_name}</h3>
@@ -332,7 +379,7 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
                     View Details
                   </button>
                   <button
-                    onClick={() => onShowToast(`Edit ${branch.salon.salon_name} settings`)}
+                    onClick={() => openSettings(branch.salon)}
                     className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
                   >
                     <Settings className="w-4 h-4" />
@@ -366,11 +413,13 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-white p-0.5 overflow-hidden border border-gray-200">
-                          <img
-                            src={branch.salon.logo || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=150&auto=format&fit=crop&q=80'}
-                            alt={branch.salon.salon_name}
-                            className="w-full h-full object-cover rounded-md"
-                          />
+                          {branch.salon.logo ? (
+                            <img
+                              src={branch.salon.logo}
+                              alt={branch.salon.salon_name}
+                              className="w-full h-full object-cover rounded-md"
+                            />
+                          ) : null}
                         </div>
                         <div>
                           <div className="font-semibold text-sm text-gray-900">{branch.salon.salon_name}</div>
@@ -416,7 +465,7 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => onShowToast(`Edit ${branch.salon.salon_name} settings`)}
+                          onClick={() => openSettings(branch.salon)}
                           className="p-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                           title="Settings"
                         >
@@ -429,6 +478,77 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {editingSalon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={handleSaveSettings} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between border-b border-purple-100 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Branch Settings</h3>
+                <p className="text-xs text-gray-500">Update {editingSalon.salon_name}</p>
+              </div>
+              <button type="button" onClick={() => setEditingSalon(null)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Close branch settings">
+                <span className="text-lg leading-none">&times;</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-gray-700">
+                Branch Name
+                <input value={settingsName} onChange={(event) => setSettingsName(event.target.value)} required className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
+              </label>
+              <label className="block text-xs font-semibold text-gray-700">
+                Address
+                <input value={settingsAddress} onChange={(event) => setSettingsAddress(event.target.value)} required className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-gray-700">
+                  Phone
+                  <input value={settingsPhone} onChange={(event) => setSettingsPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
+                </label>
+                <label className="block text-xs font-semibold text-gray-700">
+                  Email
+                  <input type="email" value={settingsEmail} onChange={(event) => setSettingsEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
+                </label>
+              </div>
+              <label className="block text-xs font-semibold text-gray-700">
+                Description
+                <textarea rows={3} value={settingsDescription} onChange={(event) => setSettingsDescription(event.target.value)} className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
+              </label>
+              <label className="block text-xs font-semibold text-gray-700">
+                Profile Image
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) {
+                      onShowToast('Please choose an image smaller than 2 MB');
+                      event.currentTarget.value = '';
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => setSettingsLogo(String(reader.result));
+                    reader.readAsDataURL(file);
+                  }}
+                  className="mt-1 w-full rounded-xl border border-purple-200 bg-white p-2 text-sm"
+                />
+                {settingsLogo && (
+                  <img src={settingsLogo} alt="Branch profile preview" className="mt-2 h-20 w-20 rounded-xl border border-purple-200 object-cover" />
+                )}
+              </label>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setEditingSalon(null)} className="rounded-xl bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-200">Cancel</button>
+              <button type="submit" disabled={savingSettings || !settingsName.trim() || !settingsAddress.trim()} className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50">
+                {savingSettings ? 'Saving...' : 'Save Settings'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

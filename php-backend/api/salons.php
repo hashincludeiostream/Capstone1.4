@@ -47,7 +47,10 @@ if ($method === 'GET') {
 
     // List all salons with filtering
     try {
-        $sql = "SELECT * FROM salons WHERE 1=1";
+        $includeUnpublished = isset($_GET['include_unpublished']) && $_GET['include_unpublished'] === 'true';
+        $sql = $includeUnpublished
+            ? "SELECT * FROM salons WHERE 1=1"
+            : "SELECT * FROM salons WHERE is_active = 1 AND verification_status = 'verified'";
         $params = [];
 
         if (!empty($_GET['category']) && is_numeric($_GET['category'])) {
@@ -106,8 +109,8 @@ if ($method === 'GET') {
             $input['phone'] ?? null,
             $input['email'] ?? null,
             $input['description'] ?? '',
-            $input['logo'] ?? 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&auto=format&fit=crop&q=80',
-            $input['banner'] ?? 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80',
+            $input['logo'] ?? null,
+            $input['banner'] ?? null,
             $input['category_id'] ?? 1,
             $input['category_name'] ?? 'Nail Services',
             $input['latitude'] ?? 14.5995,
@@ -125,7 +128,8 @@ if ($method === 'GET') {
     }
 } elseif ($method === 'PUT') {
     $input = getJsonInput();
-    if (empty($input['id'])) {
+    $salonId = $input['id'] ?? ($_GET['id'] ?? null);
+    if (empty($salonId)) {
         sendError('Salon ID is required');
     }
 
@@ -151,13 +155,13 @@ if ($method === 'GET') {
             sendError('No valid fields to update');
         }
 
-        $params[] = $input['id'];
+        $params[] = $salonId;
         $sql = "UPDATE salons SET " . implode(', ', $fields) . " WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
         $stmtGet = $pdo->prepare("SELECT * FROM salons WHERE id = ?");
-        $stmtGet->execute([$input['id']]);
+        $stmtGet->execute([$salonId]);
         $updated = $stmtGet->fetch();
 
         sendResponse(['success' => true, 'salon' => $updated]);

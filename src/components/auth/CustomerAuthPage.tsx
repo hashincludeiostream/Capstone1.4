@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { User } from '../../types';
 import { API_BASE } from '../../lib/api';
+import { validateEmail, validatePassword, validateFullname, validatePhone } from '../../lib/validation';
+import { login, register, formatAuthError } from '../../lib/auth';
 
 interface CustomerAuthPageProps {
   initialMode?: 'signin' | 'register';
@@ -40,36 +42,36 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    setError('');
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || 'Invalid email');
       return;
     }
 
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address (e.g., user@example.com)');
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || 'Invalid password');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: 'customer' }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to sign in. Please verify your credentials.');
+      const authResult = await login({ email, password, role: 'customer' });
+      
+      if (!authResult.success) {
+        setError(formatAuthError(authResult.error || 'Login failed', authResult.details));
         return;
       }
 
-      onLoginSuccess(data.user);
-      onNavigate('customer-dashboard');
+      if (authResult.user) {
+        onLoginSuccess(authResult.user);
+        onNavigate('customer-dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Login network error. Please try again.');
     } finally {
@@ -79,35 +81,58 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullname || !email || !password) {
-      setError('Please provide your full name, email, and password.');
+    setError('');
+
+    // Validate fullname
+    const fullnameValidation = validateFullname(fullname);
+    if (!fullnameValidation.isValid) {
+      setError(fullnameValidation.error || 'Invalid full name');
       return;
     }
 
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || 'Invalid email');
+      return;
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || 'Invalid password');
+      return;
+    }
+
+    // Validate phone (optional but provided)
+    if (phone) {
+      const phoneValidation = validatePhone(phone);
+      if (!phoneValidation.isValid) {
+        setError(phoneValidation.error || 'Invalid phone number');
+        return;
+      }
+    }
+
     setLoading(true);
-    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullname,
-          email,
-          password,
-          phone,
-          user_type: 'customer',
-        }),
+      const authResult = await register({
+        fullname,
+        email,
+        password,
+        phone,
+        user_type: 'customer',
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Registration failed.');
+      
+      if (!authResult.success) {
+        setError(formatAuthError(authResult.error || 'Registration failed', authResult.details));
         return;
       }
 
-      onLoginSuccess(data.user);
-      onNavigate('customer-dashboard');
+      if (authResult.user) {
+        onLoginSuccess(authResult.user);
+        onNavigate('customer-dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Registration error. Please try again.');
     } finally {

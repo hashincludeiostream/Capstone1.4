@@ -10,10 +10,11 @@ if ($method === 'POST') {
     // 1. LOGIN
     if ($action === 'login') {
         $email = trim($input['email'] ?? '');
+        $password = $input['password'] ?? '';
         $role = $input['role'] ?? null;
 
-        if (empty($email)) {
-            sendError('Email address is required');
+        if (empty($email) || empty($password)) {
+            sendError('Email and password are required');
         }
 
         try {
@@ -25,12 +26,17 @@ if ($method === 'POST') {
                 sendError('No account found with this email address.', 404);
             }
 
+            if (empty($user['password']) || !password_verify($password, $user['password'])) {
+                sendError('Incorrect password. Please check your password and try again.', 401);
+            }
+
             if ($role && $user['user_type'] !== $role) {
                 sendError("This account is registered as a " . str_replace('_', ' ', $user['user_type']) . ". Please use the appropriate portal.", 403, [
                     'user_type' => $user['user_type']
                 ]);
             }
 
+            unset($user['password']);
             sendResponse(['success' => true, 'user' => $user]);
         } catch (Exception $e) {
             sendError($e->getMessage(), 500);
@@ -41,12 +47,17 @@ if ($method === 'POST') {
     if ($action === 'register') {
         $fullname = trim($input['fullname'] ?? '');
         $email = trim($input['email'] ?? '');
+        $password = $input['password'] ?? '';
         $phone = $input['phone'] ?? '';
         $user_type = $input['user_type'] ?? 'customer';
         $admin_code = $input['admin_code'] ?? '';
 
-        if (empty($fullname) || empty($email)) {
-            sendError('Full name and email are required');
+        if (empty($fullname) || empty($email) || empty($password)) {
+            sendError('Full name, email, and password are required');
+        }
+
+        if (strlen($password) < 8) {
+            sendError('Password must be at least 8 characters long');
         }
 
         // Admin Security Passcode verification
@@ -66,15 +77,16 @@ if ($method === 'POST') {
             }
 
             $stmt = $pdo->prepare("
-                INSERT INTO users (fullname, email, phone, user_type, status)
-                VALUES (?, ?, ?, ?, 'active')
+                INSERT INTO users (fullname, email, password, phone, user_type, status)
+                VALUES (?, ?, ?, ?, ?, 'active')
             ");
-            $stmt->execute([$fullname, $email, $phone, $user_type]);
+            $stmt->execute([$fullname, $email, password_hash($password, PASSWORD_DEFAULT), $phone, $user_type]);
             $userId = $pdo->lastInsertId();
 
             $stmtUser = $pdo->prepare("SELECT * FROM users WHERE id = ?");
             $stmtUser->execute([$userId]);
             $createdUser = $stmtUser->fetch();
+            unset($createdUser['password']);
 
             // If registering as a salon owner and provided salon details
             $createdSalon = null;

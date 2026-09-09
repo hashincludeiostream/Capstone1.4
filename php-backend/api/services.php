@@ -17,8 +17,8 @@ if ($method === 'GET') {
     }
 } elseif ($method === 'POST') {
     $input = getJsonInput();
-    if (empty($input['salon_id']) || empty($input['service_name']) || !isset($input['price'])) {
-        sendError('Salon ID, Service name, and Price are required');
+    if (empty($input['salon_id']) || empty($input['service_name'])) {
+        sendError('Salon ID and Service name are required');
     }
 
     try {
@@ -30,10 +30,10 @@ if ($method === 'GET') {
             $input['salon_id'],
             $input['service_name'],
             $input['description'] ?? '',
-            $input['price'],
+            0,
             $input['duration_minutes'] ?? 45,
             $input['category_name'] ?? 'Nail Services',
-            $input['image'] ?? 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400&auto=format&fit=crop&q=80',
+            $input['image'] ?? null,
             !empty($input['is_popular']) ? 1 : 0
         ]);
         $newId = $pdo->lastInsertId();
@@ -45,7 +45,8 @@ if ($method === 'GET') {
     }
 } elseif ($method === 'PUT') {
     $input = getJsonInput();
-    if (empty($input['id'])) {
+    $serviceId = $input['id'] ?? ($_GET['id'] ?? null);
+    if (empty($serviceId)) {
         sendError('Service ID is required');
     }
     try {
@@ -57,15 +58,15 @@ if ($method === 'GET') {
         $stmt->execute([
             $input['service_name'],
             $input['description'] ?? '',
-            $input['price'],
+            0,
             $input['duration_minutes'] ?? 45,
             $input['category_name'] ?? 'Nail Services',
             $input['image'] ?? '',
             !empty($input['is_popular']) ? 1 : 0,
-            $input['id']
+            $serviceId
         ]);
         $stmtGet = $pdo->prepare("SELECT * FROM services WHERE id = ?");
-        $stmtGet->execute([$input['id']]);
+        $stmtGet->execute([$serviceId]);
         sendResponse(['success' => true, 'service' => $stmtGet->fetch()]);
     } catch (Exception $e) {
         sendError($e->getMessage(), 500);

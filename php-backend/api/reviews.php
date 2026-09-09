@@ -40,20 +40,29 @@ if ($method === 'GET') {
 
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO reviews (salon_id, user_id, user_name, user_avatar, rating, comment, service_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO reviews (salon_id, technician_id, technician_name, user_id, user_name, user_avatar, rating, comment, service_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $input['salon_id'],
+            $input['technician_id'] ?? null,
+            $input['technician_name'] ?? null,
             $input['user_id'] ?? 1,
             $input['user_name'] ?? 'Verified Client',
-            $input['user_avatar'] ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+            $input['user_avatar'] ?? null,
             $input['rating'],
             $input['comment'],
             $input['service_name'] ?? 'Classic Manicure'
         ]);
 
         $newId = $pdo->lastInsertId();
+
+        if (!empty($input['technician_id'])) {
+            $stmtTechAvg = $pdo->prepare(
+                'UPDATE technicians SET rating = (SELECT AVG(rating) FROM reviews WHERE technician_id = ?) WHERE id = ?'
+            );
+            $stmtTechAvg->execute([$input['technician_id'], $input['technician_id']]);
+        }
 
         // Update average rating on salon
         $stmtAvg = $pdo->prepare("SELECT AVG(rating) as avg_r, COUNT(*) as cnt FROM reviews WHERE salon_id = ?");
