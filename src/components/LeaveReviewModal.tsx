@@ -38,7 +38,7 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
         user_name: reviewerName || currentUser?.fullname,
         salon_id: salon.id,
         technician_id: technicianId || null,
-        technician_name: technicianName || null,
+        technician_name: technicianName || undefined,
         rating,
         comment: reviewText,
       });

@@ -8,7 +8,7 @@ export interface User {
   user_type: UserRole;
   created_at: string;
   avatar?: string;
-  status?: 'active' | 'suspended';
+  status?: 'active' | 'suspended' | 'banned';
 }
 
 export interface Salon {
@@ -87,6 +87,7 @@ export interface Appointment {
   service_price?: number;
   service_duration?: number;
   technician_id?: number | null;
+  technician_name?: string;
   staff_id?: number | null;
   staff_name?: string;
   total_price?: number;
@@ -100,6 +101,7 @@ export interface Appointment {
 export interface Review {
   id: number;
   salon_id: number;
+  salon_name?: string;
   technician_id?: number | null;
   technician_name?: string;
   user_id: number;

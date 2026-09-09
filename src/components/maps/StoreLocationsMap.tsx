@@ -344,7 +344,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
         const lat = coordinates?.[0];
         const lng = coordinates?.[1];
         let distance: number | undefined = undefined;
-        if (userLocation && coordinates) {
+        if (userLocation && coordinates && lat !== undefined && lng !== undefined) {
           distance = calculateDistanceKm(userLocation.lat, userLocation.lng, lat, lng);
         }
         return { ...s, distance, coordinates };

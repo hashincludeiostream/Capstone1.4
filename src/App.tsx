@@ -431,8 +431,6 @@ const AppContent: React.FC = () => {
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}
-          technicianId={reviewTechnicianId}
-          technicianName={reviewTechnicianName}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           isAdminMode={isAdminMode}

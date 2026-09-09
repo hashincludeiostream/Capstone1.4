@@ -161,7 +161,7 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
         phone: settingsPhone.trim(),
         email: settingsEmail.trim(),
         description: settingsDescription.trim(),
-        logo: settingsLogo || null,
+        logo: settingsLogo || undefined,
       });
       setBranchMetrics((previous) => previous.map((metric) => (
         metric.salon.id === updatedSalon.id ? { ...metric, salon: updatedSalon } : metric

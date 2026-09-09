@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "lint": "tsc --noEmit",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.0",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
@@ -28,6 +29,7 @@
     "tailwindcss": "^4.0.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/leaflet": "^1.9.22",
@@ -41,7 +43,6 @@
     "vite": "^6.1.0"
   },
   "allowScripts": {
-    "bcrypt@5.1.1": true,
     "esbuild@0.25.12": true
   }
 }

@@ -22,11 +22,7 @@ const staticAppBase = typeof window !== 'undefined'
     : window.location.pathname.slice(0, window.location.pathname.lastIndexOf('/') + 1))
   : '/';
 
-export const API_BASE = configuredApiBase || (
-  typeof window !== 'undefined' && window.location.port !== '3001'
-    ? `${staticAppBase}php-backend/api`
-    : '/api'
-);
+export const API_BASE = configuredApiBase || '/api';
 
 // Error message mapping for better user feedback
 const getErrorMessage = (error: unknown, context: string): string => {

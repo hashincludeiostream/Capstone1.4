@@ -268,6 +268,9 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
       return {
         ...tech,
+        name: tech.name || tech.fullname || 'Technician',
+        experience_years: tech.experience_years || 0,
+        specialties: tech.specialties || 'General',
         totalBookings: techAppts.length,
         completedCount: completed.length,
         hoursServiced,
