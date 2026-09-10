@@ -17,6 +17,11 @@ import {
   ProductOrder,
   ProductOrderStatus,
 } from '../types';
+import {
+  createFirestoreAppointment,
+  updateFirestoreAppointmentStatus,
+  createFirestoreSalon,
+} from './firestoreService';
 
 const configuredApiBase = import.meta.env.VITE_API_URL as string | undefined;
 const staticAppBase = typeof window !== 'undefined'
@@ -176,7 +181,16 @@ export async function createAppointment(data: Partial<Appointment>): Promise<{ s
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Failed to create appointment');
-    return await res.json();
+    const result = await res.json();
+    
+    // Sync directly to Firestore for real-time listeners across all devices/sessions
+    if (result.appointment) {
+      createFirestoreAppointment(result.appointment).catch((err) =>
+        console.warn('Firestore appointment sync warning:', err)
+      );
+    }
+
+    return result;
   } catch (err) {
     console.error('API createAppointment error:', err);
     const errorMessage = getErrorMessage(err, 'appointment');
@@ -192,6 +206,12 @@ export async function updateAppointmentStatus(id: number, status: AppointmentSta
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
+
+    // Real-time Firestore sync
+    updateFirestoreAppointmentStatus(id, status).catch((err) =>
+      console.warn('Firestore status sync warning:', err)
+    );
+
     return res.ok;
   } catch (err) {
     console.warn('API updateAppointmentStatus error:', err);

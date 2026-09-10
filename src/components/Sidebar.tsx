@@ -38,6 +38,12 @@ interface SidebarProps {
   onOpenContact: () => void;
   isAdminMode: boolean;
   onNavigate?: (tab: string) => void;
+  bookingsCount?: number;
+  activeBookingsCount?: number;
+  totalBookingsCount?: number;
+  ordersCount?: number;
+  activeOrdersCount?: number;
+  totalOrdersCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -49,6 +55,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenContact,
   isAdminMode,
   onNavigate,
+  bookingsCount = 0,
+  activeBookingsCount = 0,
+  totalBookingsCount = 0,
+  ordersCount = 0,
+  activeOrdersCount = 0,
+  totalOrdersCount = 0,
 }) => {
   const handleNavigation = (tab: string) => {
     if (onNavigate) {
@@ -523,31 +535,105 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="space-y-1 mt-1">
           {currentUser ? (
             <>
-              <button
-                id="sidebar-appointments-btn"
-                onClick={() => setActiveTab('customer-dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  activeTab === 'customer-dashboard'
-                    ? 'bg-pink-100 text-pink-900 font-semibold'
-                    : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
-                }`}
-              >
-                <CalendarCheck className="w-4 h-4 text-pink-600" />
-                <span>My Bookings</span>
-              </button>
+              {/* My Bookings with notification signal and numbering */}
+              {(() => {
+                const hasActiveBookings = activeBookingsCount > 0;
+                return (
+                  <button
+                    id="sidebar-appointments-btn"
+                    onClick={() => setActiveTab('customer-dashboard')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+                      activeTab === 'customer-dashboard'
+                        ? 'bg-pink-100 text-pink-900 font-semibold shadow-xs'
+                        : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
+                    }`}
+                    title={
+                      bookingsCount > 0
+                        ? `${activeBookingsCount} active upcoming • ${totalBookingsCount} total booking${totalBookingsCount > 1 ? 's' : ''}`
+                        : 'My Bookings'
+                    }
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <CalendarCheck className="w-4 h-4 text-pink-600 shrink-0" />
+                        {hasActiveBookings && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-1 ring-white"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className="truncate">My Bookings</span>
+                    </div>
 
-              <button
-                id="sidebar-orders-btn"
-                onClick={() => setActiveTab('customer-orders')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  activeTab === 'customer-orders'
-                    ? 'bg-pink-100 text-pink-900 font-semibold'
-                    : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                <span>Reserved Orders</span>
-              </button>
+                    {bookingsCount > 0 && (
+                      <span
+                        id="sidebar-bookings-badge"
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                          hasActiveBookings
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-pink-500/25 ring-1 ring-pink-400/30'
+                            : 'bg-pink-100 text-pink-800'
+                        }`}
+                      >
+                        {hasActiveBookings && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                        )}
+                        <span>{bookingsCount}</span>
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+
+              {/* Reserved Orders with notification signal and numbering */}
+              {(() => {
+                const hasActiveOrders = activeOrdersCount > 0;
+                return (
+                  <button
+                    id="sidebar-orders-btn"
+                    onClick={() => setActiveTab('customer-orders')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+                      activeTab === 'customer-orders'
+                        ? 'bg-pink-100 text-pink-900 font-semibold shadow-xs'
+                        : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
+                    }`}
+                    title={
+                      ordersCount > 0
+                        ? `${activeOrdersCount} ready for pickup / pending • ${totalOrdersCount} total reservation${totalOrdersCount > 1 ? 's' : ''}`
+                        : 'Reserved Orders'
+                    }
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
+                        {hasActiveOrders && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-1 ring-white"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className="truncate">Reserved Orders</span>
+                    </div>
+
+                    {ordersCount > 0 && (
+                      <span
+                        id="sidebar-orders-badge"
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                          hasActiveOrders
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-600/25 ring-1 ring-emerald-400/30'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {hasActiveOrders && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                        )}
+                        <span>{ordersCount}</span>
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
 
               <button
                 id="sidebar-favorites-btn"

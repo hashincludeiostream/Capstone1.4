@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Store, Sparkles, MapPin, Phone, Mail, FileText, CheckCircle2 } from 'lucide-react';
 import { Salon, User, BusinessCategory } from '../types';
 import { API_BASE } from '../lib/api';
+import { createFirestoreSalon } from '../lib/firestoreService';
 
 interface RegisterSalonModalProps {
   currentUser: User | null;
@@ -49,9 +50,13 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
+        const createdSalon = data.salon || data;
+        createFirestoreSalon(createdSalon).catch((err) =>
+          console.warn('Firestore salon sync warning:', err)
+        );
         setDone(true);
         setTimeout(() => {
-          onSuccess(data.salon || data);
+          onSuccess(createdSalon);
           onClose();
         }, 1500);
       } else {

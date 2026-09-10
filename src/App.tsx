@@ -21,7 +21,8 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem } from './types';
-import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders } from './lib/api';
+import { initializeFirestoreData, subscribeToAppointments } from './lib/firestoreService';
+import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments } from './lib/api';
 import { localStorage as safeLocalStorage } from './lib/localStorage';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -137,6 +138,8 @@ const AppContent: React.FC = () => {
   const [productsLoading, setProductsLoading] = useState(false);
   const [customerOrders, setCustomerOrders] = useState<ProductOrder[]>([]);
   const [customerOrdersLoading, setCustomerOrdersLoading] = useState(false);
+  const [customerAppointments, setCustomerAppointments] = useState<Appointment[]>([]);
+  const [customerAppointmentsLoading, setCustomerAppointmentsLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     return safeLocalStorage.getJSON<CartItem[]>('nailglamhub_cart') || [];
   });
@@ -160,15 +163,32 @@ const AppContent: React.FC = () => {
   // Load Initial Data
   const loadData = async () => {
     setLoading(true);
+    // Initialize Firestore collections in background
+    initializeFirestoreData().catch((err) => console.warn('Firestore init background error:', err));
     try {
+      const isOwnerOrAdmin = currentUser?.user_type === 'salon_owner' || currentUser?.user_type === 'admin';
       const [cats, slns, anncs, prods] = await Promise.all([
         fetchCategories().catch(err => { console.error('Categories fetch error:', err); return []; }),
-        fetchSalons().catch(err => { console.error('Salons fetch error:', err); return []; }),
+        fetchSalons(isOwnerOrAdmin ? { includeUnpublished: true } : undefined).catch(err => { console.error('Salons fetch error:', err); return []; }),
         fetchAnnouncements().catch(err => { console.error('Announcements fetch error:', err); return []; }),
         fetchProducts().catch(err => { console.error('Products fetch error:', err); return []; }),
       ]);
       setCategories(cats);
-      setSalons(slns);
+
+      let effectiveSalons = slns;
+      if (currentUser?.id && isOwnerOrAdmin) {
+        const cachedOwnerSalons = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`);
+        if (Array.isArray(cachedOwnerSalons) && cachedOwnerSalons.length > 0) {
+          const missingSalons = cachedOwnerSalons.filter(
+            (cs) => !effectiveSalons.some((s) => s.id === cs.id)
+          );
+          if (missingSalons.length > 0) {
+            effectiveSalons = [...missingSalons, ...effectiveSalons];
+          }
+        }
+      }
+
+      setSalons(effectiveSalons);
       setAnnouncements(anncs);
       setProducts(prods);
     } catch (err) {
@@ -200,11 +220,38 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Load Customer's Bookings & Appointments
+  const loadCustomerAppointments = async () => {
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      setCustomerAppointments([]);
+      return;
+    }
+    setCustomerAppointmentsLoading(true);
+    try {
+      const appts = await fetchAppointments({ customer_id: currentUser.id });
+      setCustomerAppointments(appts);
+    } catch (err) {
+      console.error('Failed to load customer appointments:', err);
+    } finally {
+      setCustomerAppointmentsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (currentUser?.id && currentUser.user_type === 'customer') {
       loadCustomerOrders();
+      loadCustomerAppointments();
+
+      // Real-time Firestore sync for customer's live appointments
+      const unsubscribe = subscribeToAppointments({ customer_id: currentUser.id }, (liveAppts) => {
+        if (liveAppts && liveAppts.length > 0) {
+          setCustomerAppointments(liveAppts);
+        }
+      });
+      return () => unsubscribe();
     } else {
       setCustomerOrders([]);
+      setCustomerAppointments([]);
     }
   }, [currentUser?.id, currentUser?.user_type]);
 
@@ -470,6 +517,29 @@ const AppContent: React.FC = () => {
     return matchCategory && matchSearch;
   });
 
+  // Client-side notification signals & numbering
+  const activeCustomerBookings = customerAppointments.filter(
+    (a) => a.status === 'pending' || a.status === 'confirmed'
+  );
+  const totalCustomerBookings = customerAppointments.filter(
+    (a) => a.status !== 'cancelled'
+  );
+  const bookingsNotificationCount =
+    activeCustomerBookings.length > 0
+      ? activeCustomerBookings.length
+      : totalCustomerBookings.length;
+
+  const activeCustomerOrders = customerOrders.filter(
+    (o) => o.status === 'pending_pickup' || o.status === 'ready_for_pickup'
+  );
+  const totalCustomerOrders = customerOrders.filter(
+    (o) => o.status !== 'cancelled'
+  );
+  const ordersNotificationCount =
+    activeCustomerOrders.length > 0
+      ? activeCustomerOrders.length
+      : totalCustomerOrders.length;
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FCF8FA] text-[#2D1A28]">
       {/* Toast Banner */}
@@ -581,6 +651,12 @@ const AppContent: React.FC = () => {
           onOpenAbout={() => setAboutContactModal({ open: true, tab: 'about' })}
           onOpenContact={() => setAboutContactModal({ open: true, tab: 'contact' })}
           onNavigate={handleNavigate}
+          bookingsCount={bookingsNotificationCount}
+          activeBookingsCount={activeCustomerBookings.length}
+          totalBookingsCount={totalCustomerBookings.length}
+          ordersCount={ordersNotificationCount}
+          activeOrdersCount={activeCustomerOrders.length}
+          totalOrdersCount={totalCustomerOrders.length}
         />
 
         {/* Dynamic Center Stage Views */}
@@ -804,6 +880,7 @@ const AppContent: React.FC = () => {
                 }}
                 onOpenLeaveReview={(salon) => handleOpenLeaveReviewForSalon(salon)}
                 onSelectSalon={(salon) => setSelectedSalonForDetails(salon)}
+                onRefreshAppointments={loadCustomerAppointments}
               />
             ) : currentUser ? (
               <div className="py-16 text-center bg-white rounded-3xl p-8 border border-pink-100 max-w-lg mx-auto shadow-sm">
@@ -906,6 +983,9 @@ const AppContent: React.FC = () => {
                 onOpenRegisterSalon={() => setRegisterSalonModalOpen(true)}
                 onOpenRegisterBranch={() => setBranchRegistrationOpen(true)}
                 refreshKey={ownerBranchRefreshKey}
+                initialSalons={salons.filter(
+                  (s) => currentUser?.user_type === 'admin' || Number(s.owner_id) === Number(currentUser?.id)
+                )}
                 initialTab={
                   activeTab === 'owner-services'
                     ? 'services'
@@ -1214,6 +1294,7 @@ const AppContent: React.FC = () => {
           onClose={() => setBookingModalOpen(false)}
           onSuccess={(newAppt) => {
             showToast(`Appointment reserved with ${newAppt.salon_name}!`);
+            loadCustomerAppointments();
           }}
         />
       )}
@@ -1250,6 +1331,13 @@ const AppContent: React.FC = () => {
           onClose={() => setRegisterSalonModalOpen(false)}
           onSuccess={(newSalon) => {
             setSalons((prev) => [newSalon, ...prev]);
+            if (currentUser?.id) {
+              const prevCached = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`) || [];
+              safeLocalStorage.setJSON(`nailglamhub_owner_salons_${currentUser.id}`, [
+                newSalon,
+                ...prevCached.filter((s) => s.id !== newSalon.id),
+              ]);
+            }
             setOwnerBranchRefreshKey((value) => value + 1);
             showToast(`Registered ${newSalon.salon_name}!`);
           }}
@@ -1263,6 +1351,13 @@ const AppContent: React.FC = () => {
           onClose={() => setBranchRegistrationOpen(false)}
           onSuccess={(newBranch) => {
             setSalons((prev) => [newBranch, ...prev]);
+            if (currentUser?.id) {
+              const prevCached = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`) || [];
+              safeLocalStorage.setJSON(`nailglamhub_owner_salons_${currentUser.id}`, [
+                newBranch,
+                ...prevCached.filter((s) => s.id !== newBranch.id),
+              ]);
+            }
             setOwnerBranchRefreshKey((value) => value + 1);
             setBranchRegistrationOpen(false);
             showToast(`Registered ${newBranch.salon_name} under your account`);

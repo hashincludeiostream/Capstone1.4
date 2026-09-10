@@ -28,6 +28,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
+import { localStorage as safeLocalStorage } from '../lib/localStorage';
+import { subscribeToAppointments } from '../lib/firestoreService';
 import {
   fetchSalons,
   fetchServices,
@@ -67,6 +69,7 @@ interface SalonOwnerDashboardProps {
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
   refreshKey?: number;
+  initialSalons?: Salon[];
 }
 
 export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
@@ -76,8 +79,20 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   onOpenRegisterBranch,
   onNavigateTab,
   refreshKey = 0,
+  initialSalons,
 }) => {
-  const [salons, setSalons] = useState<Salon[]>([]);
+  const [salons, setSalons] = useState<Salon[]>(() => {
+    if (initialSalons && initialSalons.length > 0) {
+      return initialSalons;
+    }
+    if (currentUser?.id) {
+      const cached = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`);
+      if (Array.isArray(cached) && cached.length > 0) {
+        return cached;
+      }
+    }
+    return [];
+  });
   const [selectedSalonId, setSelectedSalonId] = useState<number | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -157,12 +172,40 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       if (loadId !== dashboardLoadId.current) return;
 
       // Isolation: Salon owners access salons they own. Admins can view all.
-      const userSalons =
+      let userSalons =
         currentUser.user_type === 'admin'
           ? allSalons
           : allSalons.filter((s) => Number(s.owner_id) === Number(currentUser.id));
 
+      // Resilient fallback: if server returned empty, check local storage for this owner
+      if (userSalons.length === 0 && currentUser?.id) {
+        const cached = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`);
+        if (Array.isArray(cached) && cached.length > 0) {
+          userSalons = cached;
+          // Silent background re-sync to backend in case database restarted
+          for (const s of cached) {
+            fetch(`${API_BASE}/salons`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                owner_id: currentUser.id,
+                salon_name: s.salon_name,
+                address: s.address,
+                phone: s.phone || '',
+                email: s.email || '',
+                description: s.description || '',
+                logo: s.logo || null,
+                category_id: s.category_id || 1,
+              }),
+            }).catch((err) => console.warn('Auto recovery sync error:', err));
+          }
+        }
+      }
+
       setSalons(userSalons);
+      if (userSalons.length > 0 && currentUser?.id) {
+        safeLocalStorage.setJSON(`nailglamhub_owner_salons_${currentUser.id}`, userSalons);
+      }
 
       if (userSalons.length > 0) {
         const currentId = selectedSalonId && userSalons.some((s) => s.id === selectedSalonId)
@@ -217,17 +260,17 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     loadDashboardData();
   }, [currentUser.id, currentUser.user_type, refreshKey]);
 
-  // Auto-refresh appointments every 30 seconds to show new bookings
+  // Real-time Firestore sync for salon appointments (instant live updates without delay)
   useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      if (selectedSalonId) {
-        fetchAppointments({ salon_id: selectedSalonId }).then((appts) => {
-          setAppointments(appts);
-        });
-      }
-    }, 30000); // Refresh every 30 seconds
+    if (!selectedSalonId) return;
 
-    return () => clearInterval(refreshInterval);
+    const unsubscribe = subscribeToAppointments({ salon_id: selectedSalonId }, (liveAppts) => {
+      if (liveAppts && liveAppts.length > 0) {
+        setAppointments(liveAppts);
+      }
+    });
+
+    return () => unsubscribe();
   }, [selectedSalonId]);
 
   // Reload branch data when selected salon changes

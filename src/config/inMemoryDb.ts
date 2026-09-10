@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import {
   seedCategories,
   seedUsers,
@@ -13,6 +15,8 @@ import {
   seedProducts,
   seedProductOrders,
 } from '../data/seedData';
+
+const DB_FILE = path.join(process.cwd(), 'src', 'data', 'persisted_db.json');
 
 class InMemoryDatabase {
   private tables: Record<string, any[]> = {
@@ -30,6 +34,45 @@ class InMemoryDatabase {
     products: JSON.parse(JSON.stringify(seedProducts)),
     product_orders: JSON.parse(JSON.stringify(seedProductOrders)),
   };
+
+  constructor() {
+    this.loadFromDisk();
+  }
+
+  private loadFromDisk(): boolean {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        if (raw.trim()) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            for (const key of Object.keys(this.tables)) {
+              if (Array.isArray(parsed[key]) && parsed[key].length > 0) {
+                this.tables[key] = parsed[key];
+              }
+            }
+            console.log(`[Database] Successfully loaded persisted records from disk (${DB_FILE})`);
+            return true;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Database] Failed to load persisted database from disk:', err);
+    }
+    return false;
+  }
+
+  private saveToDisk() {
+    try {
+      const dir = path.dirname(DB_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(this.tables, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('[Database] Failed to save database to disk:', err);
+    }
+  }
 
   private getNextId(tableName: string): number {
     const table = this.tables[tableName] || [];
@@ -135,25 +178,28 @@ class InMemoryDatabase {
       }
 
       // Dynamic filter for salons in /api/salons
-      let paramIdx = 0;
       if (/is_active\s*=\s*1/i.test(sql)) {
         results = results.filter((s) => Boolean(s.is_active));
       }
       if (/verification_status\s*=\s*'verified'/i.test(sql)) {
         results = results.filter((s) => s.verification_status === 'verified');
       }
-      if (/category_id\s*=\s*\?/i.test(sql)) {
-        const catId = Number(params[paramIdx++]);
-        results = results.filter((s) => Number(s.category_id) === catId);
+
+      // Parse WHERE conditions with '?' in the exact order of appearance
+      const matches = Array.from(sql.matchAll(/([a-zA-Z0-9_]+)\s*=\s*\?/g));
+      for (let i = 0; i < matches.length; i++) {
+        const col = matches[i][1].toLowerCase();
+        const val = params[i];
+        if (col === 'owner_id' && val !== undefined) {
+          results = results.filter((s) => Number(s.owner_id) === Number(val));
+        } else if (col === 'category_id' && val !== undefined) {
+          results = results.filter((s) => Number(s.category_id) === Number(val));
+        }
       }
-      if (/owner_id\s*=\s*\?/i.test(sql)) {
-        const ownerId = Number(params[paramIdx++]);
-        results = results.filter((s) => Number(s.owner_id) === ownerId);
-      }
+
       if (/(salon_name LIKE \? OR description LIKE \? OR address LIKE \?)/i.test(sql)) {
-        const term = String(params[paramIdx++] || '').replace(/%/g, '').toLowerCase();
-        // The query binds the search term 3 times
-        paramIdx += 2;
+        const likeIdx = matches.length;
+        const term = String(params[likeIdx] || '').replace(/%/g, '').toLowerCase();
         if (term) {
           results = results.filter((s) =>
             (s.salon_name || '').toLowerCase().includes(term) ||
@@ -367,6 +413,7 @@ class InMemoryDatabase {
     }
 
     table.push(record);
+    this.saveToDisk();
     return [{ insertId: record.id, affectedRows: 1 }, null];
   }
 
@@ -395,6 +442,7 @@ class InMemoryDatabase {
           });
         }
         record.updated_at = new Date().toISOString();
+        this.saveToDisk();
         return [{ affectedRows: 1, changedRows: 1 }, null];
       }
     }
@@ -410,6 +458,7 @@ class InMemoryDatabase {
       const salonId = Number(params[0]);
       const prevLen = table.length;
       this.tables[tableName] = table.filter((item) => item.salon_id !== salonId);
+      this.saveToDisk();
       return [{ affectedRows: prevLen - this.tables[tableName].length }, null];
     }
 
@@ -418,6 +467,7 @@ class InMemoryDatabase {
       const index = table.findIndex((item) => item.id === id);
       if (index !== -1) {
         table.splice(index, 1);
+        this.saveToDisk();
         return [{ affectedRows: 1 }, null];
       }
     }

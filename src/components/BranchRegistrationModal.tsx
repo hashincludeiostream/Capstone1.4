@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Store, MapPin, Mail, FileText, CheckCircle2 } from 'lucide-react';
 import { Salon, User, BusinessCategory } from '../types';
 import { API_BASE } from '../lib/api';
+import { createFirestoreSalon } from '../lib/firestoreService';
 
 interface BranchRegistrationModalProps {
   currentUser: User;
@@ -67,6 +68,11 @@ export const BranchRegistrationModal: React.FC<BranchRegistrationModalProps> = (
         setError('The branch was not returned by the server. Please try again.');
         return;
       }
+
+      // Sync branch directly to Firestore
+      createFirestoreSalon(createdSalon).catch((err) =>
+        console.warn('Firestore salon branch sync warning:', err)
+      );
 
       setDone(true);
       window.setTimeout(() => {

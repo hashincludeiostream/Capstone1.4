@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile and role information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number", "description": "Numeric user ID" },
+        "fullname": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "user_type": { "type": "string", "enum": ["customer", "salon_owner", "admin"] },
+        "avatar": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "suspended", "banned"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullname", "email", "user_type"]
+    },
+    "Salon": {
+      "title": "Salon",
+      "description": "Salon branch entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number", "description": "Numeric salon ID" },
+        "owner_id": { "type": "number", "description": "Owner user ID" },
+        "salon_name": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "province": { "type": "string" },
+        "postal_code": { "type": "string" },
+        "landmark": { "type": "string" },
+        "parking_info": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "description": { "type": "string" },
+        "logo": { "type": "string" },
+        "banner": { "type": "string" },
+        "avg_rating": { "type": "number" },
+        "review_count": { "type": "number" },
+        "is_active": { "type": "boolean" },
+        "verification_status": { "type": "string", "enum": ["verified", "pending", "rejected"] },
+        "category_id": { "type": "number" },
+        "category_name": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "featured": { "type": "boolean" },
+        "monthly_target_bookings": { "type": "number" }
+      },
+      "required": ["owner_id", "salon_name", "address"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Salon service catalogue item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "salon_id": { "type": "number" },
+        "service_name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "category_name": { "type": "string" },
+        "price": { "type": "number" },
+        "duration": { "type": "number" },
+        "is_active": { "type": "boolean" },
+        "image_url": { "type": "string" }
+      },
+      "required": ["salon_id", "service_name", "price"]
+    },
+    "Technician": {
+      "title": "Technician",
+      "description": "Staff member at a salon",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "salon_id": { "type": "number" },
+        "fullname": { "type": "string" },
+        "specialties": { "type": "string" },
+        "experience_years": { "type": "number" },
+        "avatar": { "type": "string" },
+        "is_available": { "type": "boolean" },
+        "rating": { "type": "number" }
+      },
+      "required": ["salon_id", "fullname"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Real-time client booking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "customer_id": { "type": "number" },
+        "customer_name": { "type": "string" },
+        "customer_phone": { "type": "string" },
+        "customer_email": { "type": "string" },
+        "salon_id": { "type": "number" },
+        "salon_name": { "type": "string" },
+        "service_id": { "type": "number" },
+        "service_name": { "type": "string" },
+        "service_price": { "type": "number" },
+        "service_duration": { "type": "number" },
+        "technician_id": { "type": "number" },
+        "technician_name": { "type": "string" },
+        "total_price": { "type": "number" },
+        "appointment_date": { "type": "string" },
+        "appointment_time": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
+        "notes": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["customer_id", "salon_id", "service_id", "appointment_date", "appointment_time"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer feedback and rating",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "salon_id": { "type": "number" },
+        "user_id": { "type": "number" },
+        "user_name": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["salon_id", "user_id", "rating"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Glam shop product inventory item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "salon_id": { "type": "number" },
+        "name": { "type": "string" },
+        "brand": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "stock_quantity": { "type": "number" },
+        "image_url": { "type": "string" },
+        "is_active": { "type": "boolean" }
+      },
+      "required": ["name", "price"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/salons/{salonId}": {
+      "schema": "Salon",
+      "description": "Salon branch documents"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Salon services"
+    },
+    "/technicians/{technicianId}": {
+      "schema": "Technician",
+      "description": "Salon technicians"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Real-time client appointments"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Salon reviews"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product store items"
+    }
+  }
+}

@@ -21,6 +21,7 @@ interface CustomerDashboardProps {
   onOpenBooking: () => void;
   onOpenLeaveReview: (salon: Salon, technicianId?: number | null, technicianName?: string) => void;
   onSelectSalon: (salon: Salon) => void;
+  onRefreshAppointments?: () => void;
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
@@ -29,6 +30,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   onOpenBooking,
   onOpenLeaveReview,
   onSelectSalon,
+  onRefreshAppointments,
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       const list = await fetchAppointments({ customer_id: currentUser.id });
       setAppointments(list);
       setLoading(false);
+      onRefreshAppointments?.();
     }
     load();
   }, [currentUser.id]);
@@ -150,17 +153,27 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {['all', 'upcoming', 'past'].map((st) => (
+            {[
+              { id: 'all', label: `All (${appointments.length})` },
+              {
+                id: 'upcoming',
+                label: `Upcoming (${appointments.filter((a) => a.status === 'pending' || a.status === 'confirmed').length})`,
+              },
+              {
+                id: 'past',
+                label: `Past (${appointments.filter((a) => a.status === 'completed' || a.status === 'cancelled').length})`,
+              },
+            ].map((tab) => (
               <button
-                key={st}
-                onClick={() => setFilterStatus(st)}
+                key={tab.id}
+                onClick={() => setFilterStatus(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
-                  filterStatus === st
+                  filterStatus === tab.id
                     ? 'bg-pink-600 text-white shadow-xs'
                     : 'bg-pink-50 text-gray-700 hover:bg-pink-100'
                 }`}
               >
-                {st}
+                {tab.label}
               </button>
             ))}
           </div>

@@ -359,7 +359,7 @@ async function startServer() {
   app.get('/api/salons', async (req, res) => {
     const { category, search, owner_id, include_unpublished } = req.query;
     try {
-      const canViewUnpublished = include_unpublished === 'true';
+      const canViewUnpublished = include_unpublished === 'true' || Boolean(owner_id);
       let query = canViewUnpublished
         ? 'SELECT * FROM salons WHERE 1=1'
         : "SELECT * FROM salons WHERE is_active = 1 AND verification_status = 'verified'";
@@ -541,7 +541,7 @@ async function startServer() {
         return res.status(400).json({ error: 'An owner account is required' });
       }
       const [ownerRows] = await db.execute(
-        "SELECT id, user_type, status FROM users WHERE id = ? AND user_type = 'salon_owner' AND status = 'active'",
+        "SELECT id, user_type, status FROM users WHERE id = ? AND user_type IN ('salon_owner', 'admin') AND status = 'active'",
         [Number(owner_id)]
       );
       if ((ownerRows as any[]).length === 0) {
@@ -566,7 +566,7 @@ async function startServer() {
           logo || null,
           categoryId,
           categoryName,
-          'pending',
+          'verified',
           1,
           0.0,
           0
