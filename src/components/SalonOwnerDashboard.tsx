@@ -24,8 +24,10 @@ import {
   Save,
   Check,
   RefreshCw,
+  Package,
+  AlertTriangle,
 } from 'lucide-react';
-import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour } from '../types';
+import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import {
   fetchSalons,
   fetchServices,
@@ -33,6 +35,8 @@ import {
   fetchAppointments,
   fetchReviews,
   fetchWorkingHours,
+  fetchProducts,
+  fetchProductOrders,
   updateAppointmentStatus,
   updateAppointmentTechnician,
   updateSalon,
@@ -42,6 +46,7 @@ import {
 import { StoreOverviewReports } from './owner/StoreOverviewReports';
 import { BranchOverview } from './owner/BranchOverview';
 import { OwnerLocationPicker } from './maps/OwnerLocationPicker';
+import { ProductInventoryManager } from './owner/ProductInventoryManager';
 import { EmptyState } from './EmptyState';
 
 const DEFAULT_WORKING_HOURS: WorkingHour[] = [
@@ -57,7 +62,7 @@ const DEFAULT_WORKING_HOURS: WorkingHour[] = [
 
 interface SalonOwnerDashboardProps {
   currentUser: User;
-  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches';
+  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory';
   onOpenRegisterSalon?: () => void;
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
@@ -78,7 +83,9 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches'>(initialTab);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productOrders, setProductOrders] = useState<ProductOrder[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory'>(initialTab);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const dashboardLoadId = React.useRef(0);
@@ -164,12 +171,14 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
         setSelectedSalonId(currentId);
 
-        const [servs, techs, appts, revs, hours] = await Promise.all([
+        const [servs, techs, appts, revs, hours, prods, prodOrders] = await Promise.all([
           fetchServices(currentId),
           fetchTechnicians(currentId),
           fetchAppointments({ salon_id: currentId }),
           fetchReviews(currentId),
           fetchWorkingHours(currentId),
+          fetchProducts({ salon_id: currentId }),
+          fetchProductOrders({ salon_id: currentId }),
         ]);
 
         if (loadId !== dashboardLoadId.current) return;
@@ -179,6 +188,8 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         setAppointments(appts);
         setReviews(revs);
         setWorkingHours(hours.length > 0 ? hours : DEFAULT_WORKING_HOURS.map((hour) => ({ ...hour, salon_id: currentId })));
+        setProducts(prods);
+        setProductOrders(prodOrders);
         console.log('Loaded reviews for salon:', currentId, revs);
 
         const currentSalon = userSalons.find((s) => s.id === currentId) || userSalons[0];
@@ -223,16 +234,20 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const handleSelectSalon = async (salonId: number) => {
     setSelectedSalonId(salonId);
     setLoading(true);
-    const [servs, techs, appts, revs] = await Promise.all([
+    const [servs, techs, appts, revs, prods, prodOrders] = await Promise.all([
       fetchServices(salonId),
       fetchTechnicians(salonId),
       fetchAppointments({ salon_id: salonId }),
       fetchReviews(salonId),
+      fetchProducts({ salon_id: salonId }),
+      fetchProductOrders({ salon_id: salonId }),
     ]);
     setServices(servs);
     setTechnicians(techs);
     setAppointments(appts);
     setReviews(revs);
+    setProducts(prods);
+    setProductOrders(prodOrders);
 
     const s = salons.find((item) => item.id === salonId);
     if (s) {
@@ -410,6 +425,10 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
   const activeSalon = salons.find((s) => s.id === selectedSalonId) || salons[0];
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
+  const lowStockProductCount = useMemo(
+    () => products.filter((p) => p.stock_quantity <= (p.low_stock_threshold || 5)).length,
+    [products]
+  );
 
   // Filter Bookings Queue
   const filteredBookings = useMemo(() => {
@@ -591,7 +610,27 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
             <span>Staff Roster ({technicians.length})</span>
           </button>
 
-          {/* Tab 5: Store Location & Map */}
+          {/* Tab 5: Products & Stock Inventory */}
+          <button
+            id="owner-tab-inventory"
+            onClick={() => setActiveTab('inventory')}
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              activeTab === 'inventory'
+                ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Package className="w-4 h-4 text-emerald-600" />
+            <span>Products & Stock ({products.length})</span>
+            {lowStockProductCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center gap-1">
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {lowStockProductCount}
+              </span>
+            )}
+          </button>
+
+          {/* Tab 6: Store Location & Map */}
           <button
             id="owner-tab-location"
             onClick={() => setActiveTab('location')}
@@ -605,7 +644,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
             <span>Store Location & Map</span>
           </button>
 
-          {/* Tab 6: Studio Settings */}
+          {/* Tab 7: Studio Settings */}
           <button
             id="owner-tab-settings"
             onClick={() => setActiveTab('settings')}
@@ -645,6 +684,16 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               technicians={technicians}
               reviews={reviews}
               showToast={showToast}
+            />
+          )}
+
+          {/* TAB: PRODUCTS & STOCK INVENTORY */}
+          {activeTab === 'inventory' && (
+            <ProductInventoryManager
+              salon={activeSalon}
+              products={products}
+              orders={productOrders}
+              onRefresh={loadDashboardData}
             />
           )}
 

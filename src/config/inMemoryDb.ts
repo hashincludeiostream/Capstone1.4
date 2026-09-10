@@ -10,6 +10,8 @@ import {
   seedReels,
   seedPromotions,
   seedAnnouncements,
+  seedProducts,
+  seedProductOrders,
 } from '../data/seedData';
 
 class InMemoryDatabase {
@@ -25,6 +27,8 @@ class InMemoryDatabase {
     reels: JSON.parse(JSON.stringify(seedReels)),
     promotions: JSON.parse(JSON.stringify(seedPromotions)),
     announcements: JSON.parse(JSON.stringify(seedAnnouncements)),
+    products: JSON.parse(JSON.stringify(seedProducts)),
+    product_orders: JSON.parse(JSON.stringify(seedProductOrders)),
   };
 
   private getNextId(tableName: string): number {
@@ -296,6 +300,37 @@ class InMemoryDatabase {
       }
       if (/is_active\s*=\s*1/i.test(sql)) {
         filtered = filtered.filter((a) => Boolean(a.is_active));
+      }
+      return [filtered, null];
+    }
+
+    // 12. Products
+    if (tableName === 'products') {
+      if (/WHERE id\s*=\s*\?/i.test(sql)) {
+        const id = Number(params[0]);
+        return [table.filter((p) => p.id === id), null];
+      }
+      let filtered = [...table];
+      if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
+        const salonId = Number(params[0]);
+        filtered = filtered.filter((p) => Number(p.salon_id) === salonId);
+      }
+      return [filtered, null];
+    }
+
+    // 13. Product Orders
+    if (tableName === 'product_orders') {
+      if (/WHERE id\s*=\s*\?/i.test(sql)) {
+        const id = Number(params[0]);
+        return [table.filter((o) => o.id === id), null];
+      }
+      let filtered = [...table];
+      if (/WHERE customer_id\s*=\s*\?/i.test(sql)) {
+        const customerId = Number(params[0]);
+        filtered = filtered.filter((o) => Number(o.customer_id) === customerId);
+      } else if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
+        const salonId = Number(params[0]);
+        filtered = filtered.filter((o) => Number(o.salon_id) === salonId);
       }
       return [filtered, null];
     }

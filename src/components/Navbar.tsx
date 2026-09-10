@@ -19,6 +19,8 @@ import {
   Menu,
   X,
   MapPin,
+  ShoppingBag,
+  Package,
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -32,6 +34,8 @@ interface NavbarProps {
   onOpenRegisterSalon: () => void;
   isAdminMode: boolean;
   onNavigate?: (tab: string) => void;
+  cartItemCount?: number;
+  onOpenCart?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -44,6 +48,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenRegisterSalon,
   isAdminMode,
   onNavigate,
+  cartItemCount = 0,
+  onOpenCart,
 }) => {
   const handleNavigation = (tab: string) => {
     if (onNavigate) {
@@ -122,9 +128,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Navigation removed - only profile dropdown remains */}
           </nav>
 
-          {/* Right Action Bar - Removed per user request */}
+          {/* Right Action Bar */}
           <div className="flex items-center gap-2.5">
-            {/* Action buttons removed - only profile dropdown remains */}
+            {/* In-Store Pickup Cart Button */}
+            {onOpenCart && currentUser?.user_type !== 'admin' && (
+              <button
+                id="navbar-cart-btn"
+                onClick={onOpenCart}
+                className="relative p-2 rounded-full border border-pink-200 hover:border-pink-300 bg-pink-50/70 hover:bg-pink-100 text-pink-700 transition-all cursor-pointer flex items-center justify-center shadow-2xs"
+                title="View In-Store Reservation Cart"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-600 text-white text-[10px] font-bold flex items-center justify-center animate-in zoom-in-50 duration-200 shadow-xs">
+                    {cartItemCount > 9 ? '9+' : cartItemCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* User Account / Profile Menu */}
             {currentUser ? (
@@ -197,6 +218,41 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <span>My Profile</span>
                       </button>
 
+                      {currentUser.user_type === 'customer' && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActiveTab('customer-dashboard');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <Calendar className="w-4 h-4 text-pink-600" />
+                            <span>My Bookings</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveTab('customer-orders');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                            <span>Reserved Orders</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveTab('products');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <Package className="w-4 h-4 text-pink-600" />
+                            <span>Shop Products</span>
+                          </button>
+                        </>
+                      )}
+
                       {currentUser.user_type === 'salon_owner' && (
                         <>
                           <button
@@ -208,6 +264,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                           >
                             <Store className="w-4 h-4 text-purple-600" />
                             <span>Salon Management Suite</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveTab('owner-inventory');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-purple-900 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer font-semibold"
+                          >
+                            <Package className="w-4 h-4 text-emerald-600" />
+                            <span>Products & Inventory</span>
                           </button>
                           <button
                             onClick={() => {
@@ -468,6 +534,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
                 <button
                   onClick={() => {
+                    setActiveTab('owner-inventory');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-purple-900 hover:bg-purple-50 rounded-lg flex items-center gap-2"
+                >
+                  <Package className="w-4 h-4 text-emerald-600" />
+                  <span>Products & Stock Inventory</span>
+                </button>
+                <button
+                  onClick={() => {
                     setActiveTab('owner-settings');
                     setMobileMenuOpen(false);
                   }}
@@ -543,6 +619,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   Services & Menu
                 </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('products');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-pink-50 rounded-lg flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                    <span>Products & Care</span>
+                  </span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full">
+                    BOUTIQUE
+                  </span>
+                </button>
+                {currentUser?.user_type === 'customer' && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('customer-orders');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-pink-50 rounded-lg flex items-center gap-2"
+                  >
+                    <ShoppingBag className="w-4 h-4 text-pink-600" />
+                    <span>My Reserved Orders</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setActiveTab('reels');

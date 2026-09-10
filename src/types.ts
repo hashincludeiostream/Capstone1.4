@@ -217,3 +217,67 @@ export interface PlatformStats {
   estimated_gmv: number;
   platform_commission: number;
 }
+
+// ---------------------------------------------------------------------------
+// E-COMMERCE PRODUCTS & INVENTORY TYPES (In-Store Physical Settlement)
+// ---------------------------------------------------------------------------
+
+export interface Product {
+  id: number;
+  salon_id: number;
+  salon_name?: string;
+  salon_city?: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  stock_quantity: number;
+  low_stock_threshold: number;
+  sku?: string;
+  image_url?: string;
+  volume_or_size?: string;
+  rating?: number;
+  review_count?: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ProductOrderItem {
+  product_id: number;
+  product_name: string;
+  price: number;
+  quantity: number;
+  image_url?: string;
+  volume_or_size?: string;
+}
+
+export type ProductOrderStatus = 'pending_pickup' | 'ready_for_pickup' | 'completed' | 'cancelled';
+
+export interface ProductOrder {
+  id: number;
+  order_number: string;
+  salon_id: number;
+  salon_name?: string;
+  salon_address?: string;
+  salon_phone?: string;
+  customer_id: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  items: ProductOrderItem[];
+  total_amount: number;
+  total_items: number;
+  status: ProductOrderStatus;
+  pickup_date: string;
+  pickup_time?: string;
+  notes?: string;
+  payment_method: 'pay_in_store';
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}

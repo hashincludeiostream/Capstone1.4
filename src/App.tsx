@@ -20,8 +20,8 @@ import {
   LayoutGrid,
   User as UserIcon,
 } from 'lucide-react';
-import { User, Salon, Service, BusinessCategory, Appointment, Announcement } from './types';
-import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser } from './lib/api';
+import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem } from './types';
+import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders } from './lib/api';
 import { localStorage as safeLocalStorage } from './lib/localStorage';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -52,6 +52,11 @@ import ProfileCustomizationModal from './components/ProfileCustomizationModal';
 import { UserProfile } from './components/UserProfile';
 import { OwnerProfile } from './components/owner/OwnerProfile';
 import { FavoritesView } from './components/FavoritesView';
+import { ProductCatalog } from './components/products/ProductCatalog';
+import { ProductDetailModal } from './components/products/ProductDetailModal';
+import { CartDrawer } from './components/products/CartDrawer';
+import { ProductCheckoutModal } from './components/products/ProductCheckoutModal';
+import { CustomerOrdersView } from './components/products/CustomerOrdersView';
 
 export const App: React.FC = () => {
   return (
@@ -127,6 +132,23 @@ const AppContent: React.FC = () => {
   const [profileCustomizationOpen, setProfileCustomizationOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
 
+  // E-Commerce / Products state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [customerOrders, setCustomerOrders] = useState<ProductOrder[]>([]);
+  const [customerOrdersLoading, setCustomerOrdersLoading] = useState(false);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    return safeLocalStorage.getJSON<CartItem[]>('nailglamhub_cart') || [];
+  });
+  const [cartOpen, setCartOpen] = useState(false);
+  const [selectedProductForDetail, setSelectedProductForDetail] = useState<Product | null>(null);
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+
+  // Persist cart items to localStorage
+  useEffect(() => {
+    safeLocalStorage.setJSON('nailglamhub_cart', cartItems);
+  }, [cartItems]);
+
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -139,23 +161,120 @@ const AppContent: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cats, slns, anncs] = await Promise.all([
+      const [cats, slns, anncs, prods] = await Promise.all([
         fetchCategories().catch(err => { console.error('Categories fetch error:', err); return []; }),
         fetchSalons().catch(err => { console.error('Salons fetch error:', err); return []; }),
         fetchAnnouncements().catch(err => { console.error('Announcements fetch error:', err); return []; }),
+        fetchProducts().catch(err => { console.error('Products fetch error:', err); return []; }),
       ]);
       setCategories(cats);
       setSalons(slns);
       setAnnouncements(anncs);
+      setProducts(prods);
     } catch (err) {
       console.error('Error loading data:', err);
       // Set empty arrays as fallback to prevent crashes
       setCategories([]);
       setSalons([]);
       setAnnouncements([]);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Load Customer's Reserved Product Orders
+  const loadCustomerOrders = async () => {
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      setCustomerOrders([]);
+      return;
+    }
+    setCustomerOrdersLoading(true);
+    try {
+      const orders = await fetchProductOrders({ customer_id: currentUser.id });
+      setCustomerOrders(orders);
+    } catch (err) {
+      console.error('Failed to load customer product orders:', err);
+    } finally {
+      setCustomerOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.id && currentUser.user_type === 'customer') {
+      loadCustomerOrders();
+    } else {
+      setCustomerOrders([]);
+    }
+  }, [currentUser?.id, currentUser?.user_type]);
+
+  // Cart Operations
+  const handleAddToCart = (product: Product, quantity = 1) => {
+    if (product.stock_quantity <= 0) {
+      showToast(`${product.name} is currently out of stock`);
+      return;
+    }
+    setCartItems((prev) => {
+      const existingIndex = prev.findIndex((item) => item.product.id === product.id);
+      if (existingIndex > -1) {
+        const existing = prev[existingIndex];
+        const newQty = Math.min(product.stock_quantity, existing.quantity + quantity);
+        const updated = [...prev];
+        updated[existingIndex] = { ...existing, quantity: newQty };
+        return updated;
+      }
+      return [...prev, { product, quantity: Math.min(product.stock_quantity, quantity) }];
+    });
+    showToast(`Added ${quantity}x ${product.name} to cart`);
+  };
+
+  const handleUpdateCartQuantity = (productId: number, delta: number) => {
+    setCartItems((prev) => {
+      return prev
+        .map((item) => {
+          if (item.product.id === productId) {
+            const newQty = item.quantity + delta;
+            if (newQty <= 0) return null;
+            if (newQty > item.product.stock_quantity) {
+              showToast(`Only ${item.product.stock_quantity} available in stock`);
+              return item;
+            }
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[];
+    });
+  };
+
+  const handleRemoveCartItem = (productId: number) => {
+    setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
+    showToast('Item removed from cart');
+  };
+
+  const handleClearCart = () => {
+    setCartItems([]);
+  };
+
+  const handleProceedToCheckout = () => {
+    setCartOpen(false);
+    setCheckoutModalOpen(true);
+  };
+
+  const handleDirectCheckout = (product: Product, quantity: number) => {
+    handleAddToCart(product, quantity);
+    setSelectedProductForDetail(null);
+    setCheckoutModalOpen(true);
+  };
+
+  const handleOrderSuccess = (order: ProductOrder) => {
+    setCartItems([]);
+    setCheckoutModalOpen(false);
+    showToast(`Reservation #${order.order_number} confirmed! Settle balance upon in-store pickup.`);
+    // Refresh product stock and customer orders
+    fetchProducts().then(setProducts).catch(console.error);
+    loadCustomerOrders();
+    setActiveTab('customer-orders');
   };
 
   useEffect(() => {
@@ -358,6 +477,8 @@ const AppContent: React.FC = () => {
         onLogout={handleLogout}
         onOpenRegisterSalon={() => setBranchRegistrationOpen(true)}
         onNavigate={handleNavigate}
+        cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+        onOpenCart={() => setCartOpen(true)}
       />
 
       {/* Live Site-Wide Announcements Broadcasted by Super Admin */}
@@ -718,12 +839,43 @@ const AppContent: React.FC = () => {
             )
           )}
 
+          {/* E-COMMERCE PRODUCTS & BOUTIQUE */}
+          {activeTab === 'products' && (
+            <ProductCatalog
+              products={products}
+              salons={salons}
+              loading={productsLoading}
+              onSelectProduct={(p) => setSelectedProductForDetail(p)}
+              onAddToCart={(p, qty) => handleAddToCart(p, qty || 1)}
+              onOpenCart={() => setCartOpen(true)}
+              cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+            />
+          )}
+
+          {/* CUSTOMER RESERVED PRODUCT ORDERS */}
+          {activeTab === 'customer-orders' && (
+            <CustomerOrdersView
+              orders={customerOrders}
+              currentUser={currentUser}
+              onRefreshOrders={loadCustomerOrders}
+              onBrowseProducts={() => setActiveTab('products')}
+              onOpenLogin={() => setActiveTab('login-customer')}
+            />
+          )}
+
           {/* 6. SALON OWNER DASHBOARD & SUB-TABS */}
           {(activeTab.startsWith('owner') ||
             (currentUser?.user_type === 'salon_owner' &&
               !activeTab.startsWith('login-') &&
               !activeTab.startsWith('register-') &&
-              activeTab !== 'profile')) && (
+              activeTab !== 'profile' &&
+              activeTab !== 'products' &&
+              activeTab !== 'customer-orders' &&
+              activeTab !== 'explore' &&
+              activeTab !== 'services' &&
+              activeTab !== 'reels' &&
+              activeTab !== 'reviews' &&
+              activeTab !== 'map')) && (
             currentUser?.user_type === 'salon_owner' || currentUser?.user_type === 'admin' ? (
               <SalonOwnerDashboard
                 currentUser={currentUser}
@@ -743,6 +895,8 @@ const AppContent: React.FC = () => {
                     ? 'appointments'
                     : activeTab === 'owner-branches'
                     ? 'branches'
+                    : activeTab === 'owner-inventory'
+                    ? 'inventory'
                     : 'overview'
                 }
               />
@@ -1110,6 +1264,46 @@ const AppContent: React.FC = () => {
           currentUser={currentUser}
         />
       )}
+
+      {/* 8. Product Detail Modal */}
+      {selectedProductForDetail && (
+        <ProductDetailModal
+          product={selectedProductForDetail}
+          onClose={() => setSelectedProductForDetail(null)}
+          onAddToCart={(product, qty) => {
+            handleAddToCart(product, qty);
+          }}
+          onDirectCheckout={(product, qty) => {
+            handleDirectCheckout(product, qty);
+          }}
+        />
+      )}
+
+      {/* 9. E-Commerce Cart Drawer */}
+      <CartDrawer
+        isOpen={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cartItems={cartItems}
+        onUpdateQuantity={handleUpdateCartQuantity}
+        onRemoveItem={handleRemoveCartItem}
+        onClearCart={handleClearCart}
+        onProceedToCheckout={handleProceedToCheckout}
+        onContinueShopping={() => setCartOpen(false)}
+      />
+
+      {/* 10. In-Store Product Reservation Checkout Modal */}
+      <ProductCheckoutModal
+        isOpen={checkoutModalOpen}
+        onClose={() => setCheckoutModalOpen(false)}
+        cartItems={cartItems}
+        currentUser={currentUser}
+        salons={salons}
+        onOrderSuccess={handleOrderSuccess}
+        onViewMyOrders={() => {
+          setCheckoutModalOpen(false);
+          setActiveTab('customer-orders');
+        }}
+      />
     </div>
   );
 };

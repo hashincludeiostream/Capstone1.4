@@ -836,6 +836,549 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // PRODUCTS & INVENTORY MANAGEMENT APIS (Physical In-Store Settlement)
+  // =========================================================================
+
+  // Products List (Customer discovery & Salon inventory management)
+  app.get('/api/products', async (req, res) => {
+    const { salon_id, category, search, low_stock_only } = req.query;
+    try {
+      let query = 'SELECT * FROM products';
+      const params: any[] = [];
+
+      if (salon_id) {
+        query += ' WHERE salon_id = ?';
+        params.push(Number(salon_id));
+      }
+
+      const [rows] = await db.execute(query, params);
+      let products = (rows as any[]).map((p: any) => ({
+        ...p,
+        id: Number(p.id),
+        salon_id: Number(p.salon_id),
+        price: Number(p.price) || 0,
+        stock_quantity: Number(p.stock_quantity) || 0,
+        low_stock_threshold: Number(p.low_stock_threshold) != null ? Number(p.low_stock_threshold) : 5,
+        rating: Number(p.rating) || 4.8,
+        review_count: Number(p.review_count) || 0,
+        is_active: p.is_active !== undefined ? Boolean(p.is_active) : true,
+      }));
+
+      // Enrich with salon names if missing
+      const [salonRows] = await db.execute('SELECT id, salon_name, city, address, phone FROM salons');
+      const salonMap = new Map((salonRows as any[]).map((s: any) => [Number(s.id), s]));
+
+      products = products.map((p) => {
+        const salon = salonMap.get(p.salon_id);
+        return {
+          ...p,
+          salon_name: p.salon_name || salon?.salon_name || 'Verified Salon',
+          salon_city: p.salon_city || salon?.city || 'Davao City',
+          salon_address: salon?.address || '',
+          salon_phone: salon?.phone || '',
+          is_low_stock: p.stock_quantity <= p.low_stock_threshold,
+          is_out_of_stock: p.stock_quantity <= 0,
+        };
+      });
+
+      // Filter by category
+      if (category && category !== 'All') {
+        products = products.filter((p) => p.category?.toLowerCase() === String(category).toLowerCase());
+      }
+
+      // Filter by search query
+      if (search) {
+        const q = String(search).toLowerCase();
+        products = products.filter(
+          (p) =>
+            p.name?.toLowerCase().includes(q) ||
+            p.description?.toLowerCase().includes(q) ||
+            p.category?.toLowerCase().includes(q) ||
+            p.sku?.toLowerCase().includes(q) ||
+            p.salon_name?.toLowerCase().includes(q)
+        );
+      }
+
+      // Filter for low stock alert viewer
+      if (low_stock_only === 'true' || low_stock_only === '1') {
+        products = products.filter((p) => p.stock_quantity <= p.low_stock_threshold);
+      }
+
+      res.json(products);
+    } catch (error) {
+      console.error('Products list error:', error);
+      res.status(500).json({ error: 'Server error fetching products' });
+    }
+  });
+
+  // Single Product Details
+  app.get('/api/products/:id', async (req, res) => {
+    const id = Number(req.params.id);
+    try {
+      const [rows] = await db.execute('SELECT * FROM products WHERE id = ?', [id]);
+      const product = (rows as any[])[0];
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      const [salonRows] = await db.execute('SELECT id, salon_name, city, address, phone FROM salons WHERE id = ?', [
+        Number(product.salon_id),
+      ]);
+      const salon = (salonRows as any[])[0];
+
+      res.json({
+        ...product,
+        id: Number(product.id),
+        salon_id: Number(product.salon_id),
+        price: Number(product.price) || 0,
+        stock_quantity: Number(product.stock_quantity) || 0,
+        low_stock_threshold: Number(product.low_stock_threshold) || 5,
+        rating: Number(product.rating) || 4.8,
+        review_count: Number(product.review_count) || 0,
+        salon_name: salon?.salon_name || product.salon_name || 'Verified Salon',
+        salon_city: salon?.city || 'Davao City',
+        salon_address: salon?.address || '',
+        salon_phone: salon?.phone || '',
+        is_low_stock: Number(product.stock_quantity) <= (Number(product.low_stock_threshold) || 5),
+        is_out_of_stock: Number(product.stock_quantity) <= 0,
+      });
+    } catch (error) {
+      console.error('Product details error:', error);
+      res.status(500).json({ error: 'Server error fetching product' });
+    }
+  });
+
+  // Create Product (Salon Owner)
+  app.post('/api/products', async (req, res) => {
+    const {
+      salon_id,
+      name,
+      description,
+      price,
+      category,
+      stock_quantity,
+      low_stock_threshold,
+      sku,
+      image_url,
+      volume_or_size,
+    } = req.body;
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    const numericPrice = Number(price);
+    if (isNaN(numericPrice) || numericPrice < 0) {
+      return res.status(400).json({ error: 'Price must be a positive number' });
+    }
+
+    const numericStock = Number(stock_quantity);
+    if (isNaN(numericStock) || numericStock < 0) {
+      return res.status(400).json({ error: 'Stock quantity cannot be negative' });
+    }
+
+    const threshold = Number(low_stock_threshold) >= 0 ? Number(low_stock_threshold) : 5;
+
+    try {
+      const [salonRows] = await db.execute('SELECT id, salon_name, city FROM salons WHERE id = ?', [Number(salon_id) || 1]);
+      const salon = (salonRows as any[])[0];
+
+      const [result] = await db.execute(
+        `INSERT INTO products (salon_id, name, description, price, category, stock_quantity, low_stock_threshold, sku, image_url, volume_or_size, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          Number(salon_id) || 1,
+          name.trim(),
+          description?.trim() || '',
+          numericPrice,
+          category?.trim() || 'Nail Care',
+          numericStock,
+          threshold,
+          sku?.trim() || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+          image_url?.trim() || 'https://images.unsplash.com/photo-1608248597359-0a62377c08fe?w=600&auto=format&fit=crop&q=80',
+          volume_or_size?.trim() || 'Standard',
+          1,
+        ]
+      );
+
+      const newId = (result as any).insertId;
+      const [newRows] = await db.execute('SELECT * FROM products WHERE id = ?', [newId]);
+      const newProduct = (newRows as any[])[0] || {
+        id: newId,
+        salon_id: Number(salon_id) || 1,
+        name: name.trim(),
+        description: description?.trim() || '',
+        price: numericPrice,
+        category: category?.trim() || 'Nail Care',
+        stock_quantity: numericStock,
+        low_stock_threshold: threshold,
+        sku: sku?.trim() || `SKU-${newId}`,
+        image_url: image_url?.trim(),
+        volume_or_size: volume_or_size?.trim() || 'Standard',
+        is_active: true,
+      };
+
+      res.status(201).json({
+        ...newProduct,
+        salon_name: salon?.salon_name || 'Verified Salon',
+        salon_city: salon?.city || 'Davao City',
+        is_low_stock: numericStock <= threshold,
+        is_out_of_stock: numericStock <= 0,
+      });
+    } catch (error) {
+      console.error('Create product error:', error);
+      res.status(500).json({ error: 'Server error creating product' });
+    }
+  });
+
+  // Update Product (Salon Owner)
+  app.put('/api/products/:id', async (req, res) => {
+    const id = Number(req.params.id);
+    try {
+      const [existingRows] = await db.execute('SELECT * FROM products WHERE id = ?', [id]);
+      const existing = (existingRows as any[])[0];
+      if (!existing) return res.status(404).json({ error: 'Product not found' });
+
+      const allowedFields = [
+        'name',
+        'description',
+        'price',
+        'category',
+        'stock_quantity',
+        'low_stock_threshold',
+        'sku',
+        'image_url',
+        'volume_or_size',
+        'is_active',
+      ];
+
+      const updateFields = [];
+      const updateValues = [];
+
+      for (const [key, value] of Object.entries(req.body)) {
+        if (value !== undefined && key !== 'id' && allowedFields.includes(key)) {
+          if (key === 'price' || key === 'stock_quantity' || key === 'low_stock_threshold') {
+            const num = Number(value);
+            if (isNaN(num) || num < 0) {
+              return res.status(400).json({ error: `${key} must be a non-negative number` });
+            }
+            updateFields.push(`${key} = ?`);
+            updateValues.push(num);
+          } else if (key === 'is_active') {
+            updateFields.push(`${key} = ?`);
+            updateValues.push(value ? 1 : 0);
+          } else {
+            updateFields.push(`${key} = ?`);
+            updateValues.push(String(value ?? ''));
+          }
+        }
+      }
+
+      if (updateFields.length > 0) {
+        await db.execute(`UPDATE products SET ${updateFields.join(', ')} WHERE id = ?`, [...updateValues, id]);
+      }
+
+      const [updatedRows] = await db.execute('SELECT * FROM products WHERE id = ?', [id]);
+      const updated = (updatedRows as any[])[0];
+
+      res.json({
+        ...updated,
+        id: Number(updated.id),
+        salon_id: Number(updated.salon_id),
+        price: Number(updated.price) || 0,
+        stock_quantity: Number(updated.stock_quantity) || 0,
+        low_stock_threshold: Number(updated.low_stock_threshold) || 5,
+        is_low_stock: Number(updated.stock_quantity) <= (Number(updated.low_stock_threshold) || 5),
+        is_out_of_stock: Number(updated.stock_quantity) <= 0,
+      });
+    } catch (error) {
+      console.error('Update product error:', error);
+      res.status(500).json({ error: 'Server error updating product' });
+    }
+  });
+
+  // Quick Stock Adjustment / Restock API
+  app.patch('/api/products/:id/stock', async (req, res) => {
+    const id = Number(req.params.id);
+    const { delta, stock_quantity } = req.body;
+
+    try {
+      const [existingRows] = await db.execute('SELECT * FROM products WHERE id = ?', [id]);
+      const product = (existingRows as any[])[0];
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      let newStock: number;
+      if (stock_quantity !== undefined) {
+        newStock = Math.max(0, Number(stock_quantity));
+      } else if (delta !== undefined) {
+        newStock = Math.max(0, (Number(product.stock_quantity) || 0) + Number(delta));
+      } else {
+        return res.status(400).json({ error: 'Either delta or stock_quantity must be provided' });
+      }
+
+      await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [newStock, id]);
+
+      const [updatedRows] = await db.execute('SELECT * FROM products WHERE id = ?', [id]);
+      const updated = (updatedRows as any[])[0];
+
+      const threshold = Number(updated.low_stock_threshold) || 5;
+      const isLowStock = newStock <= threshold;
+
+      res.json({
+        success: true,
+        product: {
+          ...updated,
+          stock_quantity: newStock,
+          is_low_stock: isLowStock,
+          is_out_of_stock: newStock <= 0,
+        },
+        message: `Stock updated to ${newStock} units.${isLowStock ? ' Warning: item is at or below low stock threshold!' : ''}`,
+      });
+    } catch (error) {
+      console.error('Update product stock error:', error);
+      res.status(500).json({ error: 'Server error updating product stock' });
+    }
+  });
+
+  // Delete Product
+  app.delete('/api/products/:id', async (req, res) => {
+    const id = Number(req.params.id);
+    try {
+      await db.execute('DELETE FROM products WHERE id = ?', [id]);
+      res.json({ success: true, message: 'Product successfully removed' });
+    } catch (error) {
+      console.error('Delete product error:', error);
+      res.status(500).json({ error: 'Server error deleting product' });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // PRODUCT PICKUP RESERVATION ORDERS (Settled in physical store)
+  // -------------------------------------------------------------------------
+
+  // List Product Orders (Customer orders or Salon Owner order manager)
+  app.get('/api/product-orders', async (req, res) => {
+    const { customer_id, salon_id, status } = req.query;
+    try {
+      let query = 'SELECT * FROM product_orders';
+      const params: any[] = [];
+
+      if (customer_id) {
+        query += ' WHERE customer_id = ?';
+        params.push(Number(customer_id));
+      } else if (salon_id) {
+        query += ' WHERE salon_id = ?';
+        params.push(Number(salon_id));
+      }
+
+      const [rows] = await db.execute(query, params);
+      let orders = (rows as any[]).map((order: any) => ({
+        ...order,
+        id: Number(order.id),
+        salon_id: Number(order.salon_id),
+        customer_id: Number(order.customer_id),
+        total_amount: Number(order.total_amount) || 0,
+        total_items: Number(order.total_items) || 0,
+        items: typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []),
+        payment_method: 'pay_in_store',
+      }));
+
+      if (status && status !== 'all') {
+        orders = orders.filter((o) => o.status === status);
+      }
+
+      // Sort newest first
+      orders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+      res.json(orders);
+    } catch (error) {
+      console.error('Product orders list error:', error);
+      res.status(500).json({ error: 'Server error fetching product orders' });
+    }
+  });
+
+  // Place Product Pickup Reservation Order (Customer E-Commerce Checkout)
+  app.post('/api/product-orders', async (req, res) => {
+    const {
+      salon_id,
+      customer_id,
+      customer_name,
+      customer_phone,
+      customer_email,
+      items,
+      pickup_date,
+      pickup_time,
+      notes,
+    } = req.body;
+
+    if (!salon_id || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Order must contain a salon and at least one item' });
+    }
+
+    if (!customer_name || !customer_phone) {
+      return res.status(400).json({ error: 'Customer name and contact number are required for in-store pickup' });
+    }
+
+    try {
+      // Get salon details
+      const [salonRows] = await db.execute('SELECT id, salon_name, address, phone FROM salons WHERE id = ?', [Number(salon_id)]);
+      const salon = (salonRows as any[])[0];
+
+      // Validate items and verify available stock
+      let calculatedTotal = 0;
+      let calculatedItemsCount = 0;
+
+      for (const item of items) {
+        const [prodRows] = await db.execute('SELECT * FROM products WHERE id = ?', [Number(item.product_id)]);
+        const product = (prodRows as any[])[0];
+        if (!product) {
+          return res.status(404).json({ error: `Product with ID ${item.product_id} no longer exists` });
+        }
+
+        const requestedQty = Number(item.quantity) || 1;
+        const availableStock = Number(product.stock_quantity) || 0;
+
+        if (requestedQty > availableStock) {
+          return res.status(400).json({
+            error: `Insufficient stock for "${product.name}". Only ${availableStock} unit(s) currently available.`,
+          });
+        }
+
+        calculatedTotal += Number(product.price) * requestedQty;
+        calculatedItemsCount += requestedQty;
+      }
+
+      // Deduct stock for all items
+      for (const item of items) {
+        const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
+        const product = (prodRows as any[])[0];
+        if (product) {
+          const newQty = Math.max(0, Number(product.stock_quantity) - Number(item.quantity));
+          await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [newQty, Number(item.product_id)]);
+        }
+      }
+
+      // Generate order number
+      const orderNumber = `NGH-PRD-${Math.floor(10000 + Math.random() * 90000)}`;
+
+      const [result] = await db.execute(
+        `INSERT INTO product_orders (
+          order_number, salon_id, salon_name, salon_address, salon_phone,
+          customer_id, customer_name, customer_phone, customer_email,
+          items, total_amount, total_items, status,
+          pickup_date, pickup_time, notes, payment_method
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderNumber,
+          Number(salon_id),
+          salon?.salon_name || 'Verified Salon',
+          salon?.address || '',
+          salon?.phone || '',
+          Number(customer_id) || 0,
+          customer_name.trim(),
+          customer_phone.trim(),
+          customer_email?.trim() || '',
+          JSON.stringify(items),
+          calculatedTotal,
+          calculatedItemsCount,
+          'pending_pickup',
+          pickup_date || new Date().toISOString().split('T')[0],
+          pickup_time || '14:00',
+          notes?.trim() || '',
+          'pay_in_store',
+        ]
+      );
+
+      const orderId = (result as any).insertId;
+      const [orderRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [orderId]);
+      const createdOrder = (orderRows as any[])[0] || {
+        id: orderId,
+        order_number: orderNumber,
+        salon_id: Number(salon_id),
+        salon_name: salon?.salon_name,
+        salon_address: salon?.address,
+        salon_phone: salon?.phone,
+        customer_id: Number(customer_id),
+        customer_name,
+        customer_phone,
+        customer_email,
+        items,
+        total_amount: calculatedTotal,
+        total_items: calculatedItemsCount,
+        status: 'pending_pickup',
+        pickup_date: pickup_date || new Date().toISOString().split('T')[0],
+        pickup_time: pickup_time || '14:00',
+        notes,
+        payment_method: 'pay_in_store',
+      };
+
+      res.status(201).json({
+        success: true,
+        order: {
+          ...createdOrder,
+          items: typeof createdOrder.items === 'string' ? JSON.parse(createdOrder.items) : createdOrder.items,
+        },
+        message: 'Product pickup reservation confirmed! Settlement will take place upon pickup at the salon counter.',
+      });
+    } catch (error) {
+      console.error('Create product order error:', error);
+      res.status(500).json({ error: 'Server error creating product order' });
+    }
+  });
+
+  // Update Product Order Status (Salon Owner / Customer Cancel)
+  app.patch('/api/product-orders/:id/status', async (req, res) => {
+    const id = Number(req.params.id);
+    const { status } = req.body;
+
+    const validStatuses = ['pending_pickup', 'ready_for_pickup', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid order status' });
+    }
+
+    try {
+      const [orderRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
+      const order = (orderRows as any[])[0];
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const prevStatus = order.status;
+
+      // If cancelling an order, restore product stock
+      if (status === 'cancelled' && prevStatus !== 'cancelled') {
+        const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+        for (const item of items) {
+          const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
+          const prod = (prodRows as any[])[0];
+          if (prod) {
+            const restoredStock = Number(prod.stock_quantity) + Number(item.quantity);
+            await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [restoredStock, Number(item.product_id)]);
+          }
+        }
+      }
+
+      await db.execute('UPDATE product_orders SET status = ? WHERE id = ?', [status, id]);
+
+      const [updatedRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
+      const updated = (updatedRows as any[])[0];
+
+      res.json({
+        success: true,
+        order: {
+          ...updated,
+          items: typeof updated.items === 'string' ? JSON.parse(updated.items) : updated.items,
+        },
+        message:
+          status === 'completed'
+            ? 'Order marked as completed & settled in physical store.'
+            : status === 'ready_for_pickup'
+            ? 'Order is marked ready for in-store customer pickup.'
+            : `Order status updated to ${status}.`,
+      });
+    } catch (error) {
+      console.error('Update product order status error:', error);
+      res.status(500).json({ error: 'Server error updating order status' });
+    }
+  });
+
   // Technicians List
   app.get('/api/technicians', async (req, res) => {
     const { salon_id } = req.query;

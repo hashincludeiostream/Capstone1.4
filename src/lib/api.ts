@@ -13,6 +13,9 @@ import {
   WorkingHour,
   ReelCommentResponse,
   PlatformStats,
+  Product,
+  ProductOrder,
+  ProductOrderStatus,
 } from '../types';
 
 const configuredApiBase = import.meta.env.VITE_API_URL as string | undefined;
@@ -514,6 +517,162 @@ export async function updateUser(id: number, data: Partial<User>): Promise<User>
 export async function fetchUser(id: number): Promise<User> {
   const res = await fetch(`${API_BASE}/users/${id}`);
   if (!res.ok) throw new Error('Failed to fetch user');
+  return await res.json();
+}
+
+// ---------------------------------------------------------------------------
+// E-COMMERCE PRODUCTS & INVENTORY API (In-Store Physical Settlement)
+// ---------------------------------------------------------------------------
+
+export async function fetchProducts(params?: {
+  salon_id?: number;
+  category?: string;
+  search?: string;
+  low_stock_only?: boolean;
+}): Promise<Product[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.salon_id) query.set('salon_id', String(params.salon_id));
+    if (params?.category) query.set('category', params.category);
+    if (params?.search) query.set('search', params.search);
+    if (params?.low_stock_only) query.set('low_stock_only', 'true');
+
+    const res = await fetch(`${API_BASE}/products?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch products');
+    const items = await res.json();
+    return Array.isArray(items) ? items : [];
+  } catch (err) {
+    console.warn('API fetchProducts error:', err);
+    return [];
+  }
+}
+
+export async function fetchProductDetails(id: number): Promise<Product | null> {
+  try {
+    const res = await fetch(`${API_BASE}/products/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch product');
+    return await res.json();
+  } catch (err) {
+    console.error('API fetchProductDetails error:', err);
+    return null;
+  }
+}
+
+export async function createProduct(productData: Partial<Product>): Promise<Product> {
+  const res = await fetch(`${API_BASE}/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(productData),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to create product');
+  }
+  return await res.json();
+}
+
+export async function updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
+  const res = await fetch(`${API_BASE}/products/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(productData),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update product');
+  }
+  return await res.json();
+}
+
+export async function updateProductStock(
+  id: number,
+  change: { delta?: number; stock_quantity?: number }
+): Promise<{ success: boolean; product: Product; message: string }> {
+  const res = await fetch(`${API_BASE}/products/${id}/stock`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(change),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to adjust stock');
+  }
+  return await res.json();
+}
+
+export async function deleteProduct(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function fetchProductOrders(params?: {
+  customer_id?: number;
+  salon_id?: number;
+  status?: string;
+}): Promise<ProductOrder[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.customer_id) query.set('customer_id', String(params.customer_id));
+    if (params?.salon_id) query.set('salon_id', String(params.salon_id));
+    if (params?.status) query.set('status', params.status);
+
+    const res = await fetch(`${API_BASE}/product-orders?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch product orders');
+    const items = await res.json();
+    return Array.isArray(items) ? items : [];
+  } catch (err) {
+    console.warn('API fetchProductOrders error:', err);
+    return [];
+  }
+}
+
+export async function createProductOrder(orderData: {
+  salon_id: number;
+  customer_id?: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  items: Array<{
+    product_id: number;
+    product_name: string;
+    price: number;
+    quantity: number;
+    image_url?: string;
+    volume_or_size?: string;
+  }>;
+  pickup_date: string;
+  pickup_time?: string;
+  notes?: string;
+}): Promise<{ success: boolean; order: ProductOrder; message: string }> {
+  const res = await fetch(`${API_BASE}/product-orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(orderData),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to reserve product order');
+  }
+  return await res.json();
+}
+
+export async function updateProductOrderStatus(
+  orderId: number,
+  status: ProductOrderStatus
+): Promise<{ success: boolean; order: ProductOrder; message: string }> {
+  const res = await fetch(`${API_BASE}/product-orders/${orderId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update order status');
+  }
   return await res.json();
 }
 

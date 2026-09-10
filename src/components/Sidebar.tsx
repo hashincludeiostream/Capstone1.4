@@ -24,6 +24,8 @@ import {
   Lock,
   BarChart3,
   MapPin,
+  Package,
+  ShoppingBag,
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -314,6 +316,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button
+              id="sidebar-owner-inventory-btn"
+              onClick={() => setActiveTab('owner-inventory')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === 'owner-inventory'
+                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+                  : 'text-purple-950 hover:bg-purple-50'
+              }`}
+            >
+              <Package className="w-4 h-4 text-purple-600" />
+              <span>Products & Stock</span>
+            </button>
+
+            <button
               id="sidebar-owner-location-btn"
               onClick={() => setActiveTab('owner-location')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
@@ -450,6 +465,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
+            id="sidebar-products-btn"
+            onClick={() => setActiveTab('products')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === 'products'
+                ? 'bg-pink-100 text-pink-900 font-semibold'
+                : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4 text-emerald-600" />
+            <div className="flex items-center justify-between flex-1">
+              <span>Products & Care</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-1.5 py-0.2 rounded-full">
+                BOUTIQUE
+              </span>
+            </div>
+          </button>
+
+          <button
             id="sidebar-reels-btn"
             onClick={() => setActiveTab('reels')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
@@ -501,6 +534,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <CalendarCheck className="w-4 h-4 text-pink-600" />
                 <span>My Bookings</span>
+              </button>
+
+              <button
+                id="sidebar-orders-btn"
+                onClick={() => setActiveTab('customer-orders')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  activeTab === 'customer-orders'
+                    ? 'bg-pink-100 text-pink-900 font-semibold'
+                    : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
+                }`}
+              >
+                <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                <span>Reserved Orders</span>
               </button>
 
               <button
