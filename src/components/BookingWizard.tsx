@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 import { Salon, Service, Technician, User, Appointment, WorkingHour } from '../types';
 import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, createAppointment } from '../lib/api';
@@ -58,6 +59,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [confirmedAppt, setConfirmedAppt] = useState<Appointment | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Load services & technicians when salon changes
   useEffect(() => {
@@ -119,26 +121,27 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   const handleSubmitBooking = async () => {
     if (!currentService) return;
+    setValidationError(null);
 
     // Basic validation
     if (!fullName.trim()) {
-      alert('Please enter your full name');
+      setValidationError('Please enter your full name');
       return;
     }
     if (!phone.trim()) {
-      alert('Please enter your phone number');
+      setValidationError('Please enter your contact phone number');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      alert('Please enter a valid email address');
+      setValidationError('Please enter a valid email address');
       return;
     }
     if (!appointmentDate) {
-      alert('Please select an appointment date');
+      setValidationError('Please select an appointment date');
       return;
     }
     if (!appointmentTime) {
-      alert('Please select an appointment time');
+      setValidationError('Please select an appointment time');
       return;
     }
 
@@ -170,7 +173,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       }
     } catch (err) {
       console.error('Booking submission error:', err);
-      alert('Failed to submit booking. Please try again.');
+      setValidationError('Failed to submit booking. Please verify connection and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -231,6 +234,21 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             >
               4. Contact
             </div>
+          </div>
+        )}
+
+        {/* Inline Validation Alert */}
+        {validationError && (
+          <div className="mx-6 mt-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 animate-in fade-in duration-150">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+            <span className="flex-1 font-medium">{validationError}</span>
+            <button
+              type="button"
+              onClick={() => setValidationError(null)}
+              className="text-rose-400 hover:text-rose-600 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
@@ -630,7 +648,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             {step > 1 ? (
               <button
                 type="button"
-                onClick={() => setStep(step - 1)}
+                onClick={() => {
+                  setValidationError(null);
+                  setStep(step - 1);
+                }}
                 className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -644,7 +665,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               <button
                 type="button"
                 disabled={!selectedServiceId}
-                onClick={() => setStep(step + 1)}
+                onClick={() => {
+                  setValidationError(null);
+                  setStep(step + 1);
+                }}
                 className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
               >
                 <span>Continue</span>

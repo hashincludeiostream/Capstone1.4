@@ -777,7 +777,7 @@ const AppContent: React.FC = () => {
                 <div className="animate-in fade-in duration-200">
                   <StoreLocationsMap
                     salons={salons}
-                    onSelectSalon={(s) => setSelectedSalonForDetails(s)}
+                    onViewSalonDetails={(s) => setSelectedSalonForDetails(s)}
                     onBookSalon={(s) => handleOpenBookingWithSalon(s)}
                   />
                 </div>
@@ -832,7 +832,7 @@ const AppContent: React.FC = () => {
             <div className="space-y-6">
               <StoreLocationsMap
                 salons={salons}
-                onSelectSalon={(s) => setSelectedSalonForDetails(s)}
+                onViewSalonDetails={(s) => setSelectedSalonForDetails(s)}
                 onBookSalon={(s) => handleOpenBookingWithSalon(s)}
               />
             </div>

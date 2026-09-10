@@ -20,7 +20,11 @@ import {
 import {
   createFirestoreAppointment,
   updateFirestoreAppointmentStatus,
+  updateFirestoreAppointmentTechnician,
   createFirestoreSalon,
+  createFirestoreReview,
+  createFirestoreProductOrder,
+  updateFirestoreProductOrderStatus,
 } from './firestoreService';
 
 const configuredApiBase = import.meta.env.VITE_API_URL as string | undefined;
@@ -228,6 +232,13 @@ export async function updateAppointmentTechnician(id: number, technicianId: numb
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ technician_id: technicianId }),
     });
+
+    if (res.ok) {
+      updateFirestoreAppointmentTechnician(id, technicianId).catch((err) =>
+        console.warn('Firestore technician sync warning:', err)
+      );
+    }
+
     return res.ok;
   } catch (err) {
     console.error('API updateAppointmentTechnician error:', err);
@@ -257,7 +268,11 @@ export async function createReview(data: Partial<Review>): Promise<Review> {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Failed to submit review');
-    return await res.json();
+    const result = await res.json();
+    createFirestoreReview(result).catch((err) =>
+      console.warn('Firestore review sync warning:', err)
+    );
+    return result;
   } catch (err) {
     console.error('API createReview error:', err);
     const errorMessage = getErrorMessage(err, 'review');
@@ -677,7 +692,13 @@ export async function createProductOrder(orderData: {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to reserve product order');
   }
-  return await res.json();
+  const result = await res.json();
+  if (result.order) {
+    createFirestoreProductOrder(result.order).catch((err) =>
+      console.warn('Firestore product order sync warning:', err)
+    );
+  }
+  return result;
 }
 
 export async function updateProductOrderStatus(
@@ -693,6 +714,10 @@ export async function updateProductOrderStatus(
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to update order status');
   }
-  return await res.json();
+  const result = await res.json();
+  updateFirestoreProductOrderStatus(orderId, status).catch((err) =>
+    console.warn('Firestore product order status sync warning:', err)
+  );
+  return result;
 }
 

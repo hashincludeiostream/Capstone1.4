@@ -16,9 +16,10 @@ import {
   Clock,
   Settings,
   LogOut,
+  AlertCircle,
 } from 'lucide-react';
 import { User as UserType, Salon, Appointment } from '../types';
-import { fetchAppointments } from '../lib/api';
+import { fetchAppointments, updateUser } from '../lib/api';
 
 interface UserProfileProps {
   currentUser: UserType;
@@ -37,6 +38,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [formData, setFormData] = useState({
     fullname: currentUser.fullname,
     email: currentUser.email,
@@ -66,25 +68,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
   const handleSave = async () => {
     setLoading(true);
+    setFeedback(null);
     try {
-      const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
-      const res = await fetch(`${apiBase}/api/users/${currentUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        const updatedUser = await res.json();
-        onUpdateUser(updatedUser);
-        setIsEditing(false);
-      } else {
-        const error = await res.json();
-        alert(error.error || 'Failed to update profile');
-      }
-    } catch (error) {
+      const updatedUser = await updateUser(currentUser.id, formData);
+      onUpdateUser(updatedUser);
+      setIsEditing(false);
+      setFeedback({ type: 'success', message: 'Profile updated successfully!' });
+      setTimeout(() => setFeedback(null), 4000);
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile');
+      setFeedback({ type: 'error', message: error.message || 'Failed to update profile' });
     } finally {
       setLoading(false);
     }
@@ -129,6 +122,32 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Feedback Alert */}
+      {feedback && (
+        <div
+          className={`p-4 rounded-2xl border flex items-center justify-between shadow-xs transition-all ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            )}
+            <p className="text-sm font-medium">{feedback.message}</p>
+          </div>
+          <button
+            onClick={() => setFeedback(null)}
+            className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Profile Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
         <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 h-32"></div>

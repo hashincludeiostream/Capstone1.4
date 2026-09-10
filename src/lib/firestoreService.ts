@@ -239,6 +239,53 @@ export async function updateFirestoreAppointmentStatus(id: number, status: Appoi
   }
 }
 
+export async function updateFirestoreAppointmentTechnician(
+  id: number,
+  technicianId: number,
+  technicianName?: string
+): Promise<boolean> {
+  try {
+    const ref = doc(db, 'appointments', String(id));
+    const updateData: Record<string, any> = {
+      technician_id: Number(technicianId),
+      updated_at: new Date().toISOString(),
+    };
+    if (technicianName) {
+      updateData.technician_name = technicianName;
+    }
+    await updateDoc(ref, updateData);
+    return true;
+  } catch (err) {
+    console.warn('[Firestore] Failed to update appointment technician:', err);
+    return false;
+  }
+}
+
+export async function createFirestoreProductOrder(order: any): Promise<any> {
+  try {
+    const orderId = String(order.id || Date.now());
+    await setDoc(doc(db, 'product_orders', orderId), order);
+    return order;
+  } catch (err) {
+    console.warn('[Firestore] Failed to sync product order to firestore:', err);
+    return order;
+  }
+}
+
+export async function updateFirestoreProductOrderStatus(
+  orderId: number,
+  status: string
+): Promise<boolean> {
+  try {
+    const ref = doc(db, 'product_orders', String(orderId));
+    await updateDoc(ref, { status, updated_at: new Date().toISOString() });
+    return true;
+  } catch (err) {
+    console.warn('[Firestore] Failed to update product order status in firestore:', err);
+    return false;
+  }
+}
+
 export async function createFirestoreSalon(data: Partial<Salon>): Promise<Salon> {
   const newId = Date.now();
   const salonRecord: Salon = {

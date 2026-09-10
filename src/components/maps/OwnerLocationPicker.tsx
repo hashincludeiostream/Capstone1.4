@@ -135,13 +135,21 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
   const [postalCode, setPostalCode] = useState(salon.postal_code || '');
   const [landmark, setLandmark] = useState(salon.landmark || '');
   const [parkingInfo, setParkingInfo] = useState(salon.parking_info || '');
-  const [latitude, setLatitude] = useState<number>(salon.latitude || 14.5995);
-  const [longitude, setLongitude] = useState<number>(salon.longitude || 120.9842);
+  const parseSafeCoord = (val: any, fallback: number) => {
+    const num = typeof val === 'number' ? val : parseFloat(String(val));
+    return Number.isFinite(num) && !isNaN(num) ? num : fallback;
+  };
+
+  const [latitude, setLatitude] = useState<number>(() => parseSafeCoord(salon.latitude, 7.0731));
+  const [longitude, setLongitude] = useState<number>(() => parseSafeCoord(salon.longitude, 125.6128));
   const [isSaving, setIsSaving] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [previewMode, setPreviewMode] = useState<'editor' | 'preview'>('editor');
-  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number }>(() => ({
+    lat: parseSafeCoord(salon.latitude, 7.0731),
+    lng: parseSafeCoord(salon.longitude, 125.6128)
+  }));
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
 
   const updateGuidesForPosition = (lat: number, lng: number) => {
@@ -157,19 +165,21 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
 
   // Sync marker position when coordinates change
   useEffect(() => {
-    setMarkerPosition({ lat: latitude, lng: longitude });
+    const safeLat = parseSafeCoord(latitude, 7.0731);
+    const safeLng = parseSafeCoord(longitude, 125.6128);
+    setMarkerPosition({ lat: safeLat, lng: safeLng });
   }, [latitude, longitude]);
 
   // Sync state when salon prop changes
   useEffect(() => {
     setAddress(salon.address || '');
-    setCity(salon.city || 'Metro Manila');
-    setProvince(salon.province || 'Metro Manila');
+    setCity(salon.city || 'Davao City');
+    setProvince(salon.province || 'Davao del Sur');
     setPostalCode(salon.postal_code || '');
     setLandmark(salon.landmark || '');
     setParkingInfo(salon.parking_info || '');
-    setLatitude(salon.latitude || 14.5995);
-    setLongitude(salon.longitude || 120.9842);
+    setLatitude(parseSafeCoord(salon.latitude, 7.0731));
+    setLongitude(parseSafeCoord(salon.longitude, 125.6128));
   }, [salon]);
 
   // Handle Preset Mall/Hub Selection
@@ -396,7 +406,7 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
 
             <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-purple-200 bg-slate-900 group shadow-inner">
               <MapContainer
-                center={[latitude, longitude] as [number, number]}
+                center={[parseSafeCoord(latitude, 7.0731), parseSafeCoord(longitude, 125.6128)] as [number, number]}
                 zoom={15}
                 style={{ width: '100%', height: '100%' }}
                 className="z-0"
