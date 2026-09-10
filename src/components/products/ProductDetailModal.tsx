@@ -14,11 +14,14 @@ import {
   Plus,
   Minus,
   Sparkles,
+  Lock,
 } from 'lucide-react';
-import { Product } from '../../types';
+import { Product, User } from '../../types';
 
 interface ProductDetailModalProps {
   product: Product | null;
+  currentUser?: User | null;
+  onRequireLogin?: () => void;
   onClose: () => void;
   onAddToCart: (product: Product, quantity: number) => void;
   onDirectCheckout: (product: Product, quantity: number) => void;
@@ -26,6 +29,8 @@ interface ProductDetailModalProps {
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
+  currentUser,
+  onRequireLogin,
   onClose,
   onAddToCart,
   onDirectCheckout,
@@ -35,6 +40,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
+  const isCustomer = currentUser?.user_type === 'customer';
   const isOutOfStock = product.stock_quantity <= 0;
   const isLowStock = !isOutOfStock && product.stock_quantity <= (product.low_stock_threshold || 5);
   const maxAvailable = Math.max(1, product.stock_quantity);
@@ -53,6 +59,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleAdd = () => {
     if (isOutOfStock) return;
+    if (!isCustomer) {
+      if (onRequireLogin) {
+        onRequireLogin();
+      }
+      return;
+    }
     onAddToCart(product, quantity);
     setAddedSuccess(true);
     setTimeout(() => {
@@ -62,6 +74,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleReserveNow = () => {
     if (isOutOfStock) return;
+    if (!isCustomer) {
+      if (onRequireLogin) {
+        onRequireLogin();
+      }
+      return;
+    }
     onDirectCheckout(product, quantity);
   };
 
@@ -210,6 +228,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
                       : addedSuccess
                       ? 'bg-emerald-600 text-white'
+                      : !isCustomer
+                      ? 'bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200'
                       : 'bg-stone-900 hover:bg-stone-800 text-white shadow-xs'
                   }`}
                 >
@@ -217,6 +237,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <>
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Added to Cart!</span>
+                    </>
+                  ) : !isCustomer ? (
+                    <>
+                      <Lock className="w-4 h-4 text-pink-600" />
+                      <span>Sign In to Add</span>
                     </>
                   ) : (
                     <>
@@ -229,9 +254,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {!isOutOfStock && (
                   <button
                     onClick={handleReserveNow}
-                    className="flex-1 py-3 px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer text-center"
+                    className="flex-1 py-3 px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
                   >
-                    Reserve for Pickup
+                    {!isCustomer && <Lock className="w-3.5 h-3.5" />}
+                    <span>{isCustomer ? 'Reserve for Pickup' : 'Sign In to Reserve'}</span>
                   </button>
                 )}
               </div>

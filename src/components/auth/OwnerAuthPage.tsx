@@ -18,6 +18,7 @@ import {
 import { User } from '../../types';
 import { validateEmail, validatePassword, validateFullname, validatePhone } from '../../lib/validation';
 import { login, register, formatAuthError } from '../../lib/auth';
+import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 
 interface OwnerAuthPageProps {
   initialMode?: 'signin' | 'register';
@@ -51,10 +52,9 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
       return;
     }
 
-    // Validate password
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      setError(passwordValidation.error || 'Invalid password');
+    // Ensure password is provided for sign in
+    if (!password || password.trim() === '') {
+      setError('Password is required');
       return;
     }
 
@@ -262,6 +262,25 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
           {/* 1. OWNER SIGN IN FORM */}
           {mode === 'signin' ? (
             <form onSubmit={handleSignIn} className="mt-6 space-y-4">
+              {/* Demo Account Quick-Fill Card */}
+              <div className="p-3 bg-purple-50/80 rounded-2xl border border-purple-200 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-gray-800">⚡ Pre-Configured Demo Salon Owner</p>
+                  <p className="text-[10px] text-gray-500 font-mono">salon@nailglamhub.com / Demo123!</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('salon@nailglamhub.com');
+                    setPassword('Demo123!');
+                    setError('');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-purple-100 text-purple-700 text-[11px] font-bold rounded-lg border border-purple-300 transition-colors shadow-2xs cursor-pointer"
+                >
+                  Auto-Fill
+                </button>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
                   Registered Business Email
@@ -423,6 +442,9 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Password strength checklist */}
+              <PasswordStrengthIndicator password={password} />
 
               <div className="rounded-xl border border-purple-200 bg-purple-50/60 px-3 py-2.5 text-xs text-purple-900">
                 Your owner account will be created without a branch. After signing in, use Register New Branch to submit your first salon location for admin approval.

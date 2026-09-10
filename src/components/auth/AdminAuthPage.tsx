@@ -17,6 +17,7 @@ import { User } from '../../types';
 import { fetchRegistrationRateLimitStatus, updateRegistrationRateLimit } from '../../lib/api';
 import { validateEmail, validatePassword, validateFullname } from '../../lib/validation';
 import { login, register, formatAuthError } from '../../lib/auth';
+import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 
 interface AdminAuthPageProps {
   initialMode?: 'signin' | 'register';
@@ -74,10 +75,9 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
       return;
     }
 
-    // Validate password
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      setError(passwordValidation.error || 'Invalid password');
+    // Ensure password is provided for sign in
+    if (!password || password.trim() === '') {
+      setError('Password is required');
       return;
     }
 
@@ -276,6 +276,25 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
           {/* 1. ADMIN SIGN IN FORM */}
           {mode === 'signin' ? (
             <form onSubmit={handleSignIn} className="mt-6 space-y-4">
+              {/* Demo Account Quick-Fill Card */}
+              <div className="p-3 bg-rose-50/80 rounded-2xl border border-rose-200 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-gray-800">⚡ Pre-Configured Demo Super Admin</p>
+                  <p className="text-[10px] text-gray-500 font-mono">admin@nailglamhub.com / Demo123!</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('admin@nailglamhub.com');
+                    setPassword('Demo123!');
+                    setError('');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-rose-100 text-rose-800 text-[11px] font-bold rounded-lg border border-rose-300 transition-colors shadow-2xs cursor-pointer"
+                >
+                  Auto-Fill
+                </button>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
                   Administrator Email
@@ -429,6 +448,9 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Password strength checklist */}
+              <PasswordStrengthIndicator password={password} />
 
               {/* Admin Authorization Code */}
               <div>

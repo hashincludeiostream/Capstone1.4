@@ -210,6 +210,10 @@ const AppContent: React.FC = () => {
 
   // Cart Operations
   const handleAddToCart = (product: Product, quantity = 1) => {
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      handleRequireCustomerLogin('Please sign in to your customer account to add products to your reservation bag.');
+      return;
+    }
     if (product.stock_quantity <= 0) {
       showToast(`${product.name} is currently out of stock`);
       return;
@@ -257,11 +261,20 @@ const AppContent: React.FC = () => {
   };
 
   const handleProceedToCheckout = () => {
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      setCartOpen(false);
+      handleRequireCustomerLogin('Please sign in to your customer account to complete your reservation.');
+      return;
+    }
     setCartOpen(false);
     setCheckoutModalOpen(true);
   };
 
   const handleDirectCheckout = (product: Product, quantity: number) => {
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      handleRequireCustomerLogin('Please sign in to your customer account to reserve products.');
+      return;
+    }
     handleAddToCart(product, quantity);
     setSelectedProductForDetail(null);
     setCheckoutModalOpen(true);
@@ -350,12 +363,15 @@ const AppContent: React.FC = () => {
     showToast(favorites.includes(salonId) ? 'Removed from favorites' : 'Added to favorites');
   };
 
-  const handleRequireCustomerLogin = () => {
+  const handleRequireCustomerLogin = (customMessage?: string) => {
     setBookingModalOpen(false);
     setBookingSalon(null);
     setBookingService(null);
+    setCartOpen(false);
+    setCheckoutModalOpen(false);
+    setSelectedProductForDetail(null);
     setActiveTab('login-customer');
-    showToast('To continue, please login to your customer account.');
+    showToast(customMessage || 'To continue, please login to your customer account.');
   };
 
   const handleOpenBookingWithService = (service: Service) => {
@@ -416,8 +432,10 @@ const AppContent: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     setActiveTab('landing');
+    setCartItems([]);
     safeLocalStorage.removeItem('nailglamhub_user');
     safeLocalStorage.removeItem('nailglamhub_activeTab');
+    safeLocalStorage.removeItem('nailglamhub_cart');
     showToast('Signed out successfully');
   };
 
@@ -573,11 +591,15 @@ const AppContent: React.FC = () => {
               salons={salons}
               categories={categories}
               currentUser={currentUser}
+              products={products}
               onExplore={() => setActiveTab('explore')}
               onOpenLogin={() => setActiveTab('login-customer')}
               onOpenRegisterSalon={() => setActiveTab('register-owner')}
               onBookSalon={(salon) => handleOpenBookingWithSalon(salon)}
               onSelectSalon={(salon) => setSelectedSalonForDetails(salon)}
+              onAddToCart={(p, qty) => handleAddToCart(p, qty || 1)}
+              onSelectProduct={(p) => setSelectedProductForDetail(p)}
+              onOpenProducts={() => setActiveTab('products')}
             />
           )}
 
@@ -845,6 +867,8 @@ const AppContent: React.FC = () => {
               products={products}
               salons={salons}
               loading={productsLoading}
+              currentUser={currentUser}
+              onRequireLogin={handleRequireCustomerLogin}
               onSelectProduct={(p) => setSelectedProductForDetail(p)}
               onAddToCart={(p, qty) => handleAddToCart(p, qty || 1)}
               onOpenCart={() => setCartOpen(true)}
@@ -1269,6 +1293,8 @@ const AppContent: React.FC = () => {
       {selectedProductForDetail && (
         <ProductDetailModal
           product={selectedProductForDetail}
+          currentUser={currentUser}
+          onRequireLogin={handleRequireCustomerLogin}
           onClose={() => setSelectedProductForDetail(null)}
           onAddToCart={(product, qty) => {
             handleAddToCart(product, qty);

@@ -10,35 +10,67 @@ import {
   Sparkles,
   Star,
   Store,
+  ShoppingBag,
+  Plus,
+  Lock,
+  Eye,
 } from 'lucide-react';
-import { Salon, BusinessCategory, User, Service, Technician } from '../types';
+import { Salon, BusinessCategory, User, Service, Technician, Product } from '../types';
 import { fetchServices, fetchTechnicians } from '../lib/api';
 
 interface LandingPageProps {
   salons: Salon[];
   categories: BusinessCategory[];
   currentUser?: User | null;
+  products?: Product[];
   onExplore: () => void;
   onOpenLogin: () => void;
   onOpenRegisterSalon: () => void;
   onBookSalon: (salon: Salon) => void;
   onSelectSalon: (salon: Salon) => void;
+  onAddToCart?: (product: Product, quantity?: number) => void;
+  onSelectProduct?: (product: Product) => void;
+  onOpenProducts?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   salons,
   categories,
   currentUser,
+  products = [],
   onExplore,
   onOpenLogin,
   onOpenRegisterSalon,
   onBookSalon,
   onSelectSalon,
+  onAddToCart,
+  onSelectProduct,
+  onOpenProducts,
 }) => {
   const [featuredSalon, setFeaturedSalon] = React.useState<Salon | null>(null);
   const [featuredService, setFeaturedService] = React.useState<Service | null>(null);
   const [technicianCount, setTechnicianCount] = React.useState<number>(0);
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const [addedProductId, setAddedProductId] = React.useState<number | null>(null);
+
+  const handleQuickAdd = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Intercept if customer login is not established
+    if (!currentUser || currentUser.user_type !== 'customer') {
+      onOpenLogin();
+      return;
+    }
+
+    if (product.stock_quantity <= 0) return;
+
+    if (onAddToCart) {
+      onAddToCart(product, 1);
+      setAddedProductId(product.id);
+      setTimeout(() => {
+        setAddedProductId(null);
+      }, 1200);
+    }
+  };
 
   React.useEffect(() => {
     // Load featured content from database
@@ -373,6 +405,132 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           )}
         </div>
       </section>
+
+      {/* Featured Boutique Care & Products */}
+      {products && products.length > 0 && (
+        <section className="rounded-[2rem] border border-pink-100 bg-white p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-[0.16em] text-pink-700">Studio Boutique & Retail</span>
+              <h2 className="mt-1 font-serif text-2xl font-black text-gray-900">Featured Nail Care & Essentials</h2>
+              <p className="text-xs text-gray-500 mt-1">Reserve genuine studio polishes and care products for in-store pickup</p>
+            </div>
+            {onOpenProducts && (
+              <button
+                type="button"
+                onClick={onOpenProducts}
+                className="rounded-2xl border border-pink-200 bg-pink-50 px-4 py-2 text-[11px] font-black text-pink-700 hover:bg-pink-100 transition cursor-pointer self-start sm:self-auto"
+              >
+                Browse all products
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+            {products.slice(0, 4).map((product) => {
+              const salon = salons.find((s) => s.id === product.salon_id);
+              const isOutOfStock = product.stock_quantity <= 0;
+              const isJustAdded = addedProductId === product.id;
+              const isCustomer = currentUser?.user_type === 'customer';
+
+              return (
+                <article
+                  key={product.id}
+                  onClick={() => onSelectProduct && onSelectProduct(product)}
+                  className="rounded-[1.5rem] border border-pink-100 bg-white p-3.5 shadow-sm hover:shadow-lg transition flex flex-col justify-between cursor-pointer group"
+                >
+                  <div>
+                    <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-stone-100 mb-3">
+                      <img
+                        src={product.image_url || 'https://images.unsplash.com/photo-1608248597359-0a62377c08fe?w=600&auto=format&fit=crop&q=80'}
+                        alt={product.name}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-stone-900/80 backdrop-blur-xs text-[10px] font-semibold text-white">
+                        {product.category}
+                      </span>
+                      {isOutOfStock ? (
+                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
+                          Sold Out
+                        </span>
+                      ) : (
+                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                          In Stock
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-pink-700 truncate">
+                      {salon?.salon_name || 'Verified Studio'}
+                    </div>
+                    <h3 className="text-xs font-bold text-gray-900 line-clamp-1 mt-0.5">
+                      {product.name}
+                    </h3>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-sm font-black text-gray-900">
+                        ₱{product.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                      <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-500">
+                        <Star className="w-3 h-3 fill-amber-400" />
+                        <span>{product.rating || '4.9'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleQuickAdd(product, e)}
+                      disabled={isOutOfStock}
+                      className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        isOutOfStock
+                          ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                          : isJustAdded
+                          ? 'bg-emerald-600 text-white'
+                          : !isCustomer
+                          ? 'bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200'
+                          : 'bg-pink-600 hover:bg-pink-700 text-white shadow-2xs active:scale-98'
+                      }`}
+                      title={!isCustomer ? 'Customer sign in required' : isOutOfStock ? 'Sold Out' : 'Quick Add to reservation bag'}
+                    >
+                      {isJustAdded ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Added!</span>
+                        </>
+                      ) : !isCustomer ? (
+                        <>
+                          <Lock className="w-3 h-3 text-pink-600" />
+                          <span>Sign in to Add</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{isOutOfStock ? 'Sold Out' : 'Quick Add'}</span>
+                        </>
+                      )}
+                    </button>
+                    {onSelectProduct && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectProduct(product);
+                        }}
+                        className="p-2 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-600 transition-colors cursor-pointer"
+                        title="View Details"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Final CTA */}
       <section className="rounded-[2rem] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-8 text-center">

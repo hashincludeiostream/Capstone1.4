@@ -15,13 +15,16 @@ import {
   Building2,
   Store,
   Info,
+  Lock,
 } from 'lucide-react';
-import { Product, Salon } from '../../types';
+import { Product, Salon, User } from '../../types';
 
 interface ProductCatalogProps {
   products: Product[];
   salons: Salon[];
   loading?: boolean;
+  currentUser?: User | null;
+  onRequireLogin?: () => void;
   onSelectProduct: (product: Product) => void;
   onAddToCart: (product: Product, quantity?: number) => void;
   onOpenCart: () => void;
@@ -42,6 +45,8 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   products,
   salons,
   loading = false,
+  currentUser,
+  onRequireLogin,
   onSelectProduct,
   onAddToCart,
   onOpenCart,
@@ -53,6 +58,8 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating' | 'stock'>('featured');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [addedAnimationId, setAddedAnimationId] = useState<number | null>(null);
+
+  const isCustomer = currentUser?.user_type === 'customer';
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -102,6 +109,16 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
   const handleQuickAdd = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Intercept if customer login is not established
+    if (!isCustomer) {
+      if (onRequireLogin) {
+        onRequireLogin();
+      } else {
+        onAddToCart(product, 1);
+      }
+      return;
+    }
+
     if (product.stock_quantity <= 0) return;
     onAddToCart(product, 1);
     setAddedAnimationId(product.id);
@@ -112,6 +129,33 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Customer Authentication Notice Banner */}
+      {!isCustomer && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold">Client Login Required for Product Bag & Reservations</p>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                {currentUser
+                  ? `Signed in as ${currentUser.fullname} (${currentUser.user_type.replace('_', ' ')}). Please switch to a Client account to reserve products.`
+                  : 'Please sign in to your customer account to add products to your reservation bag and pickup at the salon.'}
+              </p>
+            </div>
+          </div>
+          {onRequireLogin && (
+            <button
+              onClick={onRequireLogin}
+              className="px-4 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold shrink-0 transition cursor-pointer self-start sm:self-auto"
+            >
+              Sign In as Customer
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Header & In-Store Notice Banner */}
       <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-pink-950 text-white rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-pink-500/10 to-transparent pointer-events-none" />
@@ -364,13 +408,21 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                           ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
                           : isJustAdded
                           ? 'bg-emerald-600 text-white'
+                          : !isCustomer
+                          ? 'bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200'
                           : 'bg-pink-600 hover:bg-pink-700 text-white shadow-2xs active:scale-98'
                       }`}
+                      title={!isCustomer ? 'Sign in to your customer account to add to cart' : isOutOfStock ? 'Sold Out' : 'Quick Add to cart'}
                     >
                       {isJustAdded ? (
                         <>
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Added!</span>
+                        </>
+                      ) : !isCustomer ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-pink-600" />
+                          <span>Sign in to Add</span>
                         </>
                       ) : (
                         <>
