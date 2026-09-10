@@ -1762,24 +1762,16 @@ async function startServer() {
     }
   });
 
-  // ----------------------------------------------------
-  // VITE MIDDLEWARE (Development) or STATIC (Production)
-  // ----------------------------------------------------
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
+  // 404 handler for unknown API routes (must precede Vite middleware)
+  app.use('/api', (req, res) => {
+    res.status(404).json({
+      error: 'Endpoint not found',
+      path: req.path,
+      method: req.method,
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+  });
 
-  // Error and 404 handlers must be registered after all routes.
+  // Global Error Handler for API routes
   app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error('Global error handler:', err);
 
@@ -1803,13 +1795,22 @@ async function startServer() {
     });
   });
 
-  app.use('/api', (req, res) => {
-    res.status(404).json({
-      error: 'Endpoint not found',
-      path: req.path,
-      method: req.method,
+  // ----------------------------------------------------
+  // VITE MIDDLEWARE (Development) or STATIC (Production)
+  // ----------------------------------------------------
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
     });
-  });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`✨ Nail Glam Hub server running at http://0.0.0.0:${PORT}`);
