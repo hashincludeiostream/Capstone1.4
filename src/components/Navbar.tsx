@@ -22,7 +22,16 @@ import {
   ShoppingBag,
   Package,
 } from 'lucide-react';
-import { User } from '../types';
+import {
+  User,
+  CartItem,
+  Appointment,
+  ProductOrder,
+  Announcement,
+  Salon,
+  Review,
+} from '../types';
+import { NotificationMenu } from './NotificationMenu';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -33,9 +42,24 @@ interface NavbarProps {
   onLogout: () => void;
   onOpenRegisterSalon: () => void;
   isAdminMode: boolean;
-  onNavigate?: (tab: string) => void;
+  onNavigate?: (tab: string, targetDomId?: string) => void;
   cartItemCount?: number;
-  onOpenCart?: () => void;
+  onOpenCart?: (targetProductId?: number) => void;
+  // Notification system props
+  cartItems?: CartItem[];
+  customerAppointments?: Appointment[];
+  customerOrders?: ProductOrder[];
+  announcements?: Announcement[];
+  salons?: Salon[];
+  ownerSalons?: Salon[];
+  ownerAppointments?: Appointment[];
+  ownerProductOrders?: ProductOrder[];
+  ownerReviews?: Review[];
+  adminPendingSalons?: Salon[];
+  adminTotalSalons?: number;
+  adminTotalUsers?: number;
+  adminTotalAppointments?: number;
+  favoritesCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,10 +74,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   cartItemCount = 0,
   onOpenCart,
+  cartItems = [],
+  customerAppointments = [],
+  customerOrders = [],
+  announcements = [],
+  salons = [],
+  ownerSalons = [],
+  ownerAppointments = [],
+  ownerProductOrders = [],
+  ownerReviews = [],
+  adminPendingSalons = [],
+  adminTotalSalons = 0,
+  adminTotalUsers = 0,
+  adminTotalAppointments = 0,
+  favoritesCount = 0,
 }) => {
-  const handleNavigation = (tab: string) => {
+  const handleNavigation = (tab: string, targetDomId?: string) => {
     if (onNavigate) {
-      onNavigate(tab);
+      onNavigate(tab, targetDomId);
     } else {
       setActiveTab(tab);
     }
@@ -130,22 +168,27 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Bar */}
           <div className="flex items-center gap-2.5">
-            {/* In-Store Pickup Cart Button */}
-            {onOpenCart && currentUser?.user_type !== 'admin' && (
-              <button
-                id="navbar-cart-btn"
-                onClick={onOpenCart}
-                className="relative p-2 rounded-full border border-pink-200 hover:border-pink-300 bg-pink-50/70 hover:bg-pink-100 text-pink-700 transition-all cursor-pointer flex items-center justify-center shadow-2xs"
-                title="View In-Store Reservation Cart"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-600 text-white text-[10px] font-bold flex items-center justify-center animate-in zoom-in-50 duration-200 shadow-xs">
-                    {cartItemCount > 9 ? '9+' : cartItemCount}
-                  </span>
-                )}
-              </button>
-            )}
+            {/* Notification Button (Arranged In-Store Cart & System Notifications) */}
+            <NotificationMenu
+              currentUser={currentUser}
+              cartItems={cartItems}
+              cartItemCount={cartItemCount}
+              onOpenCart={onOpenCart}
+              customerAppointments={customerAppointments}
+              customerOrders={customerOrders}
+              announcements={announcements}
+              salons={salons}
+              ownerSalons={ownerSalons}
+              ownerAppointments={ownerAppointments}
+              ownerProductOrders={ownerProductOrders}
+              ownerReviews={ownerReviews}
+              adminPendingSalons={adminPendingSalons}
+              adminTotalSalons={adminTotalSalons}
+              adminTotalUsers={adminTotalUsers}
+              adminTotalAppointments={adminTotalAppointments}
+              favoritesCount={favoritesCount}
+              onNavigate={handleNavigation}
+            />
 
             {/* User Account / Profile Menu */}
             {currentUser ? (
@@ -644,6 +687,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <ShoppingBag className="w-4 h-4 text-pink-600" />
                     <span>My Reserved Orders</span>
+                  </button>
+                )}
+                {onOpenCart && (
+                  <button
+                    onClick={() => {
+                      onOpenCart();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-pink-700 bg-pink-50/70 hover:bg-pink-100 rounded-lg flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4 text-pink-600" />
+                      <span>In-Store Reservation Cart</span>
+                    </span>
+                    {cartItemCount > 0 && (
+                      <span className="text-xs bg-pink-600 text-white font-bold px-2 py-0.5 rounded-full">
+                        {cartItemCount}
+                      </span>
+                    )}
                   </button>
                 )}
                 <button

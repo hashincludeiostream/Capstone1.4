@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Package,
   Plus,
@@ -32,12 +32,14 @@ import {
   deleteProduct,
   updateProductOrderStatus,
 } from '../../lib/api';
+import { scrollToElement } from '../../utils/scrollHelper';
 
 interface ProductInventoryManagerProps {
   salon: Salon | null;
   products: Product[];
   orders: ProductOrder[];
   onRefresh: () => void;
+  targetOrderId?: number | null;
 }
 
 const CATEGORIES = [
@@ -54,8 +56,17 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
   products,
   orders,
   onRefresh,
+  targetOrderId,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'orders'>('inventory');
+
+  useEffect(() => {
+    if (targetOrderId) {
+      setActiveSubTab('orders');
+      scrollToElement(`owner-order-${targetOrderId}`);
+    }
+  }, [targetOrderId]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'low_stock' | 'out_of_stock' | 'in_stock'>('all');
@@ -737,6 +748,7 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
                 return (
                   <div
                     key={order.id}
+                    id={`owner-order-${order.id}`}
                     className="bg-white rounded-3xl border border-stone-200 shadow-2xs overflow-hidden"
                   >
                     {/* Order Bar */}

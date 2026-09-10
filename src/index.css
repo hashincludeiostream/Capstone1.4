@@ -61,3 +61,38 @@
 .break-inside-avoid {
   break-inside: avoid;
 }
+
+/* Notification click auto-scroll highlight animation */
+@keyframes notificationTargetPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7);
+    transform: scale(1);
+  }
+  20% {
+    box-shadow: 0 0 0 6px rgba(236, 72, 153, 0.45);
+    transform: scale(1.015);
+  }
+  45% {
+    box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.6);
+    transform: scale(1);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(236, 72, 153, 0.25);
+    transform: scale(1.01);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(236, 72, 153, 0);
+    transform: scale(1);
+  }
+}
+
+.notification-highlight-target {
+  animation: notificationTargetPulse 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+  outline: 3px solid #ec4899 !important;
+  outline-offset: 3px !important;
+  border-radius: inherit;
+  scroll-margin-top: 110px !important;
+  scroll-margin-bottom: 60px !important;
+  position: relative;
+  z-index: 25;
+}

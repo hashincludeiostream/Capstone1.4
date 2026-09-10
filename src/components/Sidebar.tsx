@@ -38,12 +38,33 @@ interface SidebarProps {
   onOpenContact: () => void;
   isAdminMode: boolean;
   onNavigate?: (tab: string) => void;
+  // Client notifications
   bookingsCount?: number;
   activeBookingsCount?: number;
   totalBookingsCount?: number;
   ordersCount?: number;
   activeOrdersCount?: number;
   totalOrdersCount?: number;
+  favoritesCount?: number;
+  // Salon Owner notifications
+  ownerSalonsCount?: number;
+  ownerPendingSalonsCount?: number;
+  ownerAppointmentsCount?: number;
+  ownerPendingAppointmentsCount?: number;
+  ownerActiveAppointmentsCount?: number;
+  ownerTotalAppointmentsCount?: number;
+  ownerServicesCount?: number;
+  ownerStaffCount?: number;
+  ownerInventoryCount?: number;
+  ownerPendingOrdersCount?: number;
+  ownerReviewsCount?: number;
+  // Admin notifications
+  adminPendingSalonsCount?: number;
+  adminTotalSalonsCount?: number;
+  adminTotalUsersCount?: number;
+  adminContentCount?: number;
+  adminActiveAnnouncementsCount?: number;
+  adminTotalAppointmentsCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -61,6 +82,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ordersCount = 0,
   activeOrdersCount = 0,
   totalOrdersCount = 0,
+  favoritesCount = 0,
+  ownerSalonsCount = 0,
+  ownerPendingSalonsCount = 0,
+  ownerAppointmentsCount = 0,
+  ownerPendingAppointmentsCount = 0,
+  ownerActiveAppointmentsCount = 0,
+  ownerTotalAppointmentsCount = 0,
+  ownerServicesCount = 0,
+  ownerStaffCount = 0,
+  ownerInventoryCount = 0,
+  ownerPendingOrdersCount = 0,
+  ownerReviewsCount = 0,
+  adminPendingSalonsCount = 0,
+  adminTotalSalonsCount = 0,
+  adminTotalUsersCount = 0,
+  adminContentCount = 0,
+  adminActiveAnnouncementsCount = 0,
+  adminTotalAppointmentsCount = 0,
 }) => {
   const handleNavigation = (tab: string) => {
     if (onNavigate) {
@@ -119,82 +158,226 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Platform Governance
           </p>
           <div className="space-y-1 mt-1">
+            {/* Overview & KPIs */}
             <button
               id="sidebar-admin-overview-btn"
               onClick={() => handleNavigation('admin-dashboard')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'admin-dashboard'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
+              title={
+                adminTotalAppointmentsCount > 0
+                  ? `${adminTotalAppointmentsCount} platform bookings • Comprehensive system analytics`
+                  : 'Platform Overview & KPIs'
+              }
             >
-              <TrendingUp className="w-4 h-4 text-rose-700" />
-              <span>Overview & KPIs</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <TrendingUp className="w-4 h-4 text-rose-700 shrink-0" />
+                </div>
+                <span className="truncate">Overview & KPIs</span>
+              </div>
+              {adminTotalAppointmentsCount > 0 && (
+                <span
+                  id="sidebar-admin-overview-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'admin-dashboard'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  <span>{adminTotalAppointmentsCount}</span>
+                </span>
+              )}
             </button>
 
-            <button
-              id="sidebar-admin-salons-btn"
-              onClick={() => handleNavigation('admin-salons')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'admin-salons'
-                  ? 'bg-rose-900 text-white font-bold shadow-xs'
-                  : 'text-rose-950 hover:bg-rose-50'
-              }`}
-            >
-              <Store className="w-4 h-4 text-rose-700" />
-              <span>Salon Approvals</span>
-            </button>
+            {/* Salon Approvals with pending alert notification & numbering */}
+            {(() => {
+              const hasPending = adminPendingSalonsCount > 0;
+              const countToShow = hasPending ? adminPendingSalonsCount : adminTotalSalonsCount;
+              return (
+                <button
+                  id="sidebar-admin-salons-btn"
+                  onClick={() => handleNavigation('admin-salons')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+                    activeTab === 'admin-salons'
+                      ? 'bg-rose-900 text-white font-bold shadow-xs'
+                      : 'text-rose-950 hover:bg-rose-50'
+                  }`}
+                  title={
+                    hasPending
+                      ? `${adminPendingSalonsCount} salon branch${adminPendingSalonsCount !== 1 ? 'es' : ''} awaiting approval • ${adminTotalSalonsCount} total`
+                      : `${adminTotalSalonsCount} registered salon branches`
+                  }
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <Store className="w-4 h-4 text-rose-700 shrink-0" />
+                      {hasPending && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate">Salon Approvals</span>
+                  </div>
+                  {countToShow > 0 && (
+                    <span
+                      id="sidebar-admin-salons-badge"
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'admin-salons'
+                          ? 'bg-white/20 text-white'
+                          : hasPending
+                          ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-rose-500/25 ring-1 ring-rose-400/30'
+                          : 'bg-rose-100 text-rose-900'
+                      }`}
+                    >
+                      {hasPending && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                      )}
+                      <span>{hasPending ? `${countToShow} pending` : countToShow}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
+            {/* User Accounts */}
             <button
               id="sidebar-admin-users-btn"
               onClick={() => handleNavigation('admin-users')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'admin-users'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
+              title={`${adminTotalUsersCount} registered user accounts across clients, owners & admins`}
             >
-              <Users className="w-4 h-4 text-rose-700" />
-              <span>User Accounts</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-rose-700 shrink-0" />
+                </div>
+                <span className="truncate">User Accounts</span>
+              </div>
+              {adminTotalUsersCount > 0 && (
+                <span
+                  id="sidebar-admin-users-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'admin-users'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  <span>{adminTotalUsersCount}</span>
+                </span>
+              )}
             </button>
 
+            {/* Content Moderation */}
             <button
               id="sidebar-admin-content-btn"
               onClick={() => setActiveTab('admin-content')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'admin-content'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
+              title={`${adminContentCount} community reviews & viral reels`}
             >
-              <SlidersHorizontal className="w-4 h-4 text-rose-700" />
-              <span>Content Moderation</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <SlidersHorizontal className="w-4 h-4 text-rose-700 shrink-0" />
+                </div>
+                <span className="truncate">Content Moderation</span>
+              </div>
+              {adminContentCount > 0 && (
+                <span
+                  id="sidebar-admin-content-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'admin-content'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  <span>{adminContentCount}</span>
+                </span>
+              )}
             </button>
 
-            <button
-              id="sidebar-admin-announcements-btn"
-              onClick={() => setActiveTab('admin-announcements')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'admin-announcements'
-                  ? 'bg-rose-900 text-white font-bold shadow-xs'
-                  : 'text-rose-950 hover:bg-rose-50'
-              }`}
-            >
-              <Radio className="w-4 h-4 text-rose-700" />
-              <span>Site Broadcasts</span>
-            </button>
+            {/* Site Broadcasts */}
+            {(() => {
+              const hasActiveBroadcasts = adminActiveAnnouncementsCount > 0;
+              return (
+                <button
+                  id="sidebar-admin-announcements-btn"
+                  onClick={() => setActiveTab('admin-announcements')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+                    activeTab === 'admin-announcements'
+                      ? 'bg-rose-900 text-white font-bold shadow-xs'
+                      : 'text-rose-950 hover:bg-rose-50'
+                  }`}
+                  title={`${adminActiveAnnouncementsCount} active broadcast banner${adminActiveAnnouncementsCount !== 1 ? 's' : ''}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <Radio className="w-4 h-4 text-rose-700 shrink-0" />
+                      {hasActiveBroadcasts && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate">Site Broadcasts</span>
+                  </div>
+                  {adminActiveAnnouncementsCount > 0 && (
+                    <span
+                      id="sidebar-admin-announcements-badge"
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'admin-announcements'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-rose-100 text-rose-900 ring-1 ring-rose-200'
+                      }`}
+                    >
+                      {hasActiveBroadcasts && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse shrink-0"></span>
+                      )}
+                      <span>{adminActiveAnnouncementsCount}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
+            {/* My Account Profile */}
             <button
               id="sidebar-admin-profile-btn"
               onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'profile'
                   ? 'bg-rose-900 text-white font-bold shadow-xs'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
             >
-              <UserIcon className="w-4 h-4 text-rose-700" />
-              <span>My Account Profile</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <UserIcon className="w-4 h-4 text-rose-700 shrink-0" />
+                </div>
+                <span className="truncate">My Account Profile</span>
+              </div>
+              <span
+                id="sidebar-admin-profile-badge"
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  activeTab === 'profile'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
+                }`}
+              >
+                ADMIN
+              </span>
             </button>
           </div>
         </div>
@@ -262,121 +445,332 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Salon Management
           </p>
           <div className="space-y-1 mt-1">
+            {/* Branch Overview */}
             <button
               id="sidebar-owner-branches-btn"
               onClick={() => setActiveTab('owner-branches')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'owner-branches'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
+              title={`${ownerSalonsCount} branch${ownerSalonsCount !== 1 ? 'es' : ''}${ownerPendingSalonsCount > 0 ? ` • ${ownerPendingSalonsCount} pending approval` : ''}`}
             >
-              <Store className="w-4 h-4 text-purple-600" />
-              <span>Branch Overview</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <Store className="w-4 h-4 text-purple-600 shrink-0" />
+                  {ownerPendingSalonsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 ring-1 ring-white"></span>
+                    </span>
+                  )}
+                </div>
+                <span className="truncate">Branch Overview</span>
+              </div>
+              {ownerSalonsCount > 0 && (
+                <span
+                  id="sidebar-owner-branches-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-branches'
+                      ? 'bg-white/20 text-white'
+                      : ownerPendingSalonsCount > 0
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerSalonsCount}</span>
+                </span>
+              )}
             </button>
 
+            {/* Store Reports & CRM */}
             <button
               id="sidebar-owner-overview-btn"
               onClick={() => setActiveTab('owner-dashboard')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'owner-dashboard'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
+              title={`${ownerReviewsCount} client review${ownerReviewsCount !== 1 ? 's' : ''} & store analytics`}
             >
-              <BarChart3 className="w-4 h-4 text-purple-600" />
-              <span>Store Reports & CRM</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <BarChart3 className="w-4 h-4 text-purple-600 shrink-0" />
+                </div>
+                <span className="truncate">Store Reports & CRM</span>
+              </div>
+              {ownerReviewsCount > 0 && (
+                <span
+                  id="sidebar-owner-crm-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-dashboard'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerReviewsCount}</span>
+                </span>
+              )}
             </button>
 
-            <button
-              id="sidebar-owner-appointments-btn"
-              onClick={() => setActiveTab('owner-appointments')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'owner-appointments'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
-                  : 'text-purple-950 hover:bg-purple-50'
-              }`}
-            >
-              <Calendar className="w-4 h-4 text-purple-600" />
-              <span>Bookings & Schedule</span>
-            </button>
+            {/* Bookings & Schedule with pulsing pending notification */}
+            {(() => {
+              const hasPendingAppts = ownerPendingAppointmentsCount > 0;
+              const countToShow = hasPendingAppts
+                ? ownerPendingAppointmentsCount
+                : ownerActiveAppointmentsCount || ownerAppointmentsCount;
+              return (
+                <button
+                  id="sidebar-owner-appointments-btn"
+                  onClick={() => setActiveTab('owner-appointments')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+                    activeTab === 'owner-appointments'
+                      ? 'bg-purple-700 text-white font-bold shadow-xs'
+                      : 'text-purple-950 hover:bg-purple-50'
+                  }`}
+                  title={
+                    countToShow > 0
+                      ? `${ownerPendingAppointmentsCount} pending approval • ${ownerActiveAppointmentsCount} scheduled bookings`
+                      : 'Bookings & Schedule'
+                  }
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <Calendar className="w-4 h-4 text-purple-600 shrink-0" />
+                      {hasPendingAppts && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate">Bookings & Schedule</span>
+                  </div>
+                  {countToShow > 0 && (
+                    <span
+                      id="sidebar-owner-appointments-badge"
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'owner-appointments'
+                          ? 'bg-white/20 text-white'
+                          : hasPendingAppts
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-purple-500/25 ring-1 ring-purple-400/30'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {hasPendingAppts && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                      )}
+                      <span>{hasPendingAppts ? `${countToShow} new` : countToShow}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
+            {/* Services & Treatments */}
             <button
               id="sidebar-owner-services-btn"
               onClick={() => setActiveTab('owner-services')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'owner-services'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
+              title={`${ownerServicesCount} specialty nail service${ownerServicesCount !== 1 ? 's' : ''}`}
             >
-              <Scissors className="w-4 h-4 text-purple-600" />
-              <span>Services &amp; Treatments</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <Scissors className="w-4 h-4 text-purple-600 shrink-0" />
+                </div>
+                <span className="truncate">Services &amp; Treatments</span>
+              </div>
+              {ownerServicesCount > 0 && (
+                <span
+                  id="sidebar-owner-services-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-services'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerServicesCount}</span>
+                </span>
+              )}
             </button>
 
+            {/* Staff & Artists Roster */}
             <button
               id="sidebar-owner-staff-btn"
               onClick={() => setActiveTab('owner-staff')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'owner-staff'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
+              title={`${ownerStaffCount} nail artist${ownerStaffCount !== 1 ? 's' : ''} & technicians`}
             >
-              <Users className="w-4 h-4 text-purple-600" />
-              <span>Staff & Artists Roster</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-purple-600 shrink-0" />
+                </div>
+                <span className="truncate">Staff & Artists Roster</span>
+              </div>
+              {ownerStaffCount > 0 && (
+                <span
+                  id="sidebar-owner-staff-badge"
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-staff'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerStaffCount}</span>
+                </span>
+              )}
             </button>
 
-            <button
-              id="sidebar-owner-inventory-btn"
-              onClick={() => setActiveTab('owner-inventory')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'owner-inventory'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
-                  : 'text-purple-950 hover:bg-purple-50'
-              }`}
-            >
-              <Package className="w-4 h-4 text-purple-600" />
-              <span>Products & Stock</span>
-            </button>
+            {/* Products & Stock */}
+            {(() => {
+              const hasPendingOrders = ownerPendingOrdersCount > 0;
+              const countToShow = hasPendingOrders
+                ? ownerPendingOrdersCount
+                : ownerInventoryCount;
+              return (
+                <button
+                  id="sidebar-owner-inventory-btn"
+                  onClick={() => setActiveTab('owner-inventory')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+                    activeTab === 'owner-inventory'
+                      ? 'bg-purple-700 text-white font-bold shadow-xs'
+                      : 'text-purple-950 hover:bg-purple-50'
+                  }`}
+                  title={
+                    hasPendingOrders
+                      ? `${ownerPendingOrdersCount} client pickup reservation${ownerPendingOrdersCount !== 1 ? 's' : ''} awaiting fulfillment • ${ownerInventoryCount} products in catalog`
+                      : `${ownerInventoryCount} retail product${ownerInventoryCount !== 1 ? 's' : ''}`
+                  }
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <Package className="w-4 h-4 text-purple-600 shrink-0" />
+                      {hasPendingOrders && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate">Products & Stock</span>
+                  </div>
+                  {countToShow > 0 && (
+                    <span
+                      id="sidebar-owner-inventory-badge"
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'owner-inventory'
+                          ? 'bg-white/20 text-white'
+                          : hasPendingOrders
+                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-600/25 ring-1 ring-emerald-400/30'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {hasPendingOrders && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                      )}
+                      <span>{hasPendingOrders ? `${countToShow} orders` : countToShow}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
+            {/* Store Location & Map */}
             <button
               id="sidebar-owner-location-btn"
               onClick={() => setActiveTab('owner-location')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'owner-location'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
+              title="Store Location & GPS Map"
             >
-              <MapPin className="w-4 h-4 text-purple-600" />
-              <span>Store Location & Map</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 text-purple-600 shrink-0" />
+                </div>
+                <span className="truncate">Store Location & Map</span>
+              </div>
+              {ownerSalonsCount > 0 && (
+                <span
+                  id="sidebar-owner-location-badge"
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    activeTab === 'owner-location'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-50 text-purple-700 border border-purple-200'
+                  }`}
+                >
+                  <span>GPS</span>
+                </span>
+              )}
             </button>
 
+            {/* Salon Profile & Hours */}
             <button
               id="sidebar-owner-settings-btn"
               onClick={() => setActiveTab('owner-settings')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'owner-settings'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
+              title="Salon Profile & Operating Hours"
             >
-              <Clock className="w-4 h-4 text-purple-600" />
-              <span>Salon Profile & Hours</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4 text-purple-600 shrink-0" />
+                </div>
+                <span className="truncate">Salon Profile & Hours</span>
+              </div>
+              <span
+                id="sidebar-owner-hours-badge"
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  activeTab === 'owner-settings'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}
+              >
+                <span>7D</span>
+              </span>
             </button>
 
+            {/* My Account Profile */}
             <button
               id="sidebar-owner-profile-btn"
               onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                 activeTab === 'profile'
                   ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
             >
-              <UserIcon className="w-4 h-4 text-purple-600" />
-              <span>My Account Profile</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <UserIcon className="w-4 h-4 text-purple-600 shrink-0" />
+                </div>
+                <span className="truncate">My Account Profile</span>
+              </div>
+              <span
+                id="sidebar-owner-profile-badge"
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  activeTab === 'profile'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-purple-50 text-purple-800 border border-purple-200'
+                }`}
+              >
+                OWNER
+              </span>
             </button>
           </div>
         </div>
@@ -638,14 +1032,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="sidebar-favorites-btn"
                 onClick={() => setActiveTab('favorites')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
                   activeTab === 'favorites'
-                    ? 'bg-pink-100 text-pink-900 font-semibold'
+                    ? 'bg-pink-100 text-pink-900 font-semibold shadow-xs'
                     : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
                 }`}
+                title={favoritesCount > 0 ? `${favoritesCount} saved favorite salon${favoritesCount !== 1 ? 's' : ''}` : 'Favorite Salons'}
               >
-                <Heart className="w-4 h-4 text-pink-600" />
-                <span>Favorite Salons</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative flex items-center justify-center shrink-0">
+                    <Heart className="w-4 h-4 text-pink-600 shrink-0" />
+                  </div>
+                  <span className="truncate">Favorite Salons</span>
+                </div>
+                {favoritesCount > 0 && (
+                  <span
+                    id="sidebar-favorites-badge"
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                      activeTab === 'favorites'
+                        ? 'bg-pink-600 text-white'
+                        : 'bg-pink-100 text-pink-700'
+                    }`}
+                  >
+                    <span>{favoritesCount}</span>
+                  </span>
+                )}
               </button>
 
               <button

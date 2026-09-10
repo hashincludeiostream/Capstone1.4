@@ -313,6 +313,7 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
           {sortedBranches.map((branch) => (
             <div
               key={branch.salon.id}
+              id={`owner-branch-${branch.salon.id}`}
               className="bg-white rounded-2xl shadow-sm border border-purple-100 overflow-hidden hover:shadow-md transition-shadow"
             >
               {/* Branch Header */}
@@ -409,7 +410,7 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
               </thead>
               <tbody>
                 {sortedBranches.map((branch, index) => (
-                  <tr key={branch.salon.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={branch.salon.id} id={`owner-branch-${branch.salon.id}`} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-white p-0.5 overflow-hidden border border-gray-200">

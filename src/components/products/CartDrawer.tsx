@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   X,
   ShoppingBag,
@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { CartItem } from '../../types';
+import { scrollToElement } from '../../utils/scrollHelper';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface CartDrawerProps {
   onClearCart: () => void;
   onProceedToCheckout: () => void;
   onContinueShopping: () => void;
+  targetProductId?: number | null;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -32,7 +34,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onClearCart,
   onProceedToCheckout,
   onContinueShopping,
+  targetProductId,
 }) => {
+  useEffect(() => {
+    if (isOpen && targetProductId) {
+      scrollToElement(`cart-drawer-item-${targetProductId}`);
+    }
+  }, [isOpen, targetProductId]);
+
   if (!isOpen) return null;
 
   const totalAmount = cartItems.reduce(
@@ -137,6 +146,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         return (
                           <div
                             key={item.product.id}
+                            id={`cart-drawer-item-${item.product.id}`}
                             className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center gap-3.5"
                           >
                             {/* Product Thumbnail */}

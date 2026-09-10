@@ -50,6 +50,7 @@ import { BranchOverview } from './owner/BranchOverview';
 import { OwnerLocationPicker } from './maps/OwnerLocationPicker';
 import { ProductInventoryManager } from './owner/ProductInventoryManager';
 import { EmptyState } from './EmptyState';
+import { scrollToElement } from '../utils/scrollHelper';
 
 const DEFAULT_WORKING_HOURS: WorkingHour[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
@@ -70,6 +71,7 @@ interface SalonOwnerDashboardProps {
   onNavigateTab?: (tab: string) => void;
   refreshKey?: number;
   initialSalons?: Salon[];
+  targetId?: string | null;
 }
 
 export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
@@ -80,6 +82,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   onNavigateTab,
   refreshKey = 0,
   initialSalons,
+  targetId,
 }) => {
   const [salons, setSalons] = useState<Salon[]>(() => {
     if (initialSalons && initialSalons.length > 0) {
@@ -111,6 +114,24 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  // Auto-scroll when targetId is provided from notification click
+  useEffect(() => {
+    if (targetId) {
+      if (targetId.startsWith('owner-appointment-')) {
+        setActiveTab('appointments');
+        setBookingStatusFilter('all');
+        setBookingDateFilter('all');
+        setBookingSearch('');
+        scrollToElement(targetId);
+      } else if (targetId.startsWith('owner-branch-')) {
+        setActiveTab('branches');
+        scrollToElement(targetId);
+      } else if (targetId.startsWith('owner-order-')) {
+        setActiveTab('inventory');
+      }
+    }
+  }, [targetId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -737,6 +758,11 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               products={products}
               orders={productOrders}
               onRefresh={loadDashboardData}
+              targetOrderId={
+                targetId && targetId.startsWith('owner-order-')
+                  ? Number(targetId.replace('owner-order-', ''))
+                  : null
+              }
             />
           )}
 
@@ -833,6 +859,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   {filteredBookings.map((appt) => (
                     <div
                       key={appt.id}
+                      id={`owner-appointment-${appt.id}`}
                       className="p-4 sm:p-5 rounded-2xl border border-pink-100 hover:border-purple-300 bg-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs transition-all"
                     >
                       <div className="space-y-1.5">

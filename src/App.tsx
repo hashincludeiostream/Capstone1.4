@@ -20,9 +20,9 @@ import {
   LayoutGrid,
   User as UserIcon,
 } from 'lucide-react';
-import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem } from './types';
+import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem, PlatformStats, Reel, Review, Technician } from './types';
 import { initializeFirestoreData, subscribeToAppointments } from './lib/firestoreService';
-import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments } from './lib/api';
+import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments, fetchStats, fetchReels, fetchReviews, fetchTechnicians, fetchServices, API_BASE } from './lib/api';
 import { localStorage as safeLocalStorage } from './lib/localStorage';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -58,6 +58,7 @@ import { ProductDetailModal } from './components/products/ProductDetailModal';
 import { CartDrawer } from './components/products/CartDrawer';
 import { ProductCheckoutModal } from './components/products/ProductCheckoutModal';
 import { CustomerOrdersView } from './components/products/CustomerOrdersView';
+import { scrollToElement } from './utils/scrollHelper';
 
 export const App: React.FC = () => {
   return (
@@ -144,8 +145,25 @@ const AppContent: React.FC = () => {
     return safeLocalStorage.getJSON<CartItem[]>('nailglamhub_cart') || [];
   });
   const [cartOpen, setCartOpen] = useState(false);
+  const [targetElementId, setTargetElementId] = useState<string | null>(null);
+  const [targetCartProductId, setTargetCartProductId] = useState<number | null>(null);
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Product | null>(null);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+
+  // Salon Owner notification state
+  const [ownerSalons, setOwnerSalons] = useState<Salon[]>([]);
+  const [ownerAppointments, setOwnerAppointments] = useState<Appointment[]>([]);
+  const [ownerProductOrders, setOwnerProductOrders] = useState<ProductOrder[]>([]);
+  const [ownerServices, setOwnerServices] = useState<Service[]>([]);
+  const [ownerTechnicians, setOwnerTechnicians] = useState<Technician[]>([]);
+  const [ownerReviews, setOwnerReviews] = useState<Review[]>([]);
+  const [ownerProducts, setOwnerProducts] = useState<Product[]>([]);
+
+  // Admin notification state
+  const [adminStats, setAdminStats] = useState<PlatformStats | null>(null);
+  const [adminUsers, setAdminUsers] = useState<User[]>([]);
+  const [adminReels, setAdminReels] = useState<Reel[]>([]);
+  const [adminReviews, setAdminReviews] = useState<Review[]>([]);
 
   // Persist cart items to localStorage
   useEffect(() => {
@@ -254,6 +272,131 @@ const AppContent: React.FC = () => {
       setCustomerAppointments([]);
     }
   }, [currentUser?.id, currentUser?.user_type]);
+
+  // Load Salon Owner data for sidebar counters & live badges
+  const loadOwnerData = async () => {
+    if (!currentUser || currentUser.user_type !== 'salon_owner') {
+      setOwnerSalons([]);
+      setOwnerAppointments([]);
+      setOwnerProductOrders([]);
+      setOwnerServices([]);
+      setOwnerTechnicians([]);
+      setOwnerReviews([]);
+      setOwnerProducts([]);
+      return;
+    }
+    try {
+      // 1. Get owner's salons
+      let mySalons = salons.filter((s) => Number(s.owner_id) === Number(currentUser.id));
+      if (mySalons.length === 0) {
+        mySalons = await fetchSalons({ owner_id: currentUser.id, includeUnpublished: true });
+      }
+      setOwnerSalons(mySalons);
+
+      if (mySalons.length > 0) {
+        const apptsAcc: Appointment[] = [];
+        const ordersAcc: ProductOrder[] = [];
+        const servsAcc: Service[] = [];
+        const techsAcc: Technician[] = [];
+        const revsAcc: Review[] = [];
+        const prodsAcc: Product[] = [];
+
+        await Promise.all(
+          mySalons.map(async (salon) => {
+            const [salonAppts, salonOrders, salonServs, salonTechs, salonRevs, salonProds] = await Promise.all([
+              fetchAppointments({ salon_id: salon.id }).catch(() => []),
+              fetchProductOrders({ salon_id: salon.id }).catch(() => []),
+              fetchServices(salon.id).catch(() => []),
+              fetchTechnicians(salon.id).catch(() => []),
+              fetchReviews(salon.id).catch(() => []),
+              fetchProducts({ salon_id: salon.id }).catch(() => []),
+            ]);
+            apptsAcc.push(...salonAppts);
+            ordersAcc.push(...salonOrders);
+            servsAcc.push(...salonServs);
+            techsAcc.push(...salonTechs);
+            revsAcc.push(...salonRevs);
+            prodsAcc.push(...salonProds);
+          })
+        );
+
+        setOwnerAppointments(apptsAcc);
+        setOwnerProductOrders(ordersAcc);
+        setOwnerServices(servsAcc);
+        setOwnerTechnicians(techsAcc);
+        setOwnerReviews(revsAcc);
+        setOwnerProducts(prodsAcc);
+      }
+    } catch (err) {
+      console.warn('Failed to load owner sidebar counts:', err);
+    }
+  };
+
+  // Load Admin data for sidebar governance counters
+  const loadAdminData = async () => {
+    if (!currentUser || currentUser.user_type !== 'admin') {
+      setAdminStats(null);
+      setAdminUsers([]);
+      setAdminReels([]);
+      setAdminReviews([]);
+      return;
+    }
+    try {
+      const [statsData, uRes, reelsData, revsData] = await Promise.all([
+        fetchStats().catch(() => null),
+        fetch(`${API_BASE}/users`).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetchReels().catch(() => []),
+        fetchReviews().catch(() => []),
+      ]);
+      if (statsData) setAdminStats(statsData);
+      if (Array.isArray(uRes)) setAdminUsers(uRes);
+      if (Array.isArray(reelsData)) setAdminReels(reelsData);
+      if (Array.isArray(revsData)) setAdminReviews(revsData);
+    } catch (err) {
+      console.warn('Failed to load admin sidebar counts:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.id && currentUser.user_type === 'salon_owner') {
+      loadOwnerData();
+
+      // Real-time Firestore sync for owner salons' appointments
+      const mySalons = salons.filter((s) => Number(s.owner_id) === Number(currentUser.id));
+      const unsubscribers = mySalons.map((s) =>
+        subscribeToAppointments({ salon_id: s.id }, (liveAppts) => {
+          if (liveAppts && liveAppts.length > 0) {
+            setOwnerAppointments((prev) => {
+              const otherSalonAppts = prev.filter((a) => a.salon_id !== s.id);
+              return [...otherSalonAppts, ...liveAppts];
+            });
+          }
+        })
+      );
+      return () => {
+        unsubscribers.forEach((u) => u());
+      };
+    } else {
+      setOwnerSalons([]);
+      setOwnerAppointments([]);
+      setOwnerProductOrders([]);
+      setOwnerServices([]);
+      setOwnerTechnicians([]);
+      setOwnerReviews([]);
+      setOwnerProducts([]);
+    }
+  }, [currentUser?.id, currentUser?.user_type, salons, ownerBranchRefreshKey]);
+
+  useEffect(() => {
+    if (currentUser?.id && currentUser.user_type === 'admin') {
+      loadAdminData();
+    } else {
+      setAdminStats(null);
+      setAdminUsers([]);
+      setAdminReels([]);
+      setAdminReviews([]);
+    }
+  }, [currentUser?.id, currentUser?.user_type, salons, announcements]);
 
   // Cart Operations
   const handleAddToCart = (product: Product, quantity = 1) => {
@@ -487,7 +630,7 @@ const AppContent: React.FC = () => {
   };
 
   // Centralized navigation handler with validation
-  const handleNavigate = (tab: string) => {
+  const handleNavigate = (tab: string, targetDomId?: string) => {
     // Validate navigation based on user role
     if (currentUser?.user_type === 'salon_owner') {
       const allowedTabs = ['owner-dashboard', 'owner-profile', 'explore', 'profile'];
@@ -504,6 +647,11 @@ const AppContent: React.FC = () => {
     }
 
     setActiveTab(tab);
+
+    if (targetDomId) {
+      setTargetElementId(targetDomId);
+      scrollToElement(targetDomId);
+    }
   };
 
   // Filter salons for Explore tab
@@ -540,6 +688,43 @@ const AppContent: React.FC = () => {
       ? activeCustomerOrders.length
       : totalCustomerOrders.length;
 
+  // Salon Owner notification signals & numbering
+  const effectiveOwnerSalons =
+    ownerSalons.length > 0
+      ? ownerSalons
+      : salons.filter((s) => currentUser?.id && Number(s.owner_id) === Number(currentUser.id));
+  const ownerPendingSalons = effectiveOwnerSalons.filter(
+    (s) => s.verification_status === 'pending'
+  );
+  const ownerPendingAppointments = ownerAppointments.filter(
+    (a) => a.status === 'pending'
+  );
+  const ownerActiveAppointments = ownerAppointments.filter(
+    (a) => a.status === 'pending' || a.status === 'confirmed'
+  );
+  const ownerPendingOrders = ownerProductOrders.filter(
+    (o) => o.status === 'pending_pickup'
+  );
+
+  // Admin notification signals & numbering
+  const adminPendingSalons = salons.filter(
+    (s) => s.verification_status === 'pending'
+  );
+  const adminActiveAnnouncements = announcements.filter((a) => a.is_active);
+  const adminTotalAppointments =
+    adminStats?.total_appointments ?? 6;
+  const adminTotalUsers =
+    adminUsers.length > 0
+      ? adminUsers.length
+      : adminStats
+      ? adminStats.total_customers + adminStats.total_salon_owners + adminStats.total_admins
+      : 6;
+  const adminTotalSalons =
+    salons.length > 0 ? salons.length : adminStats?.total_salons ?? 3;
+  const adminContentCount =
+    (adminReels.length > 0 ? adminReels.length : 3) +
+    (adminReviews.length > 0 ? adminReviews.length : 4);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FCF8FA] text-[#2D1A28]">
       {/* Toast Banner */}
@@ -566,7 +751,26 @@ const AppContent: React.FC = () => {
         onOpenRegisterSalon={() => setBranchRegistrationOpen(true)}
         onNavigate={handleNavigate}
         cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-        onOpenCart={() => setCartOpen(true)}
+        onOpenCart={(targetProductId) => {
+          setCartOpen(true);
+          if (targetProductId) {
+            setTargetCartProductId(targetProductId);
+          }
+        }}
+        cartItems={cartItems}
+        customerAppointments={customerAppointments}
+        customerOrders={customerOrders}
+        announcements={announcements}
+        salons={salons}
+        ownerSalons={effectiveOwnerSalons}
+        ownerAppointments={ownerAppointments}
+        ownerProductOrders={ownerProductOrders}
+        ownerReviews={ownerReviews}
+        adminPendingSalons={adminPendingSalons}
+        adminTotalSalons={adminTotalSalons}
+        adminTotalUsers={adminTotalUsers}
+        adminTotalAppointments={adminTotalAppointments}
+        favoritesCount={favorites.length}
       />
 
       {/* Live Site-Wide Announcements Broadcasted by Super Admin */}
@@ -580,6 +784,7 @@ const AppContent: React.FC = () => {
           return (
             <div
               key={a.id}
+              id={`site-announcement-${a.id}`}
               className={`border-b text-xs py-2 px-4 flex items-center justify-between transition-all ${
                 isAlert
                   ? 'bg-red-500 text-white border-red-600'
@@ -651,12 +856,33 @@ const AppContent: React.FC = () => {
           onOpenAbout={() => setAboutContactModal({ open: true, tab: 'about' })}
           onOpenContact={() => setAboutContactModal({ open: true, tab: 'contact' })}
           onNavigate={handleNavigate}
+          // Customer notification signals
           bookingsCount={bookingsNotificationCount}
           activeBookingsCount={activeCustomerBookings.length}
           totalBookingsCount={totalCustomerBookings.length}
           ordersCount={ordersNotificationCount}
           activeOrdersCount={activeCustomerOrders.length}
           totalOrdersCount={totalCustomerOrders.length}
+          favoritesCount={favorites.length}
+          // Salon Owner notification signals
+          ownerSalonsCount={effectiveOwnerSalons.length}
+          ownerPendingSalonsCount={ownerPendingSalons.length}
+          ownerAppointmentsCount={ownerAppointments.length}
+          ownerPendingAppointmentsCount={ownerPendingAppointments.length}
+          ownerActiveAppointmentsCount={ownerActiveAppointments.length}
+          ownerTotalAppointmentsCount={ownerAppointments.length}
+          ownerServicesCount={ownerServices.length}
+          ownerStaffCount={ownerTechnicians.length}
+          ownerInventoryCount={ownerProducts.length}
+          ownerPendingOrdersCount={ownerPendingOrders.length}
+          ownerReviewsCount={ownerReviews.length}
+          // Admin notification signals
+          adminPendingSalonsCount={adminPendingSalons.length}
+          adminTotalSalonsCount={adminTotalSalons}
+          adminTotalUsersCount={adminTotalUsers}
+          adminContentCount={adminContentCount}
+          adminActiveAnnouncementsCount={adminActiveAnnouncements.length}
+          adminTotalAppointmentsCount={adminTotalAppointments}
         />
 
         {/* Dynamic Center Stage Views */}
@@ -881,6 +1107,11 @@ const AppContent: React.FC = () => {
                 onOpenLeaveReview={(salon) => handleOpenLeaveReviewForSalon(salon)}
                 onSelectSalon={(salon) => setSelectedSalonForDetails(salon)}
                 onRefreshAppointments={loadCustomerAppointments}
+                targetAppointmentId={
+                  targetElementId && targetElementId.startsWith('customer-appointment-')
+                    ? Number(targetElementId.replace('customer-appointment-', ''))
+                    : null
+                }
               />
             ) : currentUser ? (
               <div className="py-16 text-center bg-white rounded-3xl p-8 border border-pink-100 max-w-lg mx-auto shadow-sm">
@@ -961,6 +1192,11 @@ const AppContent: React.FC = () => {
               onRefreshOrders={loadCustomerOrders}
               onBrowseProducts={() => setActiveTab('products')}
               onOpenLogin={() => setActiveTab('login-customer')}
+              targetOrderId={
+                targetElementId && targetElementId.startsWith('customer-order-')
+                  ? Number(targetElementId.replace('customer-order-', ''))
+                  : null
+              }
             />
           )}
 
@@ -986,6 +1222,7 @@ const AppContent: React.FC = () => {
                 initialSalons={salons.filter(
                   (s) => currentUser?.user_type === 'admin' || Number(s.owner_id) === Number(currentUser?.id)
                 )}
+                targetId={targetElementId}
                 initialTab={
                   activeTab === 'owner-services'
                     ? 'services'
@@ -1063,6 +1300,7 @@ const AppContent: React.FC = () => {
               !activeTab.startsWith('register-'))) && (
             currentUser?.user_type === 'admin' ? (
               <AdminDashboard
+                targetId={targetElementId}
                 initialTab={
                   activeTab === 'admin-salons'
                     ? 'salons'
@@ -1403,13 +1641,20 @@ const AppContent: React.FC = () => {
       {/* 9. E-Commerce Cart Drawer */}
       <CartDrawer
         isOpen={cartOpen}
-        onClose={() => setCartOpen(false)}
+        onClose={() => {
+          setCartOpen(false);
+          setTargetCartProductId(null);
+        }}
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}
         onClearCart={handleClearCart}
         onProceedToCheckout={handleProceedToCheckout}
-        onContinueShopping={() => setCartOpen(false)}
+        onContinueShopping={() => {
+          setCartOpen(false);
+          setTargetCartProductId(null);
+        }}
+        targetProductId={targetCartProductId}
       />
 
       {/* 10. In-Store Product Reservation Checkout Modal */}

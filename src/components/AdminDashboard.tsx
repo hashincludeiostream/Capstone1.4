@@ -39,6 +39,7 @@ import {
   downloadFile,
   openPrintableReport,
 } from '../utils/reportGenerators';
+import { scrollToElement } from '../utils/scrollHelper';
 import {
   fetchStats,
   fetchSalons,
@@ -67,11 +68,13 @@ import {
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'salons' | 'users' | 'content' | 'announcements';
   onNavigateTab?: (tab: string) => void;
+  targetId?: string | null;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   initialTab = 'overview',
   onNavigateTab,
+  targetId,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'salons' | 'users' | 'content' | 'announcements'>(
     initialTab || 'overview'
@@ -149,6 +152,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  useEffect(() => {
+    if (targetId) {
+      if (targetId.startsWith('admin-salon-')) {
+        setActiveTab('salons');
+        setSalonFilter('all');
+        setSalonSearch('');
+        scrollToElement(targetId);
+      } else if (targetId === 'admin-stats-appointments') {
+        setActiveTab('overview');
+        scrollToElement(targetId);
+      } else if (targetId.startsWith('admin-announcement-')) {
+        setActiveTab('announcements');
+        scrollToElement(targetId);
+      }
+    }
+  }, [targetId]);
 
   const loadAllData = async () => {
     setLoading(true);
@@ -677,7 +697,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="space-y-6">
           {/* Key KPI Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs">
+            <div id="admin-stats-appointments" className="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Bookings</p>
               <p className="text-xl sm:text-2xl font-serif font-bold text-gray-900 mt-1">
                 {stats?.total_appointments || 0}
@@ -973,6 +993,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               filteredSalons.map((s) => (
                 <div
                   key={s.id}
+                  id={`admin-salon-${s.id}`}
                   className={`p-5 rounded-2xl border transition-all ${
                     s.verification_status === 'pending'
                       ? 'border-amber-300 bg-amber-50/20'
@@ -1394,6 +1415,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               announcements.map((item) => (
                 <div
                   key={item.id}
+                  id={`admin-announcement-${item.id}`}
                   className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                     item.is_active ? 'border-pink-200 bg-pink-50/20' : 'border-gray-200 bg-gray-50/50 opacity-75'
                   } space-y-3 shadow-xs`}

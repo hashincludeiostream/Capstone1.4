@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Appointment, Salon, User } from '../types';
 import { fetchAppointments } from '../lib/api';
+import { scrollToElement } from '../utils/scrollHelper';
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -22,6 +23,7 @@ interface CustomerDashboardProps {
   onOpenLeaveReview: (salon: Salon, technicianId?: number | null, technicianName?: string) => void;
   onSelectSalon: (salon: Salon) => void;
   onRefreshAppointments?: () => void;
+  targetAppointmentId?: number | null;
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
@@ -31,10 +33,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   onOpenLeaveReview,
   onSelectSalon,
   onRefreshAppointments,
+  targetAppointmentId,
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  useEffect(() => {
+    if (targetAppointmentId) {
+      setFilterStatus('all');
+      scrollToElement(`customer-appointment-${targetAppointmentId}`);
+    }
+  }, [targetAppointmentId]);
 
   useEffect(() => {
     async function load() {
@@ -204,6 +214,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
               return (
                 <div
                   key={appt.id}
+                  id={`customer-appointment-${appt.id}`}
                   className="p-4 sm:p-5 rounded-2xl border border-pink-100 hover:border-pink-300 bg-pink-50/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div className="flex items-start gap-3.5">

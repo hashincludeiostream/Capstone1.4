@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   Clock,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ProductOrder, ProductOrderStatus, User } from '../../types';
 import { updateProductOrderStatus } from '../../lib/api';
+import { scrollToElement } from '../../utils/scrollHelper';
 
 interface CustomerOrdersViewProps {
   orders: ProductOrder[];
@@ -21,6 +22,7 @@ interface CustomerOrdersViewProps {
   onRefreshOrders: () => void;
   onBrowseProducts: () => void;
   onOpenLogin: () => void;
+  targetOrderId?: number | null;
 }
 
 export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
@@ -29,9 +31,17 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
   onRefreshOrders,
   onBrowseProducts,
   onOpenLogin,
+  targetOrderId,
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (targetOrderId) {
+      setFilterStatus('all');
+      scrollToElement(`customer-order-${targetOrderId}`);
+    }
+  }, [targetOrderId]);
 
   if (!currentUser) {
     return (
@@ -187,6 +197,7 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
             return (
               <div
                 key={order.id}
+                id={`customer-order-${order.id}`}
                 className="bg-white rounded-3xl border border-stone-200 shadow-2xs overflow-hidden transition-all hover:border-pink-200"
               >
                 {/* Card Header */}
