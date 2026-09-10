@@ -248,8 +248,8 @@ class InMemoryDatabase {
         const tId = Number(params[pIdx++]);
         filtered = filtered.filter((a) => a.technician_id === tId);
       }
-      if (/ORDER BY\s+appointment_date\s+DESC/i.test(sql)) {
-        filtered.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime());
+      if (/ORDER BY\s+(appointment_date|created_at)\s+DESC/i.test(sql)) {
+        filtered.sort((a, b) => new Date(b.appointment_date || b.created_at).getTime() - new Date(a.appointment_date || a.created_at).getTime());
       }
       return [filtered, null];
     }

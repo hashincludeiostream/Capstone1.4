@@ -10,14 +10,10 @@ import {
 } from 'lucide-react';
 import { Salon } from '../../types';
 import { calculateDistanceKm } from '../../utils/geoUtils';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
-// @ts-ignore - CSS import for Leaflet
+// CSS import for Leaflet
 import 'leaflet/dist/leaflet.css';
-// @ts-ignore - CSS import for leaflet-routing-machine
-import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
-// @ts-ignore - Import leaflet-routing-machine
-import 'leaflet-routing-machine';
 
 // Extend react-leaflet types to include missing properties
 declare module 'react-leaflet' {
@@ -122,8 +118,8 @@ function MapViewUpdater({ center, zoom }: { center: { lat: number; lng: number }
   return null;
 }
 
-// Component to handle routing directions (requires leaflet-routing-machine)
-function RoutingControl({
+// Component to handle routing directions with real road geometry & fallback
+function RouteLine({
   userLocation,
   salonLocation,
   onRouteCalculated,
@@ -133,70 +129,91 @@ function RoutingControl({
   onRouteCalculated?: (distance: number, duration: number) => void;
 }) {
   const map = useMap();
+  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
 
   useEffect(() => {
-    console.log('RoutingControl useEffect:', { userLocation, salonLocation, hasL: typeof L !== 'undefined', hasRouting: typeof (L as any).Routing !== 'undefined' });
-    
-    if (!userLocation || !salonLocation) return;
+    if (!userLocation || !salonLocation) {
+      setRoutePoints([]);
+      return;
+    }
 
-    // @ts-ignore - leaflet-routing-machine will be available after npm install
-    if (typeof (L as any).Routing !== 'undefined') {
-      console.log('Creating routing control...');
-      
-      // Remove existing routing control if any
-      // @ts-ignore
-      if ((map as any).routingControl) {
-        // @ts-ignore
-        map.removeControl((map as any).routingControl);
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const fetchRoute = async () => {
+      const fallbackPoints: [number, number][] = [
+        [userLocation.lat, userLocation.lng],
+        [salonLocation.lat, salonLocation.lng],
+      ];
+
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${salonLocation.lng},${salonLocation.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error('OSRM routing request returned non-200');
+        const data = await res.json();
+
+        if (isMounted && data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const coords: [number, number][] = route.geometry.coordinates.map(
+            (pt: [number, number]) => [pt[1], pt[0]] as [number, number]
+          );
+          setRoutePoints(coords);
+          if (onRouteCalculated) {
+            onRouteCalculated(route.distance, route.duration);
+          }
+          if (map) {
+            const bounds = L.latLngBounds(coords);
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+          }
+          return;
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        // Fallback to straight line if OSRM is blocked, offline, or rate limited
       }
 
-      // @ts-ignore
-      const routingControl = (L as any).Routing.control({
-        waypoints: [
-          // @ts-ignore
-          L.latLng(userLocation.lat, userLocation.lng),
-          // @ts-ignore
-          L.latLng(salonLocation.lat, salonLocation.lng),
-        ],
-        routeWhileDragging: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-        showAlternatives: false,
-        lineOptions: {
-          styles: [{ color: '#ec4899', weight: 5, opacity: 0.8 }],
-        },
-        createMarker: () => null, // Don't create default markers
-      }).addTo(map);
-
-      console.log('Routing control added:', routingControl);
-
-      // @ts-ignore
-      (map as any).routingControl = routingControl;
-
-      // Listen for route calculated
-      // @ts-ignore
-      routingControl.on('routesfound', (e: any) => {
-        console.log('Routes found:', e);
-        const routes = e.routes;
-        if (routes && routes.length > 0) {
-          const summary = routes[0].summary;
-          if (onRouteCalculated) {
-            onRouteCalculated(summary.totalDistance, summary.totalTime);
-          }
+      if (isMounted) {
+        setRoutePoints(fallbackPoints);
+        const distKm = calculateDistanceKm(
+          userLocation.lat,
+          userLocation.lng,
+          salonLocation.lat,
+          salonLocation.lng
+        );
+        const distMeters = distKm * 1000;
+        const estDurationSeconds = Math.round((distKm / 28) * 3600); // ~28 km/h city average
+        if (onRouteCalculated) {
+          onRouteCalculated(distMeters, estDurationSeconds);
         }
-      });
-      
-      // @ts-ignore
-      routingControl.on('routingerror', (e: any) => {
-        console.error('Routing error:', e);
-      });
-    } else {
-      console.error('L.Routing is not available. Make sure leaflet-routing-machine is imported correctly.');
-    }
-  }, [userLocation, salonLocation, map, onRouteCalculated]);
+        if (map) {
+          const bounds = L.latLngBounds(fallbackPoints);
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        }
+      }
+    };
 
-  return null;
+    fetchRoute();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [userLocation?.lat, userLocation?.lng, salonLocation?.lat, salonLocation?.lng, map, onRouteCalculated]);
+
+  if (routePoints.length === 0) return null;
+
+  return (
+    <Polyline
+      positions={routePoints}
+      pathOptions={{
+        color: '#ec4899',
+        weight: 5,
+        opacity: 0.85,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }}
+    />
+  );
 }
 
 interface StoreLocationsMapProps {
@@ -217,7 +234,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
   className = '',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCity, setSelectedCity] = useState<string>('Davao City');
+  const [selectedCity, setSelectedCity] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeSalon, setActiveSalon] = useState<Salon | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -227,26 +244,24 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
   const [zoomLevel, setZoomLevel] = useState(13);
   const [showDirections, setShowDirections] = useState(false);
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
-  const davaoSalons = useMemo(() => salons.filter(isDavaoSalon), [salons]);
+  const availableSalons = useMemo(() => salons, [salons]);
 
   // Initialize active salon from prop or first salon
   useEffect(() => {
     const selectedSalon = selectedSalonId
       ? salons.find((salon) => salon.id === selectedSalonId)
       : null;
-    const nextActiveSalon = selectedSalon && isDavaoSalon(selectedSalon)
-      ? selectedSalon
-      : davaoSalons[0] || null;
+    const nextActiveSalon = selectedSalon || availableSalons[0] || null;
 
     if (activeSalon?.id !== nextActiveSalon?.id) {
       setActiveSalon(nextActiveSalon);
     }
-  }, [selectedSalonId, salons, davaoSalons, activeSalon]);
+  }, [selectedSalonId, salons, availableSalons, activeSalon]);
 
   // Unique cities list
   const cities = useMemo(() => {
     const set = new Set<string>();
-    davaoSalons.forEach((s) => {
+    availableSalons.forEach((s) => {
       if (s.city) set.add(s.city);
       else if (s.address) {
         if (s.address.includes('Taguig') || s.address.includes('BGC')) set.add('Taguig');
@@ -258,7 +273,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
       }
     });
     return Array.from(set);
-  }, [davaoSalons]);
+  }, [availableSalons]);
 
   // Handle GPS location
   const handleLocateMe = () => {
@@ -276,11 +291,24 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
         });
         setIsLocating(false);
       },
-      () => {
+      (error) => {
         setIsLocating(false);
-        setLocationError('Unable to retrieve your location. Showing Davao City salons.');
+        if (error.code === 1) {
+          // PERMISSION_DENIED
+          setLocationError(
+            'Location permission was denied. If viewing in the embedded frame, allow location permissions in your browser or open the app in a new tab.'
+          );
+        } else if (error.code === 2) {
+          // POSITION_UNAVAILABLE
+          setLocationError('GPS signal / position unavailable from your device or network.');
+        } else if (error.code === 3) {
+          // TIMEOUT
+          setLocationError('Location request timed out. Please try again.');
+        } else {
+          setLocationError('Unable to retrieve your location. Showing Davao City salons.');
+        }
       },
-      { timeout: 8000 }
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
     );
   };
 
@@ -315,7 +343,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
 
   // Filter salons with computed distances
   const filteredSalons = useMemo(() => {
-    return davaoSalons
+    return availableSalons
       .filter((s) => {
         // Search query matching
         const q = searchQuery.toLowerCase();
@@ -355,7 +383,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
         }
         return (b.avg_rating || 0) - (a.avg_rating || 0);
       });
-  }, [davaoSalons, searchQuery, selectedCity, selectedCategory, userLocation]);
+  }, [availableSalons, searchQuery, selectedCity, selectedCategory, userLocation]);
 
   const currentCenter = DAVAO_CENTER;
 
@@ -401,7 +429,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
               <span>{isLocating ? 'Locating...' : userLocation ? 'GPS Located' : 'Salons Near Me'}</span>
             </button>
 
-            {/* Directions Button (requires leaflet-routing-machine npm install) */}
+            {/* Directions Route Button */}
             {userLocation && activeSalon && (
               <button
                 onClick={handleToggleDirections}
@@ -472,7 +500,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
               onChange={(e) => setSelectedCity(e.target.value)}
               className="w-full py-2 px-3 rounded-xl bg-white border border-pink-200/80 text-xs text-gray-700 focus:outline-none focus:border-pink-500 shadow-xs cursor-pointer"
             >
-              <option value="Davao City">All Davao City ({davaoSalons.length})</option>
+              <option value="all">All Cities ({availableSalons.length})</option>
               {cities.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -502,9 +530,29 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
         </div>
 
         {locationError && (
-          <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg mt-2 border border-amber-200">
-            {locationError}
-          </p>
+          <div className="text-[11px] text-amber-800 bg-amber-50 p-2.5 rounded-xl mt-2 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="flex-1">{locationError}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setUserLocation({ lat: DAVAO_CENTER.lat, lng: DAVAO_CENTER.lng });
+                  setLocationError(null);
+                }}
+                className="px-2 py-1 text-[10px] font-semibold bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-md transition-colors cursor-pointer"
+              >
+                Use Davao City (Demo)
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocationError(null)}
+                className="p-1 text-amber-600 hover:text-amber-900 rounded-md transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         )}
 
         {routeInfo && (
@@ -569,11 +617,17 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <img
-                        src={salon.logo}
-                        alt={salon.salon_name}
-                        className="w-12 h-12 rounded-xl object-cover border border-pink-100 shrink-0"
-                      />
+                      {salon.logo ? (
+                        <img
+                          src={salon.logo}
+                          alt={salon.salon_name}
+                          className="w-12 h-12 rounded-xl object-cover border border-pink-100 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-sm shrink-0">
+                          {salon.salon_name.charAt(0)}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <h4 className="text-xs font-bold text-gray-900 truncate">
@@ -611,30 +665,13 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
 
                     {/* Action buttons */}
                     <div className="flex items-center gap-2 pt-1 border-t border-gray-100 mt-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveSalon(salon);
-                          if (onSelectSalon) onSelectSalon(salon);
-                          if (userLocation) {
-                            setShowDirections(true);
-                          } else {
-                            setLocationError('Please enable GPS location first to get directions.');
-                          }
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <Route className="w-3 h-3 text-pink-600" />
-                        <span>Directions</span>
-                      </button>
-
                       {onViewSalonDetails && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onViewSalonDetails(salon);
                           }}
-                          className="px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-[11px] font-semibold transition-colors"
+                          className="px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-[11px] font-semibold transition-colors cursor-pointer"
                         >
                           Details
                         </button>
@@ -675,11 +712,11 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
             
             <MapViewUpdater center={currentCenter} zoom={zoomLevel} />
 
-            {/* Routing control (requires leaflet-routing-machine npm install) */}
+            {/* Routing path line and directions */}
             {showDirections && userLocation && activeSalon && (() => {
               const coords = getValidCoordinates(activeSalon);
               return coords ? (
-                <RoutingControl
+                <RouteLine
                   userLocation={userLocation}
                   salonLocation={{ lat: coords[0], lng: coords[1] }}
                   onRouteCalculated={handleRouteCalculated}

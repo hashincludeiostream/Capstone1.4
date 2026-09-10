@@ -79,16 +79,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Quick Highlights */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-lg mx-auto mt-8 pt-6 border-t border-white/10 text-center">
           <div>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-pink-200">50+</p>
-            <p className="text-[11px] text-pink-100/70 font-medium">Bespoke Salons</p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-pink-200">24/7</p>
+            <p className="text-[11px] text-pink-100/70 font-medium">Direct Booking</p>
           </div>
           <div>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-pink-200">10,000+</p>
-            <p className="text-[11px] text-pink-100/70 font-medium">Happy Clients</p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-pink-200">100%</p>
+            <p className="text-[11px] text-pink-100/70 font-medium">Accredited</p>
           </div>
           <div>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-pink-200">4.9 ★</p>
-            <p className="text-[11px] text-pink-100/70 font-medium">Average Rating</p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-pink-200">Verified</p>
+            <p className="text-[11px] text-pink-100/70 font-medium">Safety Standard</p>
           </div>
         </div>
       </div>

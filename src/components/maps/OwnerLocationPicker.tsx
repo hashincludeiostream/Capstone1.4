@@ -189,7 +189,7 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
   // Handle GPS Geolocation from device
   const handleUseCurrentGPS = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      if (onShowToast) onShowToast('Geolocation is not supported by your browser.');
       return;
     }
     setIsLocating(true);
@@ -205,11 +205,21 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
           onShowToast(`Updated coordinates to GPS position (${lat}, ${lng})`);
         }
       },
-      () => {
+      (err) => {
         setIsLocating(false);
-        alert('Could not acquire your device GPS position. Please check permissions.');
+        let msg = 'Could not acquire your device GPS position. Please check permissions.';
+        if (err.code === 1) {
+          msg = 'Location permission denied. Please allow location access in your browser or open in a new tab.';
+        } else if (err.code === 2) {
+          msg = 'GPS signal unavailable from your device or network.';
+        } else if (err.code === 3) {
+          msg = 'GPS acquisition timed out. Please try again.';
+        }
+        if (onShowToast) {
+          onShowToast(msg);
+        }
       },
-      { timeout: 8000 }
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
     );
   };
 

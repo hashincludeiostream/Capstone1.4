@@ -155,57 +155,82 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="absolute left-8 top-8 h-60 w-60 rounded-full bg-amber-300/40 blur-3xl" />
             <div className="relative w-full max-w-md rounded-[2rem] border border-white/50 bg-white/12 p-3 shadow-2xl backdrop-blur-xl">
               <div className="rounded-[1.8rem] bg-white/90 p-4">
-                <div className="rounded-[1.4rem] bg-gradient-to-br from-rose-100 via-pink-50 to-purple-50 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black tracking-[0.18em] text-pink-800 uppercase">Today’s Beauty Match</span>
-                    <Sparkles className="w-5 h-5 text-pink-700" />
-                  </div>
-
-                  <div className="mt-6 flex items-center gap-3">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-600 to-rose-400 flex items-center justify-center text-white shadow-md overflow-hidden">
-                      {featuredSalon?.logo ? (
-                        <img src={featuredSalon.logo} alt={featuredSalon.salon_name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Scissors className="w-8 h-8" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-pink-700 uppercase tracking-[0.13em]">Signature Studio</div>
-                      <div className="text-lg font-serif font-black text-gray-900">{featuredSalon?.salon_name || 'Loading...'}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><MapPin className="w-4 h-4" /> {featuredSalon?.city || 'Metro Manila'}</div>
-                      <div className="mt-2 text-xs text-gray-500 truncate">{featuredSalon?.address?.split(',')[0] || 'Premium Location'}</div>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {featuredSalon?.review_count ? Number(featuredSalon.avg_rating).toFixed(1) : 'Not rated yet'}</div>
-                      <div className="mt-2 text-xs text-gray-500">{featuredSalon?.review_count ? `${featuredSalon.review_count} reviews` : 'No reviews yet'}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl bg-pink-950 text-white p-4">
+                {featuredSalon ? (
+                  <div className="rounded-[1.4rem] bg-gradient-to-br from-rose-100 via-pink-50 to-purple-50 p-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black uppercase tracking-[0.12em]">Today’s Ritual</span>
-                      {featuredService?.duration ? (
-                        <span className="text-[11px] font-bold bg-white/12 rounded-full px-2 py-1">
-                          {featuredService.duration} min
-                        </span>
-                      ) : null}
+                      <span className="text-[11px] font-black tracking-[0.18em] text-pink-800 uppercase">Today’s Beauty Match</span>
+                      <Sparkles className="w-5 h-5 text-pink-700" />
                     </div>
-                    <div className="mt-3 flex items-center gap-3">
-                      <span className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
-                        <Heart className="w-5 h-5 text-pink-200" />
-                      </span>
+
+                    <div className="mt-6 flex items-center gap-3">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-600 to-rose-400 flex items-center justify-center text-white shadow-md overflow-hidden">
+                        {featuredSalon.logo ? (
+                          <img src={featuredSalon.logo} alt={featuredSalon.salon_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Scissors className="w-8 h-8" />
+                        )}
+                      </div>
                       <div>
-                        <div className="text-sm font-bold">{featuredService?.service_name || 'No featured treatment yet'}</div>
-                        <div className="text-[11px] text-pink-100">{featuredService?.category || featuredService?.category_name || 'Choose from the catalog'}</div>
+                        <div className="text-xs font-black text-pink-700 uppercase tracking-[0.13em]">Signature Studio</div>
+                        <div className="text-lg font-serif font-black text-gray-900">{featuredSalon.salon_name}</div>
                       </div>
                     </div>
+
+                    <div className="mt-6 grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl bg-white p-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><MapPin className="w-4 h-4" /> {featuredSalon.city || 'Metro Studio'}</div>
+                        <div className="mt-2 text-xs text-gray-500 truncate">{featuredSalon.address?.split(',')[0] || 'Studio Address'}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {featuredSalon.review_count ? Number(featuredSalon.avg_rating).toFixed(1) : 'Not rated yet'}</div>
+                        <div className="mt-2 text-xs text-gray-500">{featuredSalon.review_count ? `${featuredSalon.review_count} reviews` : 'No reviews yet'}</div>
+                      </div>
+                    </div>
+
+                    {featuredService && (
+                      <div className="mt-4 rounded-2xl bg-pink-950 text-white p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase tracking-[0.12em]">Today’s Ritual</span>
+                          {featuredService.duration ? (
+                            <span className="text-[11px] font-bold bg-white/12 rounded-full px-2 py-1">
+                              {featuredService.duration} min
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-3 flex items-center gap-3">
+                          <span className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
+                            <Heart className="w-5 h-5 text-pink-200" />
+                          </span>
+                          <div>
+                            <div className="text-sm font-bold">{featuredService.service_name}</div>
+                            <div className="text-[11px] text-pink-100">{featuredService.category || featuredService.category_name || 'Signature Ritual'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-[1.4rem] bg-gradient-to-br from-rose-100/70 via-pink-50 to-purple-50 p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-white shadow-sm border border-pink-200 flex items-center justify-center mx-auto text-pink-600 mb-3">
+                      <Store className="w-7 h-7" />
+                    </div>
+                    <div className="text-[11px] font-black text-pink-700 uppercase tracking-[0.16em]">Studio Spotlight</div>
+                    <h3 className="mt-2 font-serif text-lg font-black text-gray-900">No Studios Registered Yet</h3>
+                    <p className="mt-2 text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
+                      Be the first verified nail salon or beauty studio to showcase your branches, treatments, and artists on Nail Glam Hub.
+                    </p>
+                    <div className="mt-5">
+                      <button
+                        type="button"
+                        onClick={onOpenRegisterSalon}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-pink-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-pink-800 transition shadow-sm cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        Register Your Studio
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -233,10 +258,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Trust cards */}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {[
-          { icon: <Sparkles className="w-5 h-5 text-pink-600" />, label: 'Beauty Experts', value: `${technicianCount}+` },
+          { icon: <Sparkles className="w-5 h-5 text-pink-600" />, label: 'Beauty Experts', value: technicianCount > 0 ? `${technicianCount}+` : '0' },
           { icon: <Store className="w-5 h-5 text-purple-700" />, label: 'Verified Stores', value: `${salons.length}` },
           { icon: <Calendar className="w-5 h-5 text-rose-600" />, label: 'Easy Booking', value: '24/7' },
-          { icon: <Heart className="w-5 h-5 text-pink-500" />, label: 'Beauty Matches', value: '1:1' },
+          { icon: <Heart className="w-5 h-5 text-pink-500" />, label: 'Beauty Matches', value: salons.length > 0 ? '1:1' : 'Ready' },
         ].map((item, idx) => (
           <div key={idx} className="rounded-3xl border border-pink-100 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
@@ -291,44 +316,61 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-          {featureSalons.map((salon) => (
-            <article key={salon.id} className="rounded-[1.5rem] border border-pink-100 bg-white p-4 shadow-sm hover:shadow-lg transition">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-10 h-10 rounded-2xl bg-pink-50 flex items-center justify-center">
-                    <Store className="w-5 h-5 text-pink-700" />
-                  </span>
-                  <div>
-                    <div className="text-sm font-black text-gray-900">{salon.salon_name}</div>
-                    <div className="text-[11px] text-gray-500">{salon.city || salon.province || 'Metro Studio'}</div>
+          {featureSalons.length > 0 ? (
+            featureSalons.map((salon) => (
+              <article key={salon.id} className="rounded-[1.5rem] border border-pink-100 bg-white p-4 shadow-sm hover:shadow-lg transition">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-10 h-10 rounded-2xl bg-pink-50 flex items-center justify-center">
+                      <Store className="w-5 h-5 text-pink-700" />
+                    </span>
+                    <div>
+                      <div className="text-sm font-black text-gray-900">{salon.salon_name}</div>
+                      <div className="text-[11px] text-gray-500">{salon.city || salon.province || 'Metro Studio'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-amber-500">
+                    <Star className="w-4 h-4 fill-amber-400" />
+                    <span className="text-[11px] font-black text-gray-700">{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-amber-500">
-                  <Star className="w-4 h-4 fill-amber-400" />
-                  <span className="text-[11px] font-black text-gray-700">{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
+
+                <div className="mt-4 text-[11px] text-gray-500 line-clamp-2">{salon.address}</div>
+
+                <div className="mt-4 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => onSelectSalon(salon)}
+                    className="text-[11px] font-black text-pink-700 hover:underline cursor-pointer"
+                  >
+                    Details
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBookSalon(salon)}
+                    className="rounded-2xl bg-pink-700 px-4 py-2 text-[11px] font-black text-white hover:bg-pink-800 transition cursor-pointer"
+                  >
+                    Book now
+                  </button>
                 </div>
-              </div>
-
-              <div className="mt-4 text-[11px] text-gray-500 line-clamp-2">{salon.address}</div>
-
-              <div className="mt-4 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => onSelectSalon(salon)}
-                  className="text-[11px] font-black text-pink-700 hover:underline cursor-pointer"
-                >
-                  Details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onBookSalon(salon)}
-                  className="rounded-2xl bg-pink-700 px-4 py-2 text-[11px] font-black text-white hover:bg-pink-800 transition cursor-pointer"
-                >
-                  Book now
-                </button>
-              </div>
-            </article>
-          ))}
+              </article>
+            ))
+          ) : (
+            <div className="col-span-full py-12 px-6 text-center rounded-2xl border border-dashed border-pink-200 bg-pink-50/40">
+              <Store className="w-10 h-10 text-pink-400 mx-auto mb-3" />
+              <h3 className="text-base font-bold text-gray-800">No studios listed yet</h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                No salons are currently listed. Register your studio to get accredited and listed on Nail Glam Hub.
+              </p>
+              <button
+                type="button"
+                onClick={onOpenRegisterSalon}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-pink-700 px-4 py-2 text-xs font-bold text-white hover:bg-pink-800 transition shadow-sm cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Register Your Studio
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

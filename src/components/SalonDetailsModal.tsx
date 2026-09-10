@@ -37,6 +37,9 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'services' | 'technicians' | 'reviews' | 'location' | 'about'>('services');
   const [loading, setLoading] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
   const [salonData, setSalonData] = useState<{
     services: Service[];
     technicians: Technician[];
@@ -66,138 +69,229 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
     load();
   }, [salon.id]);
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    if (scrollTop > 70 && !isScrolled) {
+      setIsScrolled(true);
+    } else if (scrollTop <= 70 && isScrolled) {
+      setIsScrolled(false);
+    }
+  };
+
+  const handleTabChange = (tab: 'services' | 'technicians' | 'reviews' | 'location' | 'about') => {
+    setActiveTab(tab);
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 140) {
+      scrollContainerRef.current.scrollTo({ top: 140, behavior: 'smooth' });
+    }
+  };
+
   const lat = salon.latitude || 14.5505;
   const lng = salon.longitude || 121.0509;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-pink-100">
-        {/* Header / Hero Banner */}
-        <div className="relative h-56 sm:h-72 bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 text-white shrink-0">
-          {salon.banner || salon.logo ? (
-            <img
-              src={salon.banner || salon.logo || undefined}
-              alt={salon.salon_name}
-              className="w-full h-full object-cover opacity-60"
-            />
-          ) : null}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-pink-100 relative">
+        {/* Floating Close button that stays easily accessible */}
+        <button
+          onClick={onClose}
+          className={`absolute top-3.5 right-3.5 z-40 w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
+            isScrolled
+              ? 'bg-white hover:bg-pink-50 text-gray-700 hover:text-pink-700 border border-pink-200/80 shadow-xs'
+              : 'bg-black/50 hover:bg-black/80 text-white backdrop-blur-xs'
+          }`}
+          aria-label="Close modal"
+          title="Close modal"
+        >
+          <X className="w-4.5 h-4.5" />
+        </button>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-colors cursor-pointer z-10"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        {/* Scrollable Container with collapsible hero and sticky navigation */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="overflow-y-auto flex-1 relative scroll-smooth"
+        >
+          {/* Collapsible Hero Banner */}
+          <div className="relative h-44 sm:h-56 bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 text-white overflow-hidden">
+            {salon.banner || salon.logo ? (
+              <img
+                src={salon.banner || salon.logo || undefined}
+                alt={salon.salon_name}
+                className="w-full h-full object-cover opacity-60 transition-transform duration-500 hover:scale-105"
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
 
-          {/* Salon Banner Info */}
-          <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 right-4 sm:right-6 flex items-end justify-between gap-4">
-            <div className="flex items-end gap-3 sm:gap-4">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-1 shadow-xl border-2 border-white shrink-0 overflow-hidden">
-                {salon.logo ? (
-                  <img
-                    src={salon.logo}
-                    alt={`${salon.salon_name} logo`}
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : null}
+            {/* Salon Banner Info */}
+            <div className="absolute bottom-3.5 left-4 sm:bottom-5 sm:left-6 right-4 sm:right-6 flex items-end justify-between gap-4">
+              <div className="flex items-end gap-3 sm:gap-4 min-w-0">
+                <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-2xl bg-white p-1 shadow-xl border-2 border-white shrink-0 overflow-hidden">
+                  {salon.logo ? (
+                    <img
+                      src={salon.logo}
+                      alt={`${salon.salon_name} logo`}
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-pink-100 flex items-center justify-center rounded-xl">
+                      <Sparkles className="w-6 h-6 text-pink-600" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 text-white">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg sm:text-2xl font-serif font-bold leading-tight truncate">
+                      {salon.salon_name}
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-pink-500/80 text-white shrink-0">
+                      {salon.category_name || 'Nail Spa'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 mt-1 text-xs sm:text-sm text-pink-100/90 flex-wrap">
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-bold">{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
+                      <span className="text-white/70">({salon.review_count || 0} reviews)</span>
+                    </div>
+                    <span>•</span>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <MapPin className="w-3.5 h-3.5 text-pink-300 shrink-0" />
+                      <span className="truncate max-w-[200px] sm:max-w-xs">{salon.address}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl sm:text-3xl font-serif font-bold text-white leading-tight">
-                    {salon.salon_name}
-                  </h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-pink-500/80 text-white">
-                    {salon.category_name || 'Nail Spa'}
-                  </span>
+
+              <button
+                onClick={() => onBookService(salon)}
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-semibold text-xs shadow-lg shadow-pink-500/30 transition-all cursor-pointer shrink-0"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Book Appointment</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sticky Header: Profile small image, Salon name, Book button, and Navigation Tabs */}
+          <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-pink-100 shadow-xs transition-all">
+            {/* Compact Store Bar (Becomes visible and sticky as hero collapses) */}
+            <div
+              className={`transition-all duration-300 px-4 sm:px-6 flex items-center justify-between gap-3 border-b border-pink-100/70 overflow-hidden ${
+                isScrolled
+                  ? 'max-h-16 py-2.5 opacity-100'
+                  : 'max-h-0 py-0 opacity-0 border-transparent pointer-events-none'
+              }`}
+            >
+              {/* Profile small image + Salon name */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-white p-0.5 shadow-xs border border-pink-200 shrink-0 overflow-hidden">
+                  {salon.logo ? (
+                    <img
+                      src={salon.logo}
+                      alt={salon.salon_name}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-pink-100 flex items-center justify-center rounded-lg">
+                      <Sparkles className="w-4 h-4 text-pink-600" />
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 mt-1.5 text-xs sm:text-sm text-pink-100/90">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span className="font-bold">{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'Not rated'}</span>
-                    <span className="text-white/70">({salon.review_count || 0} verified reviews)</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-serif font-bold text-gray-900 truncate">
+                      {salon.salon_name}
+                    </h3>
+                    <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700 shrink-0">
+                      {salon.category_name || 'Nail Spa'}
+                    </span>
                   </div>
-                  <span>•</span>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-pink-300" />
-                    <span className="truncate max-w-xs">{salon.address}</span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                    <div className="flex items-center gap-0.5 text-amber-600 font-semibold">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      <span>{salon.review_count ? Number(salon.avg_rating).toFixed(1) : 'New'}</span>
+                    </div>
+                    <span className="text-gray-300">•</span>
+                    <span className="truncate max-w-[150px] sm:max-w-xs">{salon.city || salon.address}</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Book Appointment button (with right padding so it leaves space for the close button) */}
+              <div className="flex items-center gap-2 shrink-0 pr-12">
+                <button
+                  onClick={() => onBookService(salon)}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-semibold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Book Appointment</span>
+                  <span className="sm:hidden">Book</span>
+                </button>
               </div>
             </div>
 
-            <button
-              onClick={() => onBookService(salon)}
-              className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-semibold text-sm shadow-lg shadow-pink-500/30 transition-all cursor-pointer shrink-0"
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Book Appointment</span>
-            </button>
+            {/* Modal Navigation Tabs */}
+            <div className="flex px-3 sm:px-6 bg-pink-50/40 overflow-x-auto no-scrollbar scroll-smooth">
+              <button
+                onClick={() => handleTabChange('services')}
+                className={`py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'services'
+                    ? 'border-pink-600 text-pink-700 font-bold'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <Scissors className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Services &amp; Treatments ({salonData.services.length})</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('technicians')}
+                className={`py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'technicians'
+                    ? 'border-pink-600 text-pink-700 font-bold'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Staff &amp; Specialists ({salonData.technicians.length})</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('reviews')}
+                className={`py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'reviews'
+                    ? 'border-pink-600 text-pink-700 font-bold'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Reviews ({salonData.reviews.length})</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('location')}
+                className={`py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'location'
+                    ? 'border-pink-600 text-pink-700 font-bold'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-600" />
+                <span>Location &amp; Map</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('about')}
+                className={`py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'about'
+                    ? 'border-pink-600 text-pink-700 font-bold'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Hours &amp; Contact</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Modal Navigation Tabs */}
-        <div className="flex border-b border-pink-100 px-4 sm:px-6 bg-pink-50/40 shrink-0 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('services')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'services'
-                ? 'border-pink-600 text-pink-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <Scissors className="w-4 h-4" />
-            <span>Services &amp; Treatments ({salonData.services.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('technicians')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'technicians'
-                ? 'border-pink-600 text-pink-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Staff & Specialists ({salonData.technicians.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('reviews')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'reviews'
-                ? 'border-pink-600 text-pink-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>Reviews ({salonData.reviews.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('location')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'location'
-                ? 'border-pink-600 text-pink-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <MapPin className="w-4 h-4 text-pink-600" />
-            <span>Location & Map</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('about')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'about'
-                ? 'border-pink-600 text-pink-700'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Hours & Contact</span>
-          </button>
-        </div>
-
-        {/* Tab Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white">
+          {/* Tab Content Body */}
+          <div className="p-4 sm:p-6 bg-white min-h-[380px]">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin" />
@@ -553,6 +647,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
             </>
           )}
         </div>
+      </div>
 
         {/* Modal Bottom CTA */}
         <div className="p-4 bg-pink-50 border-t border-pink-100 flex items-center justify-between gap-3 shrink-0">

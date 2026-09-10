@@ -129,7 +129,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               <Store className="w-4 h-4 text-purple-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
               <p className="text-xs font-bold text-gray-900">Salon Owner</p>
-              <p className="text-[9px] text-gray-400">Elena</p>
+              <p className="text-[9px] text-gray-400">Camille</p>
             </button>
             <button
               onClick={() => handleDemoLogin('admin')}

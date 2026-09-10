@@ -1,7 +1,9 @@
 {
   "name": "Nail Glam Hub",
   "description": "A beauty and nail salon booking portal with customer discovery, Pinterest-style inspiration, salon dashboards, and online appointment management.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "geolocation"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

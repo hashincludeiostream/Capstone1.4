@@ -163,6 +163,14 @@ export const ReelsView: React.FC<ReelsViewProps> = ({
           <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
           <p className="text-sm text-gray-500">Loading nail reels...</p>
         </div>
+      ) : filteredReels.length === 0 ? (
+        <div className="py-16 px-6 text-center rounded-3xl border border-dashed border-pink-200 bg-white shadow-xs">
+          <Sparkles className="w-10 h-10 text-pink-400 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-gray-800">No nail reels posted yet</h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+            Video transformations and trending nail reels will appear here once published by verified studios.
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredReels.map((reel) => (
