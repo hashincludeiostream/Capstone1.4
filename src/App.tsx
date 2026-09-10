@@ -262,7 +262,7 @@ const AppContent: React.FC = () => {
 
       // Real-time Firestore sync for customer's live appointments
       const unsubscribe = subscribeToAppointments({ customer_id: currentUser.id }, (liveAppts) => {
-        if (liveAppts && liveAppts.length > 0) {
+        if (liveAppts) {
           setCustomerAppointments(liveAppts);
         }
       });
@@ -1396,11 +1396,16 @@ const AppContent: React.FC = () => {
                     showToast('Signed out successfully');
                   }}
                   onNavigateToDashboard={() => setActiveTab('admin-dashboard')}
+                  onNavigateTab={(tab) => setActiveTab(tab)}
                 />
               ) : (
                 <UserProfile
                   currentUser={currentUser}
                   salons={salons}
+                  customerAppointments={customerAppointments}
+                  customerOrders={customerOrders}
+                  favorites={favorites}
+                  onToggleFavorite={handleToggleFavorite}
                   onUpdateUser={(userData) => setCurrentUser({ ...currentUser, ...userData })}
                   onLogout={() => {
                     setCurrentUser(null);
@@ -1410,6 +1415,9 @@ const AppContent: React.FC = () => {
                     showToast('Signed out successfully');
                   }}
                   onNavigateToDashboard={() => setActiveTab('customer-dashboard')}
+                  onNavigateTab={(tab) => setActiveTab(tab)}
+                  onOpenBooking={(salon) => handleOpenBookingWithSalon(salon || salons[0])}
+                  onSelectSalon={(salon) => setSelectedSalonForDetails(salon)}
                 />
               )}
             </>

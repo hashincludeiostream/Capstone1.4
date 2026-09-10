@@ -16,6 +16,8 @@ import {
   Store,
   Info,
   Lock,
+  Package,
+  XCircle,
 } from 'lucide-react';
 import { Product, Salon, User } from '../../types';
 
@@ -55,11 +57,14 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSalonId, setSelectedSalonId] = useState<number | 'all'>('all');
-  const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating' | 'stock'>('featured');
+  const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating' | 'stock' | 'stock-asc'>('featured');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [addedAnimationId, setAddedAnimationId] = useState<number | null>(null);
 
   const isCustomer = currentUser?.user_type === 'customer';
+
+  const inStockCount = useMemo(() => products.filter((p) => p.is_active !== false && p.stock_quantity > 0).length, [products]);
+  const totalStockUnits = useMemo(() => products.filter((p) => p.is_active !== false).reduce((sum, p) => sum + (p.stock_quantity || 0), 0), [products]);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -103,6 +108,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
         if (sortBy === 'price-desc') return b.price - a.price;
         if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
         if (sortBy === 'stock') return b.stock_quantity - a.stock_quantity;
+        if (sortBy === 'stock-asc') return a.stock_quantity - b.stock_quantity;
         return 0; // featured default
       });
   }, [products, selectedCategory, selectedSalonId, inStockOnly, searchQuery, sortBy]);
@@ -231,10 +237,11 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 className="bg-transparent border-none font-medium text-stone-700 focus:outline-none cursor-pointer"
               >
                 <option value="featured">Featured</option>
+                <option value="stock">Highest Available Stock</option>
+                <option value="stock-asc">Lowest Stock (Restock Soon)</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
                 <option value="rating">Top Rated</option>
-                <option value="stock">Highest Stock</option>
               </select>
             </div>
 
@@ -272,15 +279,22 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
             ))}
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer select-none self-end sm:self-auto shrink-0">
-            <input
-              type="checkbox"
-              checked={inStockOnly}
-              onChange={(e) => setInStockOnly(e.target.checked)}
-              className="rounded border-stone-300 text-pink-600 focus:ring-pink-500 cursor-pointer"
-            />
-            <span>In-stock only</span>
-          </label>
+          <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
+            <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-800 text-[11px] font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{totalStockUnits} total units in inventory</span>
+            </span>
+
+            <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={inStockOnly}
+                onChange={(e) => setInStockOnly(e.target.checked)}
+                className="rounded border-stone-300 text-pink-600 focus:ring-pink-500 cursor-pointer"
+              />
+              <span>In-stock only ({inStockCount})</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -383,6 +397,49 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     </div>
                   </div>
 
+                  {/* Available Stock Indicator */}
+                  <div className="pt-2 border-t border-stone-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Package className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <span className="text-stone-500 font-medium truncate">Available Stock:</span>
+                      </div>
+                      {isOutOfStock ? (
+                        <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md text-[11px] shrink-0">
+                          0 units (Sold Out)
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1 shrink-0">
+                          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                          Only {product.stock_quantity} left
+                        </span>
+                      ) : (
+                        <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1 shrink-0">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                          {product.stock_quantity} in stock
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stock Availability Level Bar */}
+                    <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          isOutOfStock
+                            ? 'bg-stone-300 w-0'
+                            : isLowStock
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{
+                          width: isOutOfStock
+                            ? '0%'
+                            : `${Math.min(100, Math.max(15, (product.stock_quantity / Math.max(15, (product.low_stock_threshold || 5) * 3)) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
                   {/* Rating & In-Store Price */}
                   <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
                     <div>
@@ -412,7 +469,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                           ? 'bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200'
                           : 'bg-pink-600 hover:bg-pink-700 text-white shadow-2xs active:scale-98'
                       }`}
-                      title={!isCustomer ? 'Sign in to your customer account to add to cart' : isOutOfStock ? 'Sold Out' : 'Quick Add to cart'}
+                      title={!isCustomer ? 'Sign in to your customer account to add to cart' : isOutOfStock ? 'Sold Out' : `Quick Add 1 of ${product.stock_quantity} available units to cart`}
                     >
                       {isJustAdded ? (
                         <>

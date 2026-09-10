@@ -246,7 +246,11 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
           return true;
         if (id.startsWith('cust-appt-') && activeCustomerBookings.some((a) => id === `cust-appt-${a.id}`))
           return true;
-        if (id.startsWith('owner-appt-') && ownerPendingAppointments.some((a) => id === `owner-appt-${a.id}`))
+        if (
+          id.startsWith('owner-appt-') &&
+          (ownerPendingAppointments.some((a) => id === `owner-appt-${a.id}`) ||
+            ownerConfirmedAppointments.some((a) => id === `owner-appt-${a.id}`))
+        )
           return true;
         if (id.startsWith('admin-salon-') && adminPendingSalons.some((s) => id === `admin-salon-${s.id}`))
           return true;
@@ -709,12 +713,56 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                       Appointments &amp; Bookings
                     </h4>
                   </div>
-                  {bookingsCount > 0 && (
+                  {currentUser?.user_type === 'customer' && activeCustomerBookings.length > 0 && (
                     <span className="text-[10px] font-semibold text-purple-700">
-                      {bookingsCount} scheduled
+                      {activeCustomerBookings.length} {activeCustomerBookings.length === 1 ? 'appointment' : 'appointments'} scheduled
                     </span>
                   )}
+                  {currentUser?.user_type === 'salon_owner' && (
+                    <>
+                      {ownerPendingAppointments.length > 0 && ownerConfirmedAppointments.length > 0 ? (
+                        <span className="text-[10px] font-semibold text-purple-700">
+                          {ownerPendingAppointments.length} pending • {ownerConfirmedAppointments.length} confirmed
+                        </span>
+                      ) : ownerPendingAppointments.length > 0 ? (
+                        <span className="text-[10px] font-semibold text-amber-700">
+                          {ownerPendingAppointments.length} pending approval
+                        </span>
+                      ) : ownerConfirmedAppointments.length > 0 ? (
+                        <span className="text-[10px] font-semibold text-purple-700">
+                          {ownerConfirmedAppointments.length} scheduled
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </div>
+
+                {/* Guest State */}
+                {!currentUser && (
+                  <div className="p-3.5 rounded-2xl border border-dashed border-purple-200 bg-purple-50/40 text-center">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto mb-2 shadow-2xs">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <p className="text-xs font-bold text-gray-900">Track Your Salon Bookings</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 max-w-xs mx-auto">
+                      Sign in to your customer account to view your scheduled salon appointments and booking updates.
+                    </p>
+                    <div className="mt-3 flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleItemNavigation('login-customer')}
+                        className="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 px-3.5 py-1.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        onClick={() => handleItemNavigation('salons')}
+                        className="text-xs font-semibold text-purple-700 hover:text-purple-900 px-3 py-1.5 rounded-xl hover:bg-purple-100/60 transition-colors cursor-pointer"
+                      >
+                        Explore Salons
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Customer Bookings */}
                 {currentUser?.user_type === 'customer' && (
@@ -798,31 +846,111 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                   </>
                 )}
 
-                {/* Salon Owner Appointment Requests */}
+                {/* Salon Owner Appointments: Pending Requests & Confirmed Bookings */}
                 {currentUser?.user_type === 'salon_owner' && (
-                  <div className="space-y-1.5">
-                    {ownerPendingAppointments.length > 0 ? (
-                      ownerPendingAppointments.slice(0, 3).map((appt) => (
-                        <div
-                          key={appt.id}
-                          onClick={() => handleItemNavigation('owner-appointments', `owner-appointment-${appt.id}`, `owner-appt-${appt.id}`)}
-                          className="p-2.5 rounded-xl border border-amber-300 bg-amber-50/60 hover:bg-amber-100/60 transition-all cursor-pointer"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-amber-950">
-                              Booking Request: {appt.customer_name || 'Client'}
-                            </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white animate-pulse">
-                              Pending Action
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-amber-900 mt-0.5">
-                            {appt.service_name} • {appt.appointment_date} at {appt.appointment_time}
-                          </p>
+                  <div className="space-y-2">
+                    {/* Pending Requests Needing Approval */}
+                    {ownerPendingAppointments.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>Pending Booking Requests ({ownerPendingAppointments.length})</span>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-gray-500 italic p-2 bg-gray-50 rounded-lg">
+                        {ownerPendingAppointments.slice(0, 3).map((appt) => {
+                          const isRead = readItemIds.includes(`owner-appt-${appt.id}`);
+                          return (
+                            <div
+                              key={appt.id}
+                              onClick={() =>
+                                handleItemNavigation(
+                                  'owner-appointments',
+                                  `owner-appointment-${appt.id}`,
+                                  `owner-appt-${appt.id}`
+                                )
+                              }
+                              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                                isRead
+                                  ? 'border-amber-200 bg-amber-50/40 hover:bg-amber-100/50'
+                                  : 'border-amber-300 bg-amber-50/80 hover:bg-amber-100/70 shadow-2xs'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-amber-950">
+                                  Booking Request: {appt.customer_name || 'Client'}
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white animate-pulse">
+                                  Pending Action
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-amber-900 mt-0.5 font-medium">
+                                {appt.service_name} {appt.salon_name ? `• ${appt.salon_name}` : ''}
+                              </p>
+                              <div className="mt-1 flex items-center justify-between text-[11px] text-amber-800/90 pt-1 border-t border-amber-200/50">
+                                <span>{appt.appointment_date} at {appt.appointment_time}</span>
+                                <span className="font-semibold text-amber-900 flex items-center gap-0.5 hover:underline">
+                                  Review <ChevronRight className="w-3 h-3" />
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Upcoming Confirmed Bookings */}
+                    {ownerConfirmedAppointments.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-800">
+                          <Calendar className="w-3 h-3 text-purple-600" />
+                          <span>Confirmed Schedule ({ownerConfirmedAppointments.length})</span>
+                        </div>
+                        {ownerConfirmedAppointments.slice(0, 3).map((appt) => {
+                          const isRead = readItemIds.includes(`owner-appt-${appt.id}`);
+                          return (
+                            <div
+                              key={appt.id}
+                              onClick={() =>
+                                handleItemNavigation(
+                                  'owner-appointments',
+                                  `owner-appointment-${appt.id}`,
+                                  `owner-appt-${appt.id}`
+                                )
+                              }
+                              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                                isRead
+                                  ? 'border-purple-200 bg-white hover:bg-purple-50/40'
+                                  : 'border-purple-200 bg-purple-50/50 hover:bg-purple-100/60 shadow-2xs'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                                  <span className="text-xs font-bold text-purple-950">
+                                    {appt.customer_name || 'Client'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                  Confirmed
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-purple-900 mt-0.5">
+                                {appt.service_name} {appt.salon_name ? `• ${appt.salon_name}` : ''}
+                              </p>
+                              <div className="mt-1 flex items-center justify-between text-[11px] text-purple-700/80 pt-1 border-t border-purple-100">
+                                <span>{appt.appointment_date} at {appt.appointment_time}</span>
+                                <span className="font-semibold text-purple-800 flex items-center gap-0.5 hover:underline">
+                                  View <ChevronRight className="w-3 h-3" />
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Empty state when neither pending nor confirmed */}
+                    {ownerPendingAppointments.length === 0 && ownerConfirmedAppointments.length === 0 && (
+                      <p className="text-xs text-gray-500 italic p-2.5 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
                         All appointment requests confirmed and up to date.
                       </p>
                     )}

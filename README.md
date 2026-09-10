@@ -49,7 +49,7 @@ A modern mobile-web responsive nail salon portal built with React, TypeScript, N
 
 1. **Clone or download the project**
    ```bash
-   cd c:\xampp\htdocs\capstone_1.4
+   cd nail-glam-hub
    ```
 
 2. **Install dependencies**
@@ -111,7 +111,7 @@ npm start
 ## File Structure
 
 ```
-capstone_1.4/
+nail-glam-hub/
 ├── src/                    # React frontend source
 │   ├── components/         # React components
 │   ├── config/            # Configuration files

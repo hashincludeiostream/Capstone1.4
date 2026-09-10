@@ -149,7 +149,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
     try {
       const res = await createAppointment({
-        customer_id: currentUser?.id || 3,
+        customer_id: currentUser?.id || 0,
         customer_name: fullName || 'Guest Client',
         customer_phone: phone || '',
         customer_email: email || '',

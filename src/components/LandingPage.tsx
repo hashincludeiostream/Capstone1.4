@@ -14,6 +14,8 @@ import {
   Plus,
   Lock,
   Eye,
+  Package,
+  AlertTriangle,
 } from 'lucide-react';
 import { Salon, BusinessCategory, User, Service, Technician, Product } from '../types';
 import { fetchServices, fetchTechnicians } from '../lib/api';
@@ -430,6 +432,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {products.slice(0, 4).map((product) => {
               const salon = salons.find((s) => s.id === product.salon_id);
               const isOutOfStock = product.stock_quantity <= 0;
+              const isLowStock = !isOutOfStock && product.stock_quantity <= (product.low_stock_threshold || 5);
               const isJustAdded = addedProductId === product.id;
               const isCustomer = currentUser?.user_type === 'customer';
 
@@ -451,12 +454,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         {product.category}
                       </span>
                       {isOutOfStock ? (
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
-                          Sold Out
+                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-stone-900/90 text-stone-200 text-[10px] font-bold">
+                          Out of Stock
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          Only {product.stock_quantity} left
                         </span>
                       ) : (
                         <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
-                          In Stock
+                          In Stock ({product.stock_quantity})
                         </span>
                       )}
                     </div>
@@ -476,6 +484,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         <span>{product.rating || '4.9'}</span>
                       </div>
                     </div>
+
+                    {/* Available Stock Indicator */}
+                    <div className="mt-2.5 pt-2 border-t border-stone-100 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-stone-500 font-medium">Available Stock:</span>
+                        {isOutOfStock ? (
+                          <span className="font-bold text-red-600">0 units</span>
+                        ) : isLowStock ? (
+                          <span className="font-bold text-amber-700">Only {product.stock_quantity} left!</span>
+                        ) : (
+                          <span className="font-bold text-emerald-700">{product.stock_quantity} units</span>
+                        )}
+                      </div>
+                      <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            isOutOfStock
+                              ? 'bg-stone-300 w-0'
+                              : isLowStock
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{
+                            width: isOutOfStock
+                              ? '0%'
+                              : `${Math.min(100, Math.max(15, (product.stock_quantity / Math.max(15, (product.low_stock_threshold || 5) * 3)) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center gap-2">
@@ -492,7 +530,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           ? 'bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200'
                           : 'bg-pink-600 hover:bg-pink-700 text-white shadow-2xs active:scale-98'
                       }`}
-                      title={!isCustomer ? 'Customer sign in required' : isOutOfStock ? 'Sold Out' : 'Quick Add to reservation bag'}
+                      title={!isCustomer ? 'Customer sign in required' : isOutOfStock ? 'Sold Out' : `Quick Add 1 of ${product.stock_quantity} available units`}
                     >
                       {isJustAdded ? (
                         <>

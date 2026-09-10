@@ -1,8 +1,8 @@
 import firebaseConfig from '../firebase-applet-config.json';
 
-const PROJECT_ID = firebaseConfig.projectId;
-const DATABASE_ID = firebaseConfig.firestoreDatabaseId || '(default)';
-const API_KEY = firebaseConfig.apiKey;
+const PROJECT_ID = firebaseConfig?.projectId || 'gen-lang-client-0593264091';
+const DATABASE_ID = firebaseConfig?.firestoreDatabaseId || 'ai-studio-capstone14-f7575340-b666-4d9b-b5f4-cffdf3c32bbc';
+const API_KEY = firebaseConfig?.apiKey || 'AIzaSyDy-J8AsXi4611lIgNnsGk41juwfF8le50';
 
 async function countCollection(colName: string): Promise<number> {
   const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents:runQuery?key=${API_KEY}`;

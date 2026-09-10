@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   ShoppingBag,
@@ -113,9 +113,46 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
     }
   };
 
+  // Keyboard Escape key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Lock body scrolling while modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-stone-200 my-8 relative">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex min-h-full items-start sm:items-center justify-center p-3 sm:p-4 text-center sm:py-8 animate-in fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Invisible backdrop click area */}
+      <div className="fixed inset-0 -z-10 cursor-pointer" onClick={onClose} aria-hidden="true" />
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative text-left"
+      >
         {/* Modal Header */}
         <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/50">
           <div className="flex items-center gap-2">
@@ -369,6 +406,50 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
                   placeholder="e.g. Please pack together with my 2pm manicure session"
                   className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 bg-stone-50/50"
                 />
+              </div>
+            </div>
+
+            {/* Itemized Stock & Reservation Breakdown */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                  Items to Reserve ({cartItems.length})
+                </h3>
+                <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                  Salon Stock Confirmed
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {cartItems.map((item) => (
+                  <div
+                    key={item.product.id}
+                    className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/70 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={item.product.image_url || 'https://images.unsplash.com/photo-1608248597359-0a62377c08fe?w=600&auto=format&fit=crop&q=80'}
+                        alt={item.product.name}
+                        referrerPolicy="no-referrer"
+                        className="w-9 h-9 rounded-lg object-cover bg-stone-200 shrink-0 border border-stone-200"
+                      />
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-stone-900 truncate text-xs">{item.product.name}</h4>
+                        <div className="flex items-center gap-2 text-[10px] text-stone-500">
+                          <span>Reserve: <strong className="text-stone-800">{item.quantity}</strong></span>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-semibold">Available stock: {item.product.stock_quantity} units</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="font-bold text-stone-900">
+                        ₱{(item.product.price * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

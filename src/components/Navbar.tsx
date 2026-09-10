@@ -21,6 +21,7 @@ import {
   MapPin,
   ShoppingBag,
   Package,
+  Compass,
 } from 'lucide-react';
 import {
   User,
@@ -239,30 +240,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
 
                     <div className="py-1">
-                      <button
-                        onClick={() => {
-                          // Settings functionality to be implemented
-                          setUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-pink-600" />
-                        <span>Settings</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setActiveTab('profile');
-                          setUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <UserIcon className="w-4 h-4 text-pink-600" />
-                        <span>My Profile</span>
-                      </button>
-
                       {currentUser.user_type === 'customer' && (
                         <>
+                          <button
+                            onClick={() => {
+                              setActiveTab('explore');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm font-semibold text-pink-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <Compass className="w-4 h-4 text-pink-600" />
+                            <span>Explore Salons</span>
+                          </button>
+
                           <button
                             onClick={() => {
                               setActiveTab('customer-dashboard');
@@ -273,6 +263,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <Calendar className="w-4 h-4 text-pink-600" />
                             <span>My Bookings</span>
                           </button>
+
+                          <button
+                            onClick={() => {
+                              setActiveTab('favorites');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <Heart className="w-4 h-4 text-rose-500" />
+                            <span>Favorite Salons</span>
+                          </button>
+
                           <button
                             onClick={() => {
                               setActiveTab('customer-orders');
@@ -283,6 +285,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <ShoppingBag className="w-4 h-4 text-emerald-600" />
                             <span>Reserved Orders</span>
                           </button>
+
                           <button
                             onClick={() => {
                               setActiveTab('products');
@@ -292,6 +295,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                           >
                             <Package className="w-4 h-4 text-pink-600" />
                             <span>Shop Products</span>
+                          </button>
+
+                          <div className="border-t border-gray-100 my-1"></div>
+
+                          <button
+                            onClick={() => {
+                              setActiveTab('profile');
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <UserIcon className="w-4 h-4 text-pink-600" />
+                            <span>My Profile & Settings</span>
                           </button>
                         </>
                       )}

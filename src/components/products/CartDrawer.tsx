@@ -175,6 +175,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                   </span>
                                 )}
                               </div>
+
+                              {/* Available Stock Indicator */}
+                              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-stone-200/70 text-stone-700 font-medium inline-flex items-center gap-1">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${item.product.stock_quantity <= 3 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                                  Available: <strong className="text-stone-900">{item.product.stock_quantity} in stock</strong>
+                                </span>
+                                {atMaxStock && (
+                                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                    Max stock reached
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             {/* Quantity Controls & Remove */}

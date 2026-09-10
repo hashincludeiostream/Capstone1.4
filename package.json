@@ -8,6 +8,7 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "lint": "tsc --noEmit",
     "seed:firebase": "tsx scripts/seedToFirestore.ts",
+    "verify:firebase": "tsx scripts/verifyFirestore.ts",
     "start": "node dist/server.cjs"
   },
   "dependencies": {

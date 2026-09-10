@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Building2,
@@ -15,6 +15,8 @@ import {
   Minus,
   Sparkles,
   Lock,
+  XCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { Product, User } from '../../types';
 
@@ -83,13 +85,54 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     onDirectCheckout(product, quantity);
   };
 
+  // Keyboard Escape key handler to ensure modal can always be closed
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Lock body scrolling while product detail modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-200 my-8 relative">
-        {/* Close Button */}
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex min-h-full items-start sm:items-center justify-center p-3 sm:p-4 text-center sm:py-8 animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="product-modal-title"
+    >
+      {/* Invisible backdrop click area */}
+      <div className="fixed inset-0 -z-10 cursor-pointer" onClick={onClose} aria-hidden="true" />
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative text-left"
+      >
+        {/* Prominent High-Contrast Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-stone-700 flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+          aria-label="Close product details (Escape)"
+          title="Close (Esc)"
+          className="absolute top-3.5 right-3.5 z-30 w-10 h-10 rounded-full bg-white/95 hover:bg-white text-stone-700 hover:text-stone-950 border border-stone-200/90 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-105 active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
@@ -149,7 +192,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
 
               {/* Product Title */}
-              <h2 className="text-xl font-bold text-stone-900 font-serif leading-snug">
+              <h2 id="product-modal-title" className="text-xl font-bold text-stone-900 font-serif leading-snug">
                 {product.name}
               </h2>
 
@@ -167,11 +210,88 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Price */}
-              <div className="pt-2">
-                <span className="text-xs text-stone-400 block font-sans">Physical Store Settlement Price</span>
-                <div className="text-2xl font-black text-stone-900">
-                  ₱{product.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              {/* Price & Available Stock Card */}
+              <div className="pt-2 space-y-3">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <span className="text-xs text-stone-400 block font-sans">Physical Store Settlement Price</span>
+                    <div className="text-2xl font-black text-stone-900">
+                      ₱{product.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 block">
+                      Salon Inventory
+                    </span>
+                    <span className={`text-sm font-black inline-flex items-center gap-1 ${
+                      isOutOfStock
+                        ? 'text-red-600'
+                        : isLowStock
+                        ? 'text-amber-700'
+                        : 'text-emerald-700'
+                    }`}>
+                      {isOutOfStock ? (
+                        <>
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>0 units</span>
+                        </>
+                      ) : isLowStock ? (
+                        <>
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                          <span>{product.stock_quantity} left</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{product.stock_quantity} available</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Available Stock Box */}
+                <div className={`p-3 rounded-2xl border flex flex-col gap-2 ${
+                  isOutOfStock
+                    ? 'bg-red-50/60 border-red-200 text-red-900'
+                    : isLowStock
+                    ? 'bg-amber-50/80 border-amber-200 text-amber-900'
+                    : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                }`}>
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 shrink-0" />
+                      <span className="font-bold">
+                        {isOutOfStock
+                          ? 'Sold Out at this Location'
+                          : isLowStock
+                          ? `Low Stock: Only ${product.stock_quantity} unit${product.stock_quantity !== 1 ? 's' : ''} remaining!`
+                          : `Available Stock: ${product.stock_quantity} unit${product.stock_quantity !== 1 ? 's' : ''} in store`}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold opacity-80">
+                      {isOutOfStock ? '0 in stock' : `${product.stock_quantity} in salon stock`}
+                    </span>
+                  </div>
+
+                  {/* Visual Inventory Bar */}
+                  <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isOutOfStock
+                          ? 'bg-red-500 w-0'
+                          : isLowStock
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-600'
+                      }`}
+                      style={{
+                        width: isOutOfStock
+                          ? '0%'
+                          : `${Math.min(100, Math.max(12, (product.stock_quantity / Math.max(15, (product.low_stock_threshold || 5) * 3)) * 100))}%`,
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -195,32 +315,61 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Quantity Selector & Action Buttons */}
             <div className="space-y-3 pt-3 border-t border-stone-100">
               {!isOutOfStock && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-stone-700">Quantity:</span>
-                  <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden bg-stone-50">
-                    <button
-                      onClick={handleDecrement}
-                      disabled={quantity <= 1}
-                      className="p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="px-4 py-1 text-xs font-bold text-stone-900 min-w-[2.5rem] text-center">
-                      {quantity}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-stone-700">Quantity to Reserve:</span>
+                    <span className="text-[11px] text-stone-500 font-medium">
+                      (Max {product.stock_quantity} available)
                     </span>
-                    <button
-                      onClick={handleIncrement}
-                      disabled={quantity >= product.stock_quantity}
-                      className="p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden bg-stone-50">
+                      <button
+                        onClick={handleDecrement}
+                        disabled={quantity <= 1}
+                        className="p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
+                        title="Decrease quantity"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="px-4 py-1 text-xs font-bold text-stone-900 min-w-[2.5rem] text-center">
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={handleIncrement}
+                        disabled={quantity >= product.stock_quantity}
+                        className="p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
+                        title={quantity >= product.stock_quantity ? `Reached all ${product.stock_quantity} units available` : 'Increase quantity'}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {quantity >= product.stock_quantity && (
+                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                        <span>All {product.stock_quantity} available units selected</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-1">
                 <button
+                  type="button"
+                  onClick={onClose}
+                  className="py-3 px-3.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
+                  title="Close product details"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Back</span>
+                  <span className="sm:hidden">Close</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleAdd}
                   disabled={isOutOfStock}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
