@@ -11,6 +11,8 @@ import {
   Plus,
   MessageSquare,
   Sparkles,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { Appointment, Salon, User } from '../types';
 import { fetchAppointments } from '../lib/api';
@@ -38,6 +40,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (targetAppointmentId) {
@@ -257,6 +260,24 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                           Note: "{appt.notes}"
                         </p>
                       )}
+
+                      {appt.design_image && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage(appt.design_image || null)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-pink-50 hover:bg-pink-100/80 border border-pink-200 text-[11px] font-semibold text-pink-800 cursor-pointer transition-colors group"
+                            title="Click to view full image"
+                          >
+                            <img
+                              src={appt.design_image}
+                              alt="Design Reference"
+                              className="w-5 h-5 rounded object-cover border border-pink-300"
+                            />
+                            <span>View Design Inspo</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -284,6 +305,40 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Lightbox Modal for Inspiration Photo */}
+        {previewImage && (
+          <div
+            id="customer-inspo-lightbox-modal"
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setPreviewImage(null)}
+          >
+            <div
+              className="relative max-w-lg w-full bg-white rounded-2xl p-4 shadow-2xl border border-pink-200 animate-in fade-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-pink-100">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-pink-600" />
+                  <h4 className="text-sm font-bold text-gray-900">Design Inspiration Reference</h4>
+                </div>
+                <button
+                  onClick={() => setPreviewImage(null)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center max-h-[70vh]">
+                <img
+                  src={previewImage}
+                  alt="Full Inspiration Reference"
+                  className="w-full h-auto max-h-[68vh] object-contain"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>

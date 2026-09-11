@@ -105,6 +105,7 @@
         "appointment_time": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
         "notes": { "type": "string" },
+        "design_image": { "type": "string", "description": "Customer uploaded inspiration or design reference photo" },
         "created_at": { "type": "string" }
       },
       "required": ["customer_id", "salon_id", "service_id", "appointment_date", "appointment_time"]

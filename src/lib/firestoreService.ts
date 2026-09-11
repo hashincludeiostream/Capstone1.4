@@ -221,6 +221,7 @@ export async function createFirestoreAppointment(data: Partial<Appointment>): Pr
     appointment_time: data.appointment_time || '10:00 AM',
     status: (data.status as AppointmentStatus) || 'pending',
     notes: data.notes || '',
+    design_image: data.design_image || '',
     created_at: new Date().toISOString(),
   };
 

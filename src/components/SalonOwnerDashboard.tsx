@@ -26,6 +26,8 @@ import {
   RefreshCw,
   Package,
   AlertTriangle,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
@@ -106,6 +108,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory'>(initialTab);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [previewInspoImage, setPreviewInspoImage] = useState<{ url: string; clientName: string } | null>(null);
   const dashboardLoadId = React.useRef(0);
 
   // Sync initialTab when navigation changes from navbar or sidebar
@@ -929,6 +932,27 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                             "{appt.notes}"
                           </p>
                         )}
+
+                        {appt.design_image && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewInspoImage({ url: appt.design_image!, clientName: appt.customer_name || 'Client' })}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-xs font-semibold text-purple-900 cursor-pointer transition-colors shadow-2xs"
+                              title="Click to view reference photo uploaded by client"
+                            >
+                              <img
+                                src={appt.design_image}
+                                alt="Inspo Thumbnail"
+                                className="w-6 h-6 rounded-md object-cover border border-purple-300 shrink-0"
+                              />
+                              <span className="flex items-center gap-1">
+                                <ImageIcon className="w-3.5 h-3.5 text-purple-700" />
+                                View Client Design Inspo Photo
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Status Action Buttons */}
@@ -1442,6 +1466,42 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal for Client Inspiration Photo */}
+      {previewInspoImage && (
+        <div
+          id="owner-inspo-lightbox-modal"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setPreviewInspoImage(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-white rounded-2xl p-4 shadow-2xl border border-purple-200 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-purple-100">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-purple-600" />
+                <h4 className="text-sm font-bold text-gray-900">
+                  Client Design Inspo Reference ({previewInspoImage.clientName})
+                </h4>
+              </div>
+              <button
+                onClick={() => setPreviewInspoImage(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mt-3 overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center max-h-[70vh]">
+              <img
+                src={previewInspoImage.url}
+                alt="Client Inspiration Full"
+                className="w-full h-auto max-h-[68vh] object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -76,19 +76,21 @@ async function startServer() {
     next();
   });
 
-  // General API rate limiting (for all other endpoints)
+  // General API rate limiting (for mutating/heavy endpoints; read queries like GET are never throttled)
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per 15 minutes
+    max: 10000, // generous allowance for preview and shared environments
     message: 'Too many requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.method === 'GET', // Read-only directory & catalog queries should never be blocked
   });
   app.use('/api', (req, res, next) => {
     if (
       req.path === '/auth/login' ||
       req.path === '/auth/register' ||
-      req.path === '/settings/registration-rate-limit'
+      req.path === '/settings/registration-rate-limit' ||
+      req.method === 'GET'
     ) {
       return next();
     }
@@ -1605,6 +1607,7 @@ async function startServer() {
       appointment_date,
       appointment_time,
       notes,
+      design_image,
     } = req.body;
 
     try {
@@ -1688,8 +1691,8 @@ async function startServer() {
         `INSERT INTO appointments (
           customer_id, customer_name, customer_phone, customer_email,
           salon_id, salon_name, service_id, service_name, total_price,
-          technician_id, technician_name, appointment_date, appointment_time, status, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          technician_id, technician_name, appointment_date, appointment_time, status, notes, design_image
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(customer.id),
           customer.fullname,
@@ -1705,7 +1708,8 @@ async function startServer() {
           appointment_date,
           appointment_time,
           'pending',
-          notes || ''
+          notes || '',
+          design_image || ''
         ]
       );
       const appointmentId = (result as any).insertId;

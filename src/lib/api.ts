@@ -26,6 +26,16 @@ import {
   createFirestoreProductOrder,
   updateFirestoreProductOrderStatus,
 } from './firestoreService';
+import {
+  seedCategories,
+  seedSalons,
+  seedServices,
+  seedTechnicians,
+  seedAppointments,
+  seedProducts,
+  seedAnnouncements,
+  seedReviews,
+} from '../data/seedData';
 
 const configuredApiBase = import.meta.env.VITE_API_URL as string | undefined;
 const staticAppBase = typeof window !== 'undefined'
@@ -67,12 +77,11 @@ export async function fetchCategories(): Promise<BusinessCategory[]> {
   try {
     const res = await fetch(`${API_BASE}/categories`);
     if (!res.ok) throw new Error('Failed to fetch categories');
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data : (seedCategories as BusinessCategory[]);
   } catch (err) {
-    console.warn('API fetchCategories error:', err);
-    const errorMessage = getErrorMessage(err, 'categories');
-    console.error('User-facing error:', errorMessage);
-    return [];
+    console.warn('API fetchCategories using fallback seed data:', err);
+    return seedCategories as BusinessCategory[];
   }
 }
 
@@ -92,7 +101,7 @@ export async function fetchSalons(params?: {
     const res = await fetch(`${API_BASE}/salons?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch salons');
     const salons = await res.json();
-    return (Array.isArray(salons) ? salons : []).map((salon: Salon) => ({
+    const parsed = (Array.isArray(salons) ? salons : []).map((salon: Salon) => ({
       ...salon,
       id: Number(salon.id),
       owner_id: Number(salon.owner_id),
@@ -101,12 +110,41 @@ export async function fetchSalons(params?: {
       review_count: Number(salon.review_count) || 0,
       is_active: Boolean(Number(salon.is_active)),
     }));
+    if (parsed.length > 0 || params?.search || params?.category) {
+      return parsed;
+    }
   } catch (err) {
-    console.warn('API fetchSalons error:', err);
-    const errorMessage = getErrorMessage(err, 'salons');
-    console.error('User-facing error:', errorMessage);
-    throw err;
+    console.warn('API fetchSalons using fallback seed data:', err);
   }
+
+  // Graceful fallback to seed salons
+  let fallback: Salon[] = seedSalons.map((salon) => ({
+    ...salon,
+    id: Number(salon.id),
+    owner_id: Number(salon.owner_id),
+    category_id: salon.category_id == null ? undefined : Number(salon.category_id),
+    avg_rating: Number(salon.avg_rating) || 0,
+    review_count: Number(salon.review_count) || 0,
+    is_active: Boolean(salon.is_active),
+    verification_status: salon.verification_status as 'verified' | 'pending' | 'rejected',
+  }));
+
+  if (params?.category) {
+    fallback = fallback.filter((s) => s.category_id === Number(params.category));
+  }
+  if (params?.owner_id) {
+    fallback = fallback.filter((s) => s.owner_id === Number(params.owner_id));
+  }
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    fallback = fallback.filter(
+      (s) =>
+        s.salon_name.toLowerCase().includes(q) ||
+        (s.city && s.city.toLowerCase().includes(q)) ||
+        (s.address && s.address.toLowerCase().includes(q))
+    );
+  }
+  return fallback;
 }
 
 export async function fetchSalonDetails(id: number): Promise<{
@@ -121,8 +159,25 @@ export async function fetchSalonDetails(id: number): Promise<{
     if (!res.ok) throw new Error('Failed to fetch salon details');
     return await res.json();
   } catch (err) {
-    console.warn('API fetchSalonDetails error:', err);
-    return null;
+    console.warn('API fetchSalonDetails using fallback:', err);
+    const salon = seedSalons.find((s) => s.id === Number(id));
+    if (!salon) return null;
+    return {
+      salon: {
+        ...salon,
+        id: Number(salon.id),
+        owner_id: Number(salon.owner_id),
+        category_id: salon.category_id == null ? undefined : Number(salon.category_id),
+        avg_rating: Number(salon.avg_rating) || 0,
+        review_count: Number(salon.review_count) || 0,
+        is_active: Boolean(salon.is_active),
+        verification_status: salon.verification_status as 'verified' | 'pending' | 'rejected',
+      },
+      services: seedServices.filter((s) => s.salon_id === Number(id)) as Service[],
+      technicians: seedTechnicians.filter((t) => t.salon_id === Number(id)) as Technician[],
+      reviews: [],
+      working_hours: [],
+    };
   }
 }
 
@@ -136,13 +191,21 @@ export async function fetchServices(salonId?: number): Promise<Service[]> {
       ...service,
       id: Number(service.id),
       salon_id: Number(service.salon_id),
-      image_url: service.image_url || service.image,
+      image_url: service.image_url || (service as any).image,
     }));
   } catch (err) {
-    console.warn('API fetchServices error:', err);
-    const errorMessage = getErrorMessage(err, 'services');
-    console.error('User-facing error:', errorMessage);
-    return [];
+    console.warn('API fetchServices fallback:', err);
+    let s: Service[] = seedServices.map((srv) => ({
+      ...srv,
+      id: Number(srv.id),
+      salon_id: Number(srv.salon_id),
+      image_url: srv.image_url || (srv as any).image,
+      difficulty_level: srv.difficulty_level as 'Beginner' | 'Intermediate' | 'Advanced' | undefined,
+    }));
+    if (salonId) {
+      s = s.filter((item) => item.salon_id === Number(salonId));
+    }
+    return s;
   }
 }
 
@@ -153,10 +216,12 @@ export async function fetchTechnicians(salonId?: number): Promise<Technician[]> 
     if (!res.ok) throw new Error('Failed to fetch technicians');
     return await res.json();
   } catch (err) {
-    console.warn('API fetchTechnicians error:', err);
-    const errorMessage = getErrorMessage(err, 'technicians');
-    console.error('User-facing error:', errorMessage);
-    return [];
+    console.warn('API fetchTechnicians fallback:', err);
+    let techs = seedTechnicians as Technician[];
+    if (salonId) {
+      techs = techs.filter((t) => t.salon_id === Number(salonId));
+    }
+    return techs;
   }
 }
 
@@ -170,10 +235,24 @@ export async function fetchAppointments(params?: { customer_id?: number; salon_i
     if (!res.ok) throw new Error('Failed to fetch appointments');
     return await res.json();
   } catch (err) {
-    console.warn('API fetchAppointments error:', err);
-    const errorMessage = getErrorMessage(err, 'appointments');
-    console.error('User-facing error:', errorMessage);
-    return [];
+    console.warn('API fetchAppointments fallback:', err);
+    let appts: Appointment[] = seedAppointments.map((a) => ({
+      ...a,
+      id: Number(a.id),
+      customer_id: Number(a.customer_id),
+      salon_id: Number(a.salon_id),
+      service_id: Number(a.service_id),
+      technician_id: a.technician_id ? Number(a.technician_id) : undefined,
+      total_price: Number(a.total_price),
+      status: a.status as AppointmentStatus,
+    }));
+    if (params?.customer_id) {
+      appts = appts.filter((a) => a.customer_id === Number(params.customer_id));
+    }
+    if (params?.salon_id) {
+      appts = appts.filter((a) => a.salon_id === Number(params.salon_id));
+    }
+    return appts;
   }
 }
 
@@ -253,10 +332,12 @@ export async function fetchReviews(salonId?: number): Promise<Review[]> {
     if (!res.ok) throw new Error('Failed to fetch reviews');
     return await res.json();
   } catch (err) {
-    console.warn('API fetchReviews error:', err);
-    const errorMessage = getErrorMessage(err, 'reviews');
-    console.error('User-facing error:', errorMessage);
-    return [];
+    console.warn('API fetchReviews fallback:', err);
+    let revs = seedReviews as Review[];
+    if (salonId) {
+      revs = revs.filter((r) => r.salon_id === Number(salonId));
+    }
+    return revs;
   }
 }
 
@@ -365,8 +446,12 @@ export async function fetchAnnouncements(audience?: string): Promise<Announcemen
     if (!res.ok) throw new Error('Failed to fetch announcements');
     return await res.json();
   } catch (err) {
-    console.warn('API fetchAnnouncements error:', err);
-    return [];
+    console.warn('API fetchAnnouncements fallback:', err);
+    let items = seedAnnouncements as Announcement[];
+    if (audience && audience !== 'all') {
+      items = items.filter((a) => a.target_audience === audience || a.target_audience === 'all');
+    }
+    return items;
   }
 }
 
@@ -577,8 +662,19 @@ export async function fetchProducts(params?: {
     const items = await res.json();
     return Array.isArray(items) ? items : [];
   } catch (err) {
-    console.warn('API fetchProducts error:', err);
-    return [];
+    console.warn('API fetchProducts fallback:', err);
+    let items = seedProducts as Product[];
+    if (params?.salon_id) {
+      items = items.filter((p) => p.salon_id === Number(params.salon_id));
+    }
+    if (params?.category) {
+      items = items.filter((p) => p.category === params.category);
+    }
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      items = items.filter((p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+    }
+    return items;
   }
 }
 

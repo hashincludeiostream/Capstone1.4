@@ -95,6 +95,7 @@ export interface Appointment {
   appointment_time: string;
   status: AppointmentStatus;
   notes?: string;
+  design_image?: string;
   created_at: string;
 }
 

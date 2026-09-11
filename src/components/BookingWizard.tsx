@@ -8,6 +8,9 @@ import {
   ChevronLeft,
   Sparkles,
   AlertCircle,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { Salon, Service, Technician, User, Appointment, WorkingHour } from '../types';
 import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, createAppointment } from '../lib/api';
@@ -55,6 +58,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [email, setEmail] = useState<string>(currentUser?.email || '');
   const [phone, setPhone] = useState<string>(currentUser?.phone || '');
   const [notes, setNotes] = useState<string>('');
+  const [designImage, setDesignImage] = useState<string | null>(null);
+  const [designImageName, setDesignImageName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -119,6 +125,59 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     }
   }, [appointmentTime, availableTimeSlots]);
 
+  const handleImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setValidationError('Please select a valid image file (JPG, PNG, WebP, etc.)');
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      setValidationError('Image size exceeds 12MB. Please upload a smaller photo.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          setDesignImage(compressed);
+          setDesignImageName(file.name);
+          setValidationError(null);
+        } else {
+          setDesignImage(dataUrl);
+          setDesignImageName(file.name);
+          setValidationError(null);
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setDesignImage(null);
+    setDesignImageName(null);
+  };
+
   const handleSubmitBooking = async () => {
     if (!currentService) return;
     setValidationError(null);
@@ -164,6 +223,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         appointment_time: appointmentTime,
         status: 'pending',
         notes,
+        design_image: designImage || undefined,
       });
 
       if (res.success && res.appointment) {
@@ -545,6 +605,126 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 />
               </div>
 
+              {/* Upload Inspiration / Design Reference Image */}
+              <div id="booking-design-image-upload-section" className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Design Inspiration Photo (Optional)
+                  </label>
+                  {designImage && (
+                    <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Photo attached
+                    </span>
+                  )}
+                </div>
+
+                {!designImage ? (
+                  <div
+                    id="booking-design-image-dropzone"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      if (e.dataTransfer.files?.[0]) {
+                        handleImageFile(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    onClick={() => {
+                      const fileInput = document.getElementById('booking-design-image-file-input') as HTMLInputElement;
+                      fileInput?.click();
+                    }}
+                    className={`relative border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
+                      isDragging
+                        ? 'border-pink-500 bg-pink-100/60 scale-[0.99]'
+                        : 'border-pink-200 hover:border-pink-400 bg-pink-50/30 hover:bg-pink-50/60'
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      id="booking-design-image-file-input"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          handleImageFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <div className="flex flex-col items-center justify-center gap-1.5 py-1">
+                      <div className="w-9 h-9 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div className="text-xs text-gray-700">
+                        <span className="font-semibold text-pink-700">Click to upload</span> or drag & drop inspo image
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        PNG, JPG, or WebP (e.g. nail art sample, color swatch, or reference photo)
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    id="booking-design-image-preview"
+                    className="p-3 rounded-2xl border border-pink-200 bg-pink-50/50 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={designImage}
+                        alt="Design Reference"
+                        className="w-14 h-14 object-cover rounded-xl border border-pink-200 shrink-0 shadow-xs"
+                      />
+                      <div className="min-w-0 text-left">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 truncate">
+                          <ImageIcon className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+                          <span className="truncate">{designImageName || 'Inspo_Reference.jpg'}</span>
+                        </div>
+                        <p className="text-[11px] text-pink-800/80 font-medium mt-0.5">
+                          Attached to this appointment for your nail specialist
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        id="booking-replace-design-image-button"
+                        onClick={() => {
+                          const fileInput = document.getElementById('booking-design-image-file-input') as HTMLInputElement;
+                          fileInput?.click();
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg border border-pink-200 bg-white hover:bg-pink-50 text-[11px] font-semibold text-pink-700 cursor-pointer transition-colors"
+                      >
+                        Change
+                      </button>
+                      <input
+                        type="file"
+                        id="booking-design-image-file-input"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleImageFile(e.target.files[0]);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        id="booking-remove-design-image-button"
+                        onClick={handleRemoveImage}
+                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 cursor-pointer transition-colors"
+                        title="Remove photo"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Order Summary Recap */}
               <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800">
                 <div className="flex justify-between font-semibold">
@@ -624,6 +804,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   <span className="text-gray-500">Settlement:</span>
                   <span className="font-semibold text-pink-900">Direct In-Salon Payment upon service</span>
                 </div>
+                {confirmedAppt.design_image && (
+                  <div className="flex items-center justify-between border-t border-pink-200/60 pt-2">
+                    <span className="text-gray-500">Design Inspo:</span>
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={confirmedAppt.design_image}
+                        alt="Attached design inspo"
+                        className="w-9 h-9 rounded-lg object-cover border border-pink-200 shadow-xs"
+                      />
+                      <span className="text-[11px] font-semibold text-pink-900">Photo Attached</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
