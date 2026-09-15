@@ -627,7 +627,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
             }`}
           >
             <BarChart3 className="w-4 h-4 text-purple-600" />
-            <span>Store Reports & CRM</span>
+            <span>Overview, Analytics &amp; Inventory</span>
           </button>
 
           {/* Tab 2: Bookings & Schedule */}
@@ -750,6 +750,10 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               services={services}
               technicians={technicians}
               reviews={reviews}
+              products={products}
+              productOrders={productOrders}
+              onNavigateToInventory={() => setActiveTab('inventory')}
+              onRefreshProducts={loadDashboardData}
               showToast={showToast}
             />
           )}
