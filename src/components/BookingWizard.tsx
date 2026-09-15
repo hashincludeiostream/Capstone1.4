@@ -89,7 +89,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   useEffect(() => {
     checkPaymentGatewayStatus().then((status) => {
       setGatewayStatus(status);
-      if (!status.liveAvailable) {
+      if (status.liveAvailable) {
+        setIsSandboxMode(false);
+      } else {
         setIsSandboxMode(true);
       }
     });
@@ -893,13 +895,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsSandboxMode(!isSandboxMode)}
-                    className="px-3 py-1.5 rounded-xl border border-pink-300 bg-white hover:bg-pink-50 text-[11px] font-semibold text-pink-700 transition-colors cursor-pointer shadow-2xs"
-                  >
-                    Switch to {isSandboxMode ? 'Live Gateway' : 'Sandbox Simulator'}
-                  </button>
+                  {gatewayStatus.liveAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsSandboxMode(!isSandboxMode)}
+                      className="px-3 py-1.5 rounded-xl border border-pink-300 bg-white hover:bg-pink-50 text-[11px] font-semibold text-pink-700 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      Switch to {isSandboxMode ? 'Live Gateway' : 'Sandbox Simulator'}
+                    </button>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-amber-200 text-[10px] font-semibold text-amber-800">
+                      Add PAYMONGO_SECRET_KEY in Settings to enable Live
+                    </span>
+                  )}
                 </div>
               </div>
 
