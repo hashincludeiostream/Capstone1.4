@@ -249,10 +249,27 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                         </span>
                         <span>•</span>
                         <span>Specialist: <strong>{appt.staff_name || 'Any'}</strong></span>
-                        <span>•</span>
-                        <span className="text-pink-800 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
-                          In-Store Settlement
-                        </span>
+                        {appt.payment_method ? (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              {appt.payment_method.replace('paymongo_', 'PayMongo ').toUpperCase()}
+                              {appt.paid_amount ? ` (₱${Number(appt.paid_amount).toLocaleString()} Paid)` : ''}
+                            </span>
+                            {Number(appt.remaining_balance || 0) > 0 && (
+                              <span className="text-amber-800 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                ₱{Number(appt.remaining_balance).toLocaleString()} Due in Salon
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span>•</span>
+                            <span className="text-pink-800 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
+                              In-Store Settlement
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       {appt.notes && (

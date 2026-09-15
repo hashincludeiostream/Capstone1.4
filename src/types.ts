@@ -74,6 +74,35 @@ export interface Technician {
 
 export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
+export type PaymentMethod = 'pay_in_salon' | 'paymongo_gcash' | 'paymongo_maya' | 'paymongo_card' | 'paymongo_link';
+export type PaymentType = 'deposit' | 'full_payment' | 'pay_at_salon';
+export type PaymentStatus = 'unpaid' | 'deposit_paid' | 'fully_paid' | 'refunded';
+
+export interface PaymentTransaction {
+  id: number;
+  transaction_reference: string;
+  entity_type: 'appointment' | 'product_order';
+  entity_id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_email?: string;
+  customer_phone?: string;
+  salon_id: number;
+  salon_name?: string;
+  amount: number;
+  total_service_price?: number;
+  remaining_balance?: number;
+  currency: 'PHP';
+  payment_method: PaymentMethod;
+  payment_type: PaymentType;
+  payment_status: 'succeeded' | 'pending' | 'failed';
+  provider: 'paymongo_live' | 'paymongo_sandbox';
+  provider_reference?: string;
+  paymongo_checkout_url?: string;
+  receipt_number?: string;
+  created_at: string;
+}
+
 export interface Appointment {
   id: number;
   customer_id: number;
@@ -96,6 +125,13 @@ export interface Appointment {
   status: AppointmentStatus;
   notes?: string;
   design_image?: string;
+  // Payment tracking
+  payment_method?: PaymentMethod;
+  payment_type?: PaymentType;
+  payment_status?: PaymentStatus;
+  paid_amount?: number;
+  remaining_balance?: number;
+  transaction_reference?: string;
   created_at: string;
 }
 

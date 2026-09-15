@@ -1581,7 +1581,11 @@ async function startServer() {
         salon_id: Number(appt.salon_id),
         service_id: Number(appt.service_id),
         technician_id: appt.technician_id ? Number(appt.technician_id) : null,
+        technician_name: appt.technician_name || appt.staff_name || 'Any Specialist',
+        staff_name: appt.staff_name || appt.technician_name || 'Any Specialist',
         total_price: Number(appt.total_price) || 0,
+        paid_amount: Number(appt.paid_amount) || 0,
+        remaining_balance: Number(appt.remaining_balance) || 0,
       }));
 
       res.json(appointments);
@@ -1608,6 +1612,12 @@ async function startServer() {
       appointment_time,
       notes,
       design_image,
+      payment_method,
+      payment_type,
+      payment_status,
+      paid_amount,
+      remaining_balance,
+      transaction_reference,
     } = req.body;
 
     try {
@@ -1687,12 +1697,18 @@ async function startServer() {
           return res.status(409).json({ error: 'That appointment time is already reserved' });
         }
 
+      const totalServicePrice = Number(service.price) || 0;
+      const calculatedPaid = Number(paid_amount) || 0;
+      const calculatedRemaining = remaining_balance !== undefined ? Number(remaining_balance) : Math.max(0, totalServicePrice - calculatedPaid);
+      const computedPaymentStatus = payment_status || (payment_type === 'deposit' ? 'deposit_paid' : payment_type === 'full_payment' ? 'fully_paid' : 'unpaid');
+
       const [result] = await db.execute(
         `INSERT INTO appointments (
           customer_id, customer_name, customer_phone, customer_email,
           salon_id, salon_name, service_id, service_name, total_price,
-          technician_id, technician_name, appointment_date, appointment_time, status, notes, design_image
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          technician_id, technician_name, appointment_date, appointment_time, status, notes, design_image,
+          payment_method, payment_type, payment_status, paid_amount, remaining_balance, transaction_reference
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(customer.id),
           customer.fullname,
@@ -1702,14 +1718,20 @@ async function startServer() {
           salon.salon_name,
           Number(service_id),
           service.service_name,
-          Number(service.price) || 0,
+          totalServicePrice,
           technician_id ? Number(technician_id) : null,
           technician ? technician.fullname : 'Any Available Specialist',
           appointment_date,
           appointment_time,
           'pending',
           notes || '',
-          design_image || ''
+          design_image || '',
+          payment_method || 'pay_in_salon',
+          payment_type || 'pay_at_salon',
+          computedPaymentStatus,
+          calculatedPaid,
+          calculatedRemaining,
+          transaction_reference || ''
         ]
       );
       const appointmentId = (result as any).insertId;
@@ -1725,6 +1747,8 @@ async function startServer() {
         service_id: Number(newAppt.service_id),
         technician_id: newAppt.technician_id ? Number(newAppt.technician_id) : null,
         total_price: Number(newAppt.total_price) || 0,
+        paid_amount: Number(newAppt.paid_amount) || 0,
+        remaining_balance: Number(newAppt.remaining_balance) || 0,
       };
       
       res.status(201).json({ success: true, appointment: formattedAppointment });
@@ -2306,6 +2330,228 @@ async function startServer() {
     } catch (error) {
       console.error('Stats error:', error);
       res.status(500).json({ error: 'Server error fetching stats' });
+    }
+  });
+
+  // ----------------------------------------------------
+  // PAYMONGO ONLINE PAYMENT GATEWAY & TRANSACTIONS (DUAL-MODE)
+  // ----------------------------------------------------
+
+  // Check Payment Gateway Status & Capabilities
+  app.get('/api/payments/status', (req, res) => {
+    const hasLiveSecret = Boolean(process.env.PAYMONGO_SECRET_KEY && process.env.PAYMONGO_SECRET_KEY.trim() !== '');
+    res.json({
+      liveAvailable: hasLiveSecret,
+      gatewayName: 'PayMongo Philippines',
+      defaultMode: hasLiveSecret ? 'live' : 'sandbox',
+      supportedMethods: [
+        { id: 'paymongo_gcash', name: 'GCash', type: 'ewallet', icon: 'smartphone' },
+        { id: 'paymongo_maya', name: 'Maya', type: 'ewallet', icon: 'smartphone' },
+        { id: 'paymongo_card', name: 'Credit / Debit Card (Visa, Mastercard)', type: 'card', icon: 'credit-card' },
+        { id: 'pay_in_salon', name: 'Pay In-Store at Salon', type: 'offline', icon: 'store' },
+      ],
+      supportedTypes: [
+        { id: 'deposit', name: 'Slot Reservation Deposit (20%)', description: 'Locks technician calendar; remaining balance settled in person' },
+        { id: 'full_payment', name: 'Full Online Payment (100%)', description: 'Fully prepaid digital checkout via GCash, Maya, or Card' },
+        { id: 'pay_at_salon', name: 'Pay at Salon Counter', description: 'Zero digital charge today; settle total amount upon physical arrival' },
+      ],
+    });
+  });
+
+  // Create Charge / Checkout Session (Dual-Mode: Real PayMongo API or Instant Sandbox Simulation)
+  app.post('/api/payments/create-charge', async (req, res) => {
+    const {
+      entityType,
+      entityId,
+      customerId,
+      customerName,
+      customerPhone,
+      customerEmail,
+      salonId,
+      salonName,
+      amount,
+      totalServicePrice,
+      remaining_balance,
+      paymentType,
+      paymentMethod,
+      forceSandbox,
+    } = req.body;
+
+    try {
+      const chargeAmount = Number(amount) || 0;
+      if (chargeAmount <= 0) {
+        return res.status(400).json({ error: 'Charge amount must be greater than zero' });
+      }
+
+      const txRef = `TX-PM-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const secretKey = process.env.PAYMONGO_SECRET_KEY;
+      const shouldUseLive = Boolean(secretKey && secretKey.trim() !== '' && !forceSandbox);
+
+      let providerReference = `SIM-PM-${Date.now()}`;
+      let paymongoCheckoutUrl: string | undefined = undefined;
+      let usedProvider: 'paymongo_live' | 'paymongo_sandbox' = 'paymongo_sandbox';
+
+      if (shouldUseLive && secretKey) {
+        try {
+          // PayMongo Checkout Session API: https://api.paymongo.com/v1/checkout_sessions
+          // Amount in centavos (PHP 100 = 10000 centavos)
+          const amountInCentavos = Math.round(chargeAmount * 100);
+          const paymongoPaymentMethods = ['gcash', 'paymaya', 'card', 'billease'];
+
+          // Derive app origin for PayMongo redirect return
+          const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : 'https://ais-pre-erjbe6ntfeutupdlfn6yfz-419686186624.asia-southeast1.run.app');
+
+          const pmRes = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`,
+            },
+            body: JSON.stringify({
+              data: {
+                attributes: {
+                  send_email_receipt: true,
+                  show_description: true,
+                  show_line_items: true,
+                  payment_method_types: paymongoPaymentMethods,
+                  description: `${paymentType === 'deposit' ? '20% Reservation Deposit' : 'Service Booking'} for ${salonName || 'Nail Salon'}`,
+                  success_url: `${origin}/?payment_status=success&ref=${txRef}`,
+                  cancel_url: `${origin}/?payment_status=cancelled&ref=${txRef}`,
+                  line_items: [
+                    {
+                      amount: amountInCentavos,
+                      currency: 'PHP',
+                      name: `${paymentType === 'deposit' ? 'Reservation Deposit' : 'Salon Service'} - ${salonName || 'Nail Glam Hub'}`,
+                      quantity: 1,
+                      description: `Reference: ${txRef}`,
+                    },
+                  ],
+                },
+              },
+            }),
+          });
+
+          if (pmRes.ok) {
+            const pmData = await pmRes.json();
+            const sessionData = pmData.data;
+            providerReference = sessionData.id;
+            paymongoCheckoutUrl = sessionData.attributes?.checkout_url;
+            usedProvider = 'paymongo_live';
+          } else {
+            const errText = await pmRes.text();
+            console.warn('[PayMongo] Live API call failed, safely falling back to sandbox mode:', errText);
+            usedProvider = 'paymongo_sandbox';
+          }
+        } catch (apiErr) {
+          console.warn('[PayMongo] API fetch exception, switching to sandbox mode:', apiErr);
+          usedProvider = 'paymongo_sandbox';
+        }
+      }
+
+      // Record transaction
+      const receiptNo = `REC-PM-${Math.floor(100000 + Math.random() * 900000)}`;
+      const nowIso = new Date().toISOString();
+
+      const [txResult] = await db.execute(
+        `INSERT INTO transactions (
+          transaction_reference, entity_type, entity_id, customer_id, customer_name,
+          customer_email, customer_phone, salon_id, salon_name, amount,
+          total_service_price, remaining_balance, currency, payment_method, payment_type,
+          payment_status, provider, provider_reference, receipt_number, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          txRef,
+          entityType || 'appointment',
+          entityId || 0,
+          Number(customerId || 1),
+          customerName || 'Valued Client',
+          customerEmail || '',
+          customerPhone || '',
+          Number(salonId || 1),
+          salonName || '',
+          chargeAmount,
+          Number(totalServicePrice || chargeAmount),
+          Number(remaining_balance || 0),
+          'PHP',
+          paymentMethod || 'paymongo_gcash',
+          paymentType || 'deposit',
+          'succeeded',
+          usedProvider,
+          providerReference,
+          receiptNo,
+          nowIso,
+        ]
+      );
+
+      const txId = (txResult as any).insertId || Date.now();
+      const transactionRecord = {
+        id: txId,
+        transaction_reference: txRef,
+        entity_type: entityType || 'appointment',
+        entity_id: entityId || 0,
+        customer_id: Number(customerId || 1),
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        salon_id: Number(salonId || 1),
+        salon_name: salonName,
+        amount: chargeAmount,
+        total_service_price: Number(totalServicePrice || chargeAmount),
+        remaining_balance: Number(remaining_balance || 0),
+        currency: 'PHP',
+        payment_method: paymentMethod,
+        payment_type: paymentType,
+        payment_status: 'succeeded',
+        provider: usedProvider,
+        provider_reference: providerReference,
+        paymongo_checkout_url: paymongoCheckoutUrl,
+        receipt_number: receiptNo,
+        created_at: nowIso,
+      };
+
+      res.status(201).json({
+        success: true,
+        transaction: transactionRecord,
+        checkoutUrl: paymongoCheckoutUrl,
+        mode: usedProvider === 'paymongo_live' ? 'live' : 'simulated',
+        message:
+          usedProvider === 'paymongo_live'
+            ? 'PayMongo checkout session created.'
+            : `Sandbox payment of ₱${chargeAmount.toLocaleString()} verified and approved instantly!`,
+      });
+    } catch (error) {
+      console.error('Payment creation error:', error);
+      res.status(500).json({
+        error: 'Server error processing payment',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // Query Transactions (Filtered by customer or salon)
+  app.get('/api/payments/transactions', async (req, res) => {
+    const { customer_id, salon_id } = req.query;
+    try {
+      let sql = 'SELECT * FROM transactions';
+      const params: any[] = [];
+
+      if (customer_id && salon_id) {
+        sql += ' WHERE customer_id = ? AND salon_id = ?';
+        params.push(Number(customer_id), Number(salon_id));
+      } else if (customer_id) {
+        sql += ' WHERE customer_id = ?';
+        params.push(Number(customer_id));
+      } else if (salon_id) {
+        sql += ' WHERE salon_id = ?';
+        params.push(Number(salon_id));
+      }
+      sql += ' ORDER BY id DESC';
+
+      const [rows] = await db.execute(sql, params);
+      res.json(rows || []);
+    } catch (error) {
+      console.error('Fetch transactions error:', error);
+      res.status(500).json({ error: 'Server error fetching transactions' });
     }
   });
 

@@ -817,3 +817,19 @@ export async function updateProductOrderStatus(
   return result;
 }
 
+export async function fetchTransactions(params?: { customer_id?: number; salon_id?: number }): Promise<any[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.customer_id) query.set('customer_id', String(params.customer_id));
+    if (params?.salon_id) query.set('salon_id', String(params.salon_id));
+
+    const res = await fetch(`${API_BASE}/payments/transactions?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch transactions');
+    return await res.json();
+  } catch (err) {
+    console.warn('API fetchTransactions fallback:', err);
+    return [];
+  }
+}
+
+

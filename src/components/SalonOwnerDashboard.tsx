@@ -893,9 +893,21 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                           <span className="text-xs text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md font-sans font-medium">
                             {appt.service_duration || 60} mins
                           </span>
-                          <span className="text-[11px] text-pink-700 font-sans font-semibold">
-                            (In-Store Settlement)
-                          </span>
+                          {appt.payment_method ? (
+                            <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-sans font-semibold">
+                              {appt.payment_method.replace('paymongo_', 'PayMongo ').toUpperCase()}
+                              {appt.paid_amount ? ` (₱${Number(appt.paid_amount).toLocaleString()} Paid)` : ''}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-pink-700 bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-md font-sans font-semibold">
+                              In-Store Settlement
+                            </span>
+                          )}
+                          {Number(appt.remaining_balance || 0) > 0 && (
+                            <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-sans font-medium">
+                              ₱{Number(appt.remaining_balance).toLocaleString()} Due In-Store
+                            </span>
+                          )}
                         </h4>
 
                         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">

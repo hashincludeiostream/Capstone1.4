@@ -11,9 +11,16 @@ import {
   Upload,
   Image as ImageIcon,
   Trash2,
+  CreditCard,
+  Smartphone,
+  Store,
+  ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
-import { Salon, Service, Technician, User, Appointment, WorkingHour } from '../types';
+import { Salon, Service, Technician, User, Appointment, WorkingHour, PaymentMethod, PaymentType, PaymentTransaction } from '../types';
 import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, createAppointment } from '../lib/api';
+import { calculatePaymentBreakdown, initiatePayment, checkPaymentGatewayStatus } from '../lib/paymentService';
+import { createFirestoreTransaction } from '../lib/firestoreService';
 
 interface BookingWizardProps {
   salons: Salon[];
@@ -65,7 +72,28 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [confirmedAppt, setConfirmedAppt] = useState<Appointment | null>(null);
+  const [confirmedTx, setConfirmedTx] = useState<PaymentTransaction | null>(null);
+  const [livePaymongoCheckoutUrl, setLivePaymongoCheckoutUrl] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Payment Options & Gateway State
+  const [paymentType, setPaymentType] = useState<PaymentType>('deposit');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('paymongo_gcash');
+  const [isSandboxMode, setIsSandboxMode] = useState<boolean>(true);
+  const [gatewayStatus, setGatewayStatus] = useState<{ liveAvailable: boolean; gatewayName: string }>({
+    liveAvailable: false,
+    gatewayName: 'PayMongo Philippines',
+  });
+
+  // Check backend payment gateway status on mount
+  useEffect(() => {
+    checkPaymentGatewayStatus().then((status) => {
+      setGatewayStatus(status);
+      if (!status.liveAvailable) {
+        setIsSandboxMode(true);
+      }
+    });
+  }, []);
 
   // Load services & technicians when salon changes
   useEffect(() => {
@@ -207,6 +235,34 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     setSubmitting(true);
 
     try {
+      const breakdown = calculatePaymentBreakdown(Number(currentService.price) || 0, paymentType);
+
+      // Process payment through Dual-Mode service
+      const paymentResult = await initiatePayment(
+        {
+          entityType: 'appointment',
+          customerId: currentUser?.id || 0,
+          customerName: fullName || 'Valued Client',
+          customerPhone: phone || '',
+          customerEmail: email || '',
+          salonId: selectedSalonId,
+          salonName: currentSalon?.salon_name,
+          totalServicePrice: Number(currentService.price) || 0,
+          paymentType,
+          paymentMethod,
+        },
+        isSandboxMode
+      );
+
+      const chargedAmount = paymentResult.transaction?.amount || breakdown.dueNow;
+      const computedPaymentStatus =
+        paymentType === 'pay_at_salon'
+          ? 'unpaid'
+          : paymentType === 'deposit'
+          ? 'deposit_paid'
+          : 'fully_paid';
+
+      // Create appointment record with payment telemetry
       const res = await createAppointment({
         customer_id: currentUser?.id || 0,
         customer_name: fullName || 'Guest Client',
@@ -224,20 +280,57 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         status: 'pending',
         notes,
         design_image: designImage || undefined,
+        payment_method: paymentMethod,
+        payment_type: paymentType,
+        payment_status: computedPaymentStatus,
+        paid_amount: chargedAmount,
+        remaining_balance: breakdown.remainingBalance,
+        transaction_reference: paymentResult.transaction?.transaction_reference,
       });
 
       if (res.success && res.appointment) {
+        // Sync transaction to Firestore
+        if (paymentResult.transaction) {
+          const fullTx: PaymentTransaction = {
+            ...paymentResult.transaction,
+            entity_id: res.appointment.id,
+          };
+          setConfirmedTx(fullTx);
+          createFirestoreTransaction(fullTx).catch((err) =>
+            console.warn('Firestore transaction sync warning:', err)
+          );
+        }
+
+        if (paymentResult.checkoutUrl) {
+          setLivePaymongoCheckoutUrl(paymentResult.checkoutUrl);
+        }
+
         setConfirmedAppt(res.appointment);
-        setStep(5); // Show confirmation step
+        setStep(6); // Step 6: Confirmation
         onSuccess(res.appointment);
+
+        // If a real PayMongo checkout session URL was returned, open PayMongo in a new tab or window
+        if (paymentResult.checkoutUrl && !isSandboxMode) {
+          try {
+            window.open(paymentResult.checkoutUrl, '_blank', 'noopener,noreferrer');
+          } catch (e) {
+            console.warn('Popup blocked, customer can click the PayMongo payment link:', e);
+          }
+        }
       }
     } catch (err) {
       console.error('Booking submission error:', err);
-      setValidationError('Failed to submit booking. Please verify connection and try again.');
+      setValidationError(
+        err instanceof Error ? err.message : 'Failed to submit booking. Please check connection and try again.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
+
+  const paymentBreakdown = React.useMemo(() => {
+    return calculatePaymentBreakdown(Number(currentService?.price) || 0, paymentType);
+  }, [currentService?.price, paymentType]);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
@@ -252,7 +345,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               <h3 className="font-serif font-bold text-base sm:text-lg">
                 Book Your Nail Appointment
               </h3>
-              <p className="text-[11px] text-pink-100">Step {step} of 4 — {currentSalon?.salon_name}</p>
+              <p className="text-[11px] text-pink-100">Step {step} of 5 — {currentSalon?.salon_name}</p>
             </div>
           </div>
           <button
@@ -264,8 +357,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         </div>
 
         {/* Stepper Progress Bar */}
-        {step < 5 && (
-          <div className="px-6 py-3 bg-pink-50/70 border-b border-pink-100 grid grid-cols-4 gap-2 text-center text-xs font-medium shrink-0">
+        {step < 6 && (
+          <div className="px-4 sm:px-6 py-3 bg-pink-50/70 border-b border-pink-100 grid grid-cols-5 gap-1.5 text-center text-[11px] font-medium shrink-0">
             <div
               className={`py-1 rounded-md transition-all ${
                 step >= 1 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
@@ -278,7 +371,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 step >= 2 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
               }`}
             >
-              2. Date & Time
+              2. Date/Time
             </div>
             <div
               className={`py-1 rounded-md transition-all ${
@@ -293,6 +386,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               }`}
             >
               4. Contact
+            </div>
+            <div
+              className={`py-1 rounded-md transition-all ${
+                step >= 5 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
+              }`}
+            >
+              5. Payment
             </div>
           </div>
         )}
@@ -725,7 +825,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 )}
               </div>
 
-              {/* Order Summary Recap */}
+              {/* Step 4 Summary Preview */}
               <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800">
                 <div className="flex justify-between font-semibold">
                   <span>Salon:</span>
@@ -733,7 +833,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span>Treatment:</span>
-                  <span className="font-semibold">{currentService?.service_name}</span>
+                  <span className="font-semibold">{currentService?.service_name} (₱{Number(currentService?.price || 0).toLocaleString()})</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Date & Time:</span>
@@ -744,23 +844,243 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <div className="flex justify-between">
                   <span>Specialist:</span>
                   <span className="font-semibold">
-                    {currentTech?.name || 'Any Available Specialist'}
+                    {currentTech?.fullname || 'Any Available Specialist'}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-pink-200 flex flex-col sm:flex-row justify-between sm:items-center text-xs font-semibold gap-1.5 bg-pink-100/50 p-2.5 rounded-xl">
-                  <span className="text-pink-900 font-bold flex items-center gap-1.5">
-                    📍 Physical Salon Appointment:
-                  </span>
-                  <span className="text-pink-800 font-bold bg-white px-2.5 py-1 rounded-md border border-pink-200">
-                    Payment Settled In-Store Upon Physical Service
-                  </span>
+                <div className="pt-2 border-t border-pink-200/80 flex items-center justify-between text-xs font-semibold text-pink-900">
+                  <span>Estimated Total Service:</span>
+                  <span className="text-base font-bold text-pink-700">₱{Number(currentService?.price || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 5: BOOKING CONFIRMED */}
-          {step === 5 && confirmedAppt && (
+          {/* STEP 5: PAYMENT SELECTION (DUAL-MODE PAYMONGO) */}
+          {step === 5 && (
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-serif font-bold text-lg text-gray-900">
+                  Payment Preference
+                </h4>
+                <p className="text-xs text-gray-500">
+                  Choose your payment option and channel for this appointment
+                </p>
+              </div>
+
+              {/* Dual-Mode Simulator / Production Gateway Banner */}
+              <div className="p-3 rounded-2xl border border-pink-200 bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                    isSandboxMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {isSandboxMode ? 'DEMO' : 'LIVE'}
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                      <span>Gateway: {gatewayStatus.gatewayName}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                        isSandboxMode ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {isSandboxMode ? 'Interactive Sandbox Mode' : 'Live Production Mode'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      {isSandboxMode
+                        ? 'Simulates GCash / Maya / Card transactions with authentic checkout receipts'
+                        : 'Processes actual online charges via registered PayMongo secret key'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsSandboxMode(!isSandboxMode)}
+                    className="px-3 py-1.5 rounded-xl border border-pink-300 bg-white hover:bg-pink-50 text-[11px] font-semibold text-pink-700 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Switch to {isSandboxMode ? 'Live Gateway' : 'Sandbox Simulator'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Type Selection (Slot Deposit vs Full Payment vs Pay at Salon) */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Payment Type
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div
+                    onClick={() => setPaymentType('deposit')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                      paymentType === 'deposit'
+                        ? 'border-pink-600 bg-pink-50/70 ring-2 ring-pink-500/20'
+                        : 'border-gray-200 hover:border-pink-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-xs text-gray-900">Slot Deposit</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-pink-100 text-pink-700">
+                        Most Popular
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-pink-600">₱{paymentBreakdown.dueNow.toLocaleString()}</div>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Lock your specialist time-slot now with a 20% deposit. Balance settled in salon.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setPaymentType('full_payment')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                      paymentType === 'full_payment'
+                        ? 'border-pink-600 bg-pink-50/70 ring-2 ring-pink-500/20'
+                        : 'border-gray-200 hover:border-pink-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-xs text-gray-900">Full Payment</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700">
+                        Hassle-Free
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-pink-600">₱{Number(currentService?.price || 0).toLocaleString()}</div>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Pay 100% online in advance. Walk in and enjoy your manicure without hassle.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setPaymentType('pay_at_salon')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                      paymentType === 'pay_at_salon'
+                        ? 'border-pink-600 bg-pink-50/70 ring-2 ring-pink-500/20'
+                        : 'border-gray-200 hover:border-pink-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-xs text-gray-900">Pay at Salon</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-600">
+                        In-Store
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-gray-700">₱0.00 Now</div>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Pay directly at the cashier desk upon completion of your nail treatment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Channel Selection */}
+              {paymentType !== 'pay_at_salon' ? (
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Payment Method
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('paymongo_gcash')}
+                      className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                        paymentMethod === 'paymongo_gcash'
+                          ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                        GCash
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">GCash via PayMongo</div>
+                        <p className="text-[10px] text-gray-500">Fast Philippines e-wallet checkout</p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('paymongo_maya')}
+                      className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                        paymentMethod === 'paymongo_maya'
+                          ? 'border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                        Maya
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">Maya / PayMaya</div>
+                        <p className="text-[10px] text-gray-500">Digital wallet QR / direct checkout</p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('paymongo_card')}
+                      className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                        paymentMethod === 'paymongo_card'
+                          ? 'border-pink-500 bg-pink-50/60 ring-2 ring-pink-500/20'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-600 to-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">Credit / Debit Card</div>
+                        <p className="text-[10px] text-gray-500">Visa, Mastercard, JCB</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center gap-3 text-xs text-gray-700">
+                  <Store className="w-5 h-5 text-gray-500 shrink-0" />
+                  <span>
+                    No advance online transaction needed. You can settle in cash or physical POS terminal at <strong>{currentSalon?.salon_name}</strong>.
+                  </span>
+                </div>
+              )}
+
+              {/* Price Breakdown Card */}
+              <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Service Fee:</span>
+                  <span className="font-semibold text-gray-900">₱{Number(currentService?.price || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Payment Option:</span>
+                  <span className="font-semibold capitalize text-pink-800">
+                    {paymentType === 'deposit'
+                      ? 'Slot Deposit (20%)'
+                      : paymentType === 'full_payment'
+                      ? 'Full Online Payment (100%)'
+                      : 'Pay at Salon Cashier'}
+                  </span>
+                </div>
+                {paymentType === 'deposit' && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Remaining Balance Due In-Salon:</span>
+                    <span className="font-bold text-amber-700">₱{paymentBreakdown.remainingBalance.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="pt-2.5 border-t border-pink-200 flex items-center justify-between text-sm font-bold text-pink-900">
+                  <span>Due Today:</span>
+                  <span className="text-lg text-pink-700">₱{paymentBreakdown.dueNow.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  Encrypted & secured via PayMongo Philippines PCI-DSS compliant checkout architecture.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: BOOKING CONFIRMED & PAYMENT RECEIPT */}
+          {step === 6 && confirmedAppt && (
             <div className="py-6 text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-10 h-10" />
@@ -768,14 +1088,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
               <div>
                 <h4 className="text-2xl font-serif font-bold text-gray-900">
-                  Appointment Requested!
+                  Appointment Confirmed!
                 </h4>
                 <p className="text-xs text-gray-500 mt-1">
-                  Reference ID: <strong className="text-pink-700">#NGH-{confirmedAppt.id}</strong>
+                  Appointment ID: <strong className="text-pink-700">#NGH-{confirmedAppt.id}</strong>
+                  {confirmedAppt.transaction_reference && (
+                    <span className="ml-2 font-mono text-gray-400">
+                      (Ref: {confirmedAppt.transaction_reference})
+                    </span>
+                  )}
                 </p>
               </div>
 
-              <div className="max-w-md mx-auto p-4 rounded-2xl bg-pink-50 border border-pink-200 text-left text-xs space-y-2">
+              <div className="max-w-md mx-auto p-4 rounded-2xl bg-pink-50 border border-pink-200 text-left text-xs space-y-2.5">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Salon:</span>
                   <span className="font-bold text-gray-900">{confirmedAppt.salon_name}</span>
@@ -791,19 +1116,42 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Technician:</span>
+                  <span className="text-gray-500">Specialist:</span>
                   <span className="font-bold text-gray-900">{confirmedAppt.staff_name}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Status:</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">
-                    Pending Salon Confirmation
-                  </span>
+
+                {/* Payment Breakdown Info */}
+                <div className="border-t border-pink-200/80 pt-2 space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Payment Channel:</span>
+                    <span className="font-semibold text-gray-900 capitalize">
+                      {confirmedAppt.payment_method?.replace('paymongo_', 'PayMongo ').toUpperCase() || 'In-Store'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Amount Paid Online:</span>
+                    <span className="font-bold text-emerald-700">₱{Number(confirmedAppt.paid_amount || 0).toLocaleString()}</span>
+                  </div>
+                  {Number(confirmedAppt.remaining_balance || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Balance Due in Salon:</span>
+                      <span className="font-bold text-amber-700">₱{Number(confirmedAppt.remaining_balance).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Payment Status:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      confirmedAppt.payment_status === 'fully_paid'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : confirmedAppt.payment_status === 'deposit_paid'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {confirmedAppt.payment_status?.replace('_', ' ') || 'Unpaid'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between border-t border-pink-200/60 pt-2 text-[11px]">
-                  <span className="text-gray-500">Settlement:</span>
-                  <span className="font-semibold text-pink-900">Direct In-Salon Payment upon service</span>
-                </div>
+
                 {confirmedAppt.design_image && (
                   <div className="flex items-center justify-between border-t border-pink-200/60 pt-2">
                     <span className="text-gray-500">Design Inspo:</span>
@@ -820,8 +1168,29 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               </div>
 
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                We've sent your request to {confirmedAppt.salon_name}. Services and consultations will be conducted at the physical salon location where any payment is settled in person.
+                We've sent your request to {confirmedAppt.salon_name}. Your appointment slot has been locked with payment confirmation.
               </p>
+
+              {livePaymongoCheckoutUrl && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 max-w-md mx-auto text-center space-y-2">
+                  <div className="text-xs font-bold text-emerald-900 flex items-center justify-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>PayMongo Live Checkout Ready</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700">
+                    If your PayMongo checkout page didn't open automatically, click below to pay via GCash, Maya, or Card:
+                  </p>
+                  <a
+                    href={livePaymongoCheckoutUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                  >
+                    <span>Proceed to PayMongo Checkout</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
 
               <div className="pt-2">
                 <button
@@ -836,7 +1205,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         </div>
 
         {/* Footer Navigation Buttons */}
-        {step < 5 && (
+        {step < 6 && (
           <div className="p-4 bg-gray-50 border-t border-pink-100 flex items-center justify-between shrink-0">
             {step > 1 ? (
               <button
@@ -854,12 +1223,29 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               <div />
             )}
 
-            {step < 4 ? (
+            {step < 5 ? (
               <button
                 type="button"
-                disabled={!selectedServiceId}
+                disabled={
+                  (step === 1 && !selectedServiceId) ||
+                  (step === 4 && (!fullName || !phone || !email))
+                }
                 onClick={() => {
                   setValidationError(null);
+                  if (step === 4) {
+                    if (!fullName.trim()) {
+                      setValidationError('Please enter your full name');
+                      return;
+                    }
+                    if (!phone.trim()) {
+                      setValidationError('Please enter your contact phone number');
+                      return;
+                    }
+                    if (!email.trim() || !email.includes('@')) {
+                      setValidationError('Please enter a valid email address');
+                      return;
+                    }
+                  }
                   setStep(step + 1);
                 }}
                 className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
@@ -870,16 +1256,20 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             ) : (
               <button
                 type="button"
-                disabled={submitting || !fullName || !phone}
+                disabled={submitting}
                 onClick={handleSubmitBooking}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition-all shadow-md shadow-pink-500/20 flex items-center gap-2 cursor-pointer"
               >
                 {submitting ? (
-                  <span>Securing Appointment...</span>
+                  <span>Processing Payment & Booking...</span>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Confirm Booking</span>
+                    <span>
+                      {paymentType === 'pay_at_salon'
+                        ? 'Confirm Booking (Pay In-Salon)'
+                        : `Pay ₱${paymentBreakdown.dueNow.toLocaleString()} & Confirm`}
+                    </span>
                   </>
                 )}
               </button>

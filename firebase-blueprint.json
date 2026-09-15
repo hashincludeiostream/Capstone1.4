@@ -106,9 +106,44 @@
         "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
         "notes": { "type": "string" },
         "design_image": { "type": "string", "description": "Customer uploaded inspiration or design reference photo" },
+        "payment_method": { "type": "string" },
+        "payment_type": { "type": "string" },
+        "payment_status": { "type": "string" },
+        "paid_amount": { "type": "number" },
+        "remaining_balance": { "type": "number" },
+        "transaction_reference": { "type": "string" },
         "created_at": { "type": "string" }
       },
       "required": ["customer_id", "salon_id", "service_id", "appointment_date", "appointment_time"]
+    },
+    "PaymentTransaction": {
+      "title": "PaymentTransaction",
+      "description": "Financial payment transaction records for bookings and retail orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "transaction_reference": { "type": "string" },
+        "entity_type": { "type": "string", "enum": ["appointment", "product_order"] },
+        "entity_id": { "type": "number" },
+        "customer_id": { "type": "number" },
+        "customer_name": { "type": "string" },
+        "customer_email": { "type": "string" },
+        "customer_phone": { "type": "string" },
+        "salon_id": { "type": "number" },
+        "salon_name": { "type": "string" },
+        "amount": { "type": "number" },
+        "total_service_price": { "type": "number" },
+        "remaining_balance": { "type": "number" },
+        "currency": { "type": "string", "enum": ["PHP"] },
+        "payment_method": { "type": "string" },
+        "payment_type": { "type": "string" },
+        "payment_status": { "type": "string", "enum": ["succeeded", "pending", "failed"] },
+        "provider": { "type": "string", "enum": ["paymongo_live", "paymongo_sandbox"] },
+        "provider_reference": { "type": "string" },
+        "receipt_number": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["transaction_reference", "amount", "customer_id", "salon_id", "payment_method"]
     },
     "Review": {
       "title": "Review",
@@ -171,6 +206,10 @@
     "/products/{productId}": {
       "schema": "Product",
       "description": "Product store items"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "PaymentTransaction",
+      "description": "Online payment and deposit transactions"
     }
   }
 }

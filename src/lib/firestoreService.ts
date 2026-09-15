@@ -222,11 +222,29 @@ export async function createFirestoreAppointment(data: Partial<Appointment>): Pr
     status: (data.status as AppointmentStatus) || 'pending',
     notes: data.notes || '',
     design_image: data.design_image || '',
+    payment_method: data.payment_method || 'pay_in_salon',
+    payment_type: data.payment_type || 'pay_at_salon',
+    payment_status: data.payment_status || (data.payment_type === 'deposit' ? 'deposit_paid' : data.payment_type === 'full_payment' ? 'fully_paid' : 'unpaid'),
+    paid_amount: Number(data.paid_amount || 0),
+    remaining_balance: Number(data.remaining_balance !== undefined ? data.remaining_balance : (data.total_price || data.service_price || 0)),
+    transaction_reference: data.transaction_reference || '',
     created_at: new Date().toISOString(),
   };
 
   await setDoc(doc(db, 'appointments', String(newId)), appointmentRecord);
   return appointmentRecord;
+}
+
+export async function createFirestoreTransaction(tx: any): Promise<any> {
+  try {
+    const txId = tx.id || Date.now();
+    const docRef = doc(db, 'transactions', String(txId));
+    await setDoc(docRef, { ...tx, id: txId });
+    return { ...tx, id: txId };
+  } catch (err) {
+    console.warn('[Firestore] Failed to persist transaction:', err);
+    return tx;
+  }
 }
 
 export async function updateFirestoreAppointmentStatus(id: number, status: AppointmentStatus): Promise<boolean> {

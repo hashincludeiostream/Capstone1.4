@@ -33,6 +33,7 @@ class InMemoryDatabase {
     announcements: JSON.parse(JSON.stringify(seedAnnouncements)),
     products: JSON.parse(JSON.stringify(seedProducts)),
     product_orders: JSON.parse(JSON.stringify(seedProductOrders)),
+    transactions: [],
   };
 
   constructor() {
