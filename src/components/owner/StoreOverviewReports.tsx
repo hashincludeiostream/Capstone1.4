@@ -268,10 +268,10 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       return years;
     }
 
-    // Default: Monthly (past 6 months)
+    // Default: Monthly (past 12 months)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthly = [];
-    for (let m = 5; m >= 0; m--) {
+    for (let m = 11; m >= 0; m--) {
       const targetDate = new Date(currentYear, currentMonth - m, 1);
       const yyyy = targetDate.getFullYear();
       const monthIdx = targetDate.getMonth();
@@ -703,8 +703,8 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
         });
       }
     } else {
-      // Monthly (last 6 months)
-      for (let i = 5; i >= 0; i--) {
+      // Monthly (last 12 months)
+      for (let i = 11; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
         const yyyy = d.getFullYear();
@@ -750,7 +750,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       contactNumber: salon.phone || 'N/A',
       generatedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       timeGrain: financialTimeGrain,
-      timeRange: financialTimeGrain === 'daily' ? 'Past 7 Days' : financialTimeGrain === 'weekly' ? 'Past 4 Weeks' : financialTimeGrain === 'yearly' ? 'Past 3 Years' : 'Past 6 Months',
+      timeRange: financialTimeGrain === 'daily' ? 'Past 7 Days' : financialTimeGrain === 'weekly' ? 'Past 4 Weeks' : financialTimeGrain === 'yearly' ? 'Past 3 Years' : 'Past 12 Months',
       costAssumptions: {
         laborCommissionPercent: laborPercent,
         suppliesCostPercent: suppliesPercent,
@@ -978,13 +978,6 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
     showToast('All-in-One Master CSV report exported successfully');
   };
 
-  const handleDownloadHtmlReport = () => {
-    const html = generateStoreVisualHtmlReport(storeReportData);
-    const filename = `${salon.salon_name.replace(/\s+/g, '_')}_Decision_Report_${new Date().toISOString().split('T')[0]}.html`;
-    downloadFile(html, filename, 'text/html');
-    showToast('Visual Decision Report (HTML) downloaded');
-  };
-
   const handlePrintReport = () => {
     const html = generateStoreVisualHtmlReport(storeReportData);
     openPrintableReport(html);
@@ -1077,24 +1070,6 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>All-in-One Master Report</span>
-          </button>
-
-          {/* Print Master PDF Action */}
-          <button
-            onClick={handlePrintReport}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5 text-purple-700" />
-            <span>Print Master (PDF)</span>
-          </button>
-
-          {/* Export All-in-One CSV Action */}
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export Master CSV</span>
           </button>
         </div>
       </div>
@@ -2290,6 +2265,14 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       {showDecisionModal && (
         <DecisionReportModal
           reportData={storeReportData}
+          salon={salon}
+          appointments={appointments}
+          services={services}
+          technicians={technicians}
+          products={products}
+          productOrders={productOrders}
+          initialTimeGrain={financialTimeGrain}
+          onTimeGrainChange={(grain) => setFinancialTimeGrain(grain)}
           onClose={() => setShowDecisionModal(false)}
           onExportCsv={handleExportCSV}
           showToast={showToast}
