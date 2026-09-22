@@ -58,6 +58,7 @@ import { ProductDetailModal } from './components/products/ProductDetailModal';
 import { CartDrawer } from './components/products/CartDrawer';
 import { ProductCheckoutModal } from './components/products/ProductCheckoutModal';
 import { CustomerOrdersView } from './components/products/CustomerOrdersView';
+import { ChatWidget } from './components/chat/ChatWidget';
 import { scrollToElement } from './utils/scrollHelper';
 
 export const App: React.FC = () => {
@@ -1676,6 +1677,19 @@ const AppContent: React.FC = () => {
         onViewMyOrders={() => {
           setCheckoutModalOpen(false);
           setActiveTab('customer-orders');
+        }}
+      />
+
+      {/* 11. AI Assistant Chatbot (Accessible across Customer, Salon Owner, and Admin views) */}
+      <ChatWidget
+        currentUser={currentUser}
+        activeTab={activeTab}
+        salons={salons}
+        onNavigate={handleNavigate}
+        onOpenBookingModal={() => {
+          setBookingSalon(salons[0] || null);
+          setBookingService(null);
+          setBookingModalOpen(true);
         }}
       />
     </div>

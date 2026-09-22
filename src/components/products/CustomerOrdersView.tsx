@@ -11,10 +11,12 @@ import {
   ArrowRight,
   ShieldCheck,
   Tag,
+  PackageX,
 } from 'lucide-react';
 import { ProductOrder, ProductOrderStatus, User } from '../../types';
-import { updateProductOrderStatus } from '../../lib/api';
+import { cancelProductOrder, updateProductOrderStatus } from '../../lib/api';
 import { scrollToElement } from '../../utils/scrollHelper';
+import { OrderCancellationModal } from '../cancellation/OrderCancellationModal';
 
 interface CustomerOrdersViewProps {
   orders: ProductOrder[];
@@ -34,7 +36,7 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
   targetOrderId,
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<ProductOrder | null>(null);
 
   useEffect(() => {
     if (targetOrderId) {
@@ -68,20 +70,16 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
     return order.status === filterStatus;
   });
 
-  const handleCancelOrder = async (orderId: number) => {
-    if (!window.confirm('Are you sure you want to cancel this in-store pickup reservation? The reserved products will be returned to salon stock.')) {
-      return;
-    }
-
-    setCancellingId(orderId);
-    try {
-      await updateProductOrderStatus(orderId, 'cancelled');
-      onRefreshOrders();
-    } catch (err) {
-      console.error('Failed to cancel order:', err);
-    } finally {
-      setCancellingId(null);
-    }
+  const handleConfirmCancel = async (
+    orderId: number,
+    data: { cancellation_reason: string; cancellation_notes: string }
+  ) => {
+    await cancelProductOrder(orderId, {
+      cancellation_reason: data.cancellation_reason,
+      cancellation_notes: data.cancellation_notes,
+      cancelled_by: 'customer',
+    });
+    onRefreshOrders();
   };
 
   const getStatusBadge = (status: ProductOrderStatus) => {
@@ -296,6 +294,24 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
                     </p>
                   )}
 
+                  {/* Cancellation Reason Banner for Cancelled Orders */}
+                  {order.status === 'cancelled' && (
+                    <div className="p-3 bg-red-50/80 border border-red-200 rounded-xl text-xs space-y-1 text-red-900">
+                      <div className="flex items-center gap-1.5 font-bold text-red-950">
+                        <PackageX className="w-4 h-4 text-red-600 shrink-0" />
+                        <span>Cancelled: {order.cancellation_reason || 'Client cancelled reservation'}</span>
+                      </div>
+                      {order.cancellation_notes && (
+                        <p className="text-[11px] text-red-700 italic pl-5.5">
+                          "{order.cancellation_notes}"
+                        </p>
+                      )}
+                      <p className="text-[10px] text-red-600 pl-5.5">
+                        Inventory status: Reserved items were returned to salon shelf inventory.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Card Footer: Settlement & Actions */}
                   <div className="pt-3 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -310,11 +326,11 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
 
                     {isPending && (
                       <button
-                        onClick={() => handleCancelOrder(order.id)}
-                        disabled={cancellingId === order.id}
-                        className="text-xs text-stone-400 hover:text-red-600 font-semibold transition-colors cursor-pointer self-end sm:self-auto"
+                        onClick={() => setOrderToCancel(order)}
+                        className="px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold transition-colors cursor-pointer self-end sm:self-auto flex items-center gap-1"
                       >
-                        {cancellingId === order.id ? 'Cancelling...' : 'Cancel Reservation'}
+                        <PackageX className="w-3.5 h-3.5" />
+                        <span>Cancel Pickup Reservation</span>
                       </button>
                     )}
                   </div>
@@ -324,6 +340,14 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
           })}
         </div>
       )}
+
+      {/* Structured Multi-Step Order Cancellation Modal */}
+      <OrderCancellationModal
+        isOpen={Boolean(orderToCancel)}
+        order={orderToCancel}
+        onClose={() => setOrderToCancel(null)}
+        onConfirmCancel={handleConfirmCancel}
+      />
     </div>
   );
 };

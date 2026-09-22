@@ -13,10 +13,17 @@ import {
   Sparkles,
   Image as ImageIcon,
   X,
+  CalendarClock,
+  ShieldAlert,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { Appointment, Salon, User } from '../types';
-import { fetchAppointments } from '../lib/api';
+import { fetchAppointments, cancelAppointment, rescheduleAppointment } from '../lib/api';
 import { scrollToElement } from '../utils/scrollHelper';
+import { AppointmentCancellationModal } from './cancellation/AppointmentCancellationModal';
+import { RescheduleAppointmentModal } from './cancellation/RescheduleAppointmentModal';
+import { AccountReliabilityBadge } from './cancellation/AccountReliabilityBadge';
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -41,6 +48,8 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
+  const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
 
   useEffect(() => {
     if (targetAppointmentId) {
@@ -48,6 +57,12 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       scrollToElement(`customer-appointment-${targetAppointmentId}`);
     }
   }, [targetAppointmentId]);
+
+  const reloadAppointments = async () => {
+    const list = await fetchAppointments({ customer_id: currentUser.id });
+    setAppointments(list);
+    onRefreshAppointments?.();
+  };
 
   useEffect(() => {
     async function load() {
@@ -59,6 +74,31 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     }
     load();
   }, [currentUser.id]);
+
+  const handleConfirmCancel = async (
+    appointmentId: number,
+    data: {
+      cancellation_reason: string;
+      cancellation_notes: string;
+      tier: string;
+      fee: number;
+    }
+  ) => {
+    await cancelAppointment(appointmentId, {
+      cancellation_reason: data.cancellation_reason,
+      cancellation_notes: data.cancellation_notes,
+      cancelled_by: 'customer',
+    });
+    await reloadAppointments();
+  };
+
+  const handleConfirmReschedule = async (
+    appointmentId: number,
+    data: { new_date: string; new_time: string; notes?: string }
+  ) => {
+    await rescheduleAppointment(appointmentId, data);
+    await reloadAppointments();
+  };
 
   const filteredAppointments = appointments.filter((a) => {
     if (filterStatus === 'upcoming') return a.status === 'pending' || a.status === 'confirmed';
@@ -120,9 +160,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <h2 className="text-2xl sm:text-3xl font-serif font-bold">
               Welcome, {currentUser.fullname}
             </h2>
-            <p className="text-xs text-pink-100/80 mt-0.5">
-              Manage your upcoming nail appointments, beauty history, and saved pins.
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <p className="text-xs text-pink-100/80">
+                Manage your upcoming nail appointments, beauty history, and saved pins.
+              </p>
+              <span className="hidden sm:inline text-pink-300">•</span>
+              <AccountReliabilityBadge
+                userId={currentUser.id}
+                cancellationStrikes={currentUser.cancellation_strikes}
+                reliabilityScore={currentUser.reliability_score}
+                compact
+              />
+            </div>
           </div>
         </div>
 
@@ -136,22 +185,34 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs">
           <p className="text-xs font-medium text-gray-500">Total Bookings</p>
-          <p className="text-2xl font-bold font-serif text-pink-900 mt-1">
+          <p className="text-xl sm:text-2xl font-bold font-serif text-pink-900 mt-1">
             {appointments.length}
           </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-xs">
-          <p className="text-xs font-medium text-gray-500">Upcoming Sessions</p>
-          <p className="text-2xl font-bold font-serif text-pink-600 mt-1">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs">
+          <p className="text-xs font-medium text-gray-500">Upcoming</p>
+          <p className="text-xl sm:text-2xl font-bold font-serif text-pink-600 mt-1">
             {appointments.filter((a) => a.status === 'pending' || a.status === 'confirmed').length}
           </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-xs">
-          <p className="text-xs font-medium text-gray-500">Partner Salons</p>
-          <p className="text-2xl font-bold font-serif text-purple-900 mt-1">{salons.length}</p>
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs">
+          <p className="text-xs font-medium text-gray-500">Completed</p>
+          <p className="text-xl sm:text-2xl font-bold font-serif text-emerald-700 mt-1">
+            {appointments.filter((a) => a.status === 'completed').length}
+          </p>
+        </div>
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs flex flex-col justify-between">
+          <p className="text-xs font-medium text-gray-500">Reliability</p>
+          <div className="mt-1">
+            <AccountReliabilityBadge
+              userId={currentUser.id}
+              cancellationStrikes={currentUser.cancellation_strikes}
+              reliabilityScore={currentUser.reliability_score}
+            />
+          </div>
         </div>
       </div>
 
@@ -295,12 +356,44 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                           </button>
                         </div>
                       )}
+
+                      {/* Cancellation Sanctions & Audit Banner if cancelled */}
+                      {appt.status === 'cancelled' && (
+                        <div className="mt-3 p-3 bg-red-50/80 border border-red-200 rounded-xl text-xs space-y-1 text-red-900">
+                          <div className="flex items-center gap-1.5 font-bold text-red-950">
+                            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                            <span>Cancellation: {appt.cancellation_reason || 'Client requested cancellation'}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-red-800 font-medium pl-5.5">
+                            {appt.cancellation_tier && (
+                              <span className="bg-red-100 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px]">
+                                {appt.cancellation_tier} tier
+                              </span>
+                            )}
+                            {Number(appt.cancellation_fee || 0) > 0 ? (
+                              <span className="bg-rose-200 text-rose-950 px-2 py-0.5 rounded-md font-bold">
+                                ₱{Number(appt.cancellation_fee).toLocaleString()} Late Fee Applied
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                                ₱0 Fee (Standard Notice)
+                              </span>
+                            )}
+                            <span>• Specialist schedule released</span>
+                          </div>
+                          {appt.cancellation_notes && (
+                            <p className="text-[11px] text-red-700 italic pl-5.5">
+                              "{appt.cancellation_notes}"
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-pink-100">
                     <span className="text-[11px] font-mono text-gray-400">#NGH-{appt.id}</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {salon && (
                         <button
                           onClick={() => onSelectSalon(salon)}
@@ -309,6 +402,29 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                           Salon Info
                         </button>
                       )}
+
+                      {/* Active Appointment Actions: Reschedule & Cancel */}
+                      {(appt.status === 'pending' || appt.status === 'confirmed') && (
+                        <>
+                          <button
+                            onClick={() => setReschedulingAppt(appt)}
+                            className="px-3 py-1.5 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                            title="Reschedule to a new date with zero penalty fee"
+                          >
+                            <CalendarClock className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Reschedule</span>
+                          </button>
+                          <button
+                            onClick={() => setCancellingAppt(appt)}
+                            className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                            title="Cancel appointment (subject to store cancellation policy)"
+                          >
+                            <X className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Cancel</span>
+                          </button>
+                        </>
+                      )}
+
                       {appt.status === 'completed' && salon && (
                         <button
                           onClick={() => onOpenLeaveReview(salon, appt.technician_id, appt.technician_name)}
@@ -358,6 +474,26 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             </div>
           </div>
         )}
+
+        {/* Structured Multi-Step Appointment Cancellation Modal */}
+        <AppointmentCancellationModal
+          isOpen={Boolean(cancellingAppt)}
+          appointment={cancellingAppt}
+          onClose={() => setCancellingAppt(null)}
+          onConfirmCancel={handleConfirmCancel}
+          onOpenReschedule={(appt) => {
+            setCancellingAppt(null);
+            setReschedulingAppt(appt);
+          }}
+        />
+
+        {/* Zero-Penalty Reschedule Appointment Modal */}
+        <RescheduleAppointmentModal
+          isOpen={Boolean(reschedulingAppt)}
+          appointment={reschedulingAppt}
+          onClose={() => setReschedulingAppt(null)}
+          onConfirmReschedule={handleConfirmReschedule}
+        />
       </div>
     </div>
   );

@@ -247,10 +247,18 @@ export async function createFirestoreTransaction(tx: any): Promise<any> {
   }
 }
 
-export async function updateFirestoreAppointmentStatus(id: number, status: AppointmentStatus): Promise<boolean> {
+export async function updateFirestoreAppointmentStatus(
+  id: number,
+  status: AppointmentStatus,
+  extraData?: Record<string, any>
+): Promise<boolean> {
   try {
     const ref = doc(db, 'appointments', String(id));
-    await updateDoc(ref, { status, updated_at: new Date().toISOString() });
+    await updateDoc(ref, {
+      status,
+      ...(extraData || {}),
+      updated_at: new Date().toISOString(),
+    });
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to update appointment status:', err);
@@ -293,11 +301,16 @@ export async function createFirestoreProductOrder(order: any): Promise<any> {
 
 export async function updateFirestoreProductOrderStatus(
   orderId: number,
-  status: string
+  status: string,
+  extraData?: Record<string, any>
 ): Promise<boolean> {
   try {
     const ref = doc(db, 'product_orders', String(orderId));
-    await updateDoc(ref, { status, updated_at: new Date().toISOString() });
+    await updateDoc(ref, {
+      status,
+      ...(extraData || {}),
+      updated_at: new Date().toISOString(),
+    });
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to update product order status in firestore:', err);

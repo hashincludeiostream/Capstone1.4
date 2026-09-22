@@ -969,6 +969,29 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                             </button>
                           </div>
                         )}
+
+                        {/* Cancellation Reason and Policy info for Salon Owner */}
+                        {appt.status === 'cancelled' && (
+                          <div className="mt-2.5 p-2.5 bg-red-50/70 border border-red-200 rounded-xl text-xs text-red-900 space-y-1">
+                            <div className="font-bold flex items-center gap-1.5 text-red-950">
+                              <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                              <span>
+                                Cancellation Log ({appt.cancelled_by === 'customer' ? 'By Client' : 'By Salon'}): {appt.cancellation_reason || 'Client cancelled appointment'}
+                              </span>
+                            </div>
+                            {appt.cancellation_tier && (
+                              <div className="text-[11px] text-red-800 flex items-center gap-2 pl-5">
+                                <span>Policy: <strong>{appt.cancellation_tier.toUpperCase()}</strong></span>
+                                {Number(appt.cancellation_fee || 0) > 0 && (
+                                  <span>• Penalty Fee: <strong>₱{Number(appt.cancellation_fee).toLocaleString()}</strong></span>
+                                )}
+                              </div>
+                            )}
+                            {appt.cancellation_notes && (
+                              <p className="text-[11px] text-red-700 italic pl-5">"{appt.cancellation_notes}"</p>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Status Action Buttons */}

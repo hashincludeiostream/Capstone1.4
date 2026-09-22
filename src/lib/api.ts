@@ -282,16 +282,35 @@ export async function createAppointment(data: Partial<Appointment>): Promise<{ s
   }
 }
 
-export async function updateAppointmentStatus(id: number, status: AppointmentStatus): Promise<boolean> {
+export async function updateAppointmentStatus(
+  id: number,
+  status: AppointmentStatus,
+  cancellationData?: {
+    reason?: string;
+    notes?: string;
+    fee?: number;
+    tier?: string;
+    cancelled_by?: string;
+  }
+): Promise<boolean> {
   try {
+    const payload: Record<string, any> = { status };
+    if (cancellationData) {
+      if (cancellationData.reason) payload.cancellation_reason = cancellationData.reason;
+      if (cancellationData.notes) payload.cancellation_notes = cancellationData.notes;
+      if (cancellationData.fee !== undefined) payload.cancellation_fee = cancellationData.fee;
+      if (cancellationData.tier) payload.cancellation_tier = cancellationData.tier;
+      if (cancellationData.cancelled_by) payload.cancelled_by = cancellationData.cancelled_by;
+    }
+
     const res = await fetch(`${API_BASE}/appointments/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(payload),
     });
 
     // Real-time Firestore sync
-    updateFirestoreAppointmentStatus(id, status).catch((err) =>
+    updateFirestoreAppointmentStatus(id, status, cancellationData).catch((err) =>
       console.warn('Firestore status sync warning:', err)
     );
 
@@ -302,6 +321,79 @@ export async function updateAppointmentStatus(id: number, status: AppointmentSta
     console.error('User-facing error:', errorMessage);
     return false;
   }
+}
+
+export async function cancelAppointment(
+  id: number,
+  data: {
+    cancellation_reason: string;
+    cancellation_notes?: string;
+    cancelled_by?: 'customer' | 'salon_owner' | 'admin';
+  }
+): Promise<{
+  success: boolean;
+  appointment: Appointment;
+  policy: any;
+  cancellation_fee: number;
+  cancellation_tier: string;
+  strike_applied: boolean;
+  strike_count: number;
+  refund_amount: number;
+  message: string;
+}> {
+  const res = await fetch(`${API_BASE}/appointments/${id}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to cancel appointment');
+  }
+
+  const result = await res.json();
+  // Sync to firestore in background
+  updateFirestoreAppointmentStatus(id, 'cancelled', {
+    cancellation_reason: data.cancellation_reason,
+    cancellation_notes: data.cancellation_notes,
+    cancellation_fee: result.cancellation_fee,
+    cancellation_tier: result.cancellation_tier,
+  }).catch((err) => console.warn('Firestore cancel sync warning:', err));
+
+  return result;
+}
+
+export async function rescheduleAppointment(
+  id: number,
+  data: {
+    new_date: string;
+    new_time: string;
+    notes?: string;
+  }
+): Promise<{
+  success: boolean;
+  appointment: Appointment;
+  message: string;
+}> {
+  const res = await fetch(`${API_BASE}/appointments/${id}/reschedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to reschedule appointment');
+  }
+
+  const result = await res.json();
+  updateFirestoreAppointmentStatus(id, 'confirmed', {
+    appointment_date: data.new_date,
+    appointment_time: data.new_time,
+  }).catch((err) => console.warn('Firestore reschedule sync warning:', err));
+
+  return result;
 }
 
 export async function updateAppointmentTechnician(id: number, technicianId: number): Promise<boolean> {
@@ -799,22 +891,88 @@ export async function createProductOrder(orderData: {
 
 export async function updateProductOrderStatus(
   orderId: number,
-  status: ProductOrderStatus
+  status: ProductOrderStatus,
+  cancellationData?: {
+    reason?: string;
+    notes?: string;
+    cancelled_by?: string;
+  }
 ): Promise<{ success: boolean; order: ProductOrder; message: string }> {
+  const payload: Record<string, any> = { status };
+  if (cancellationData) {
+    if (cancellationData.reason) payload.cancellation_reason = cancellationData.reason;
+    if (cancellationData.notes) payload.cancellation_notes = cancellationData.notes;
+    if (cancellationData.cancelled_by) payload.cancelled_by = cancellationData.cancelled_by;
+  }
+
   const res = await fetch(`${API_BASE}/product-orders/${orderId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to update order status');
   }
   const result = await res.json();
-  updateFirestoreProductOrderStatus(orderId, status).catch((err) =>
+  updateFirestoreProductOrderStatus(orderId, status, cancellationData).catch((err) =>
     console.warn('Firestore product order status sync warning:', err)
   );
   return result;
+}
+
+export async function cancelProductOrder(
+  orderId: number,
+  data: {
+    cancellation_reason: string;
+    cancellation_notes?: string;
+    cancelled_by?: 'customer' | 'salon_owner' | 'admin';
+  }
+): Promise<{
+  success: boolean;
+  order: ProductOrder;
+  restocked_items_count: number;
+  message: string;
+}> {
+  const res = await fetch(`${API_BASE}/product-orders/${orderId}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to cancel product order');
+  }
+
+  const result = await res.json();
+  updateFirestoreProductOrderStatus(orderId, 'cancelled', {
+    cancellation_reason: data.cancellation_reason,
+    cancellation_notes: data.cancellation_notes,
+    cancelled_by: data.cancelled_by || 'customer',
+  }).catch((err) => console.warn('Firestore product order cancel sync warning:', err));
+
+  return result;
+}
+
+export async function fetchUserReliability(userId: number): Promise<{
+  success: boolean;
+  user_id: number;
+  fullname: string;
+  strikes: number;
+  score: number;
+  total_bookings: number;
+  completed_bookings: number;
+  cancelled_bookings: number;
+  standing: string;
+  tier: 'excellent' | 'good' | 'caution' | 'restricted';
+  info: any;
+}> {
+  const res = await fetch(`${API_BASE}/users/${userId}/reliability`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch user reliability status');
+  }
+  return await res.json();
 }
 
 export async function fetchTransactions(params?: { customer_id?: number; salon_id?: number }): Promise<any[]> {
@@ -831,5 +989,44 @@ export async function fetchTransactions(params?: { customer_id?: number; salon_i
     return [];
   }
 }
+
+export interface ChatApiMessage {
+  role: 'user' | 'model' | 'assistant';
+  content: string;
+}
+
+export interface SendChatParams {
+  messages: ChatApiMessage[];
+  userRole?: 'customer' | 'salon_owner' | 'admin' | 'guest';
+  userId?: number;
+  userName?: string;
+  currentTab?: string;
+  salonContext?: {
+    salonId?: number;
+    salonName?: string;
+  };
+}
+
+export interface ChatApiResponse {
+  reply: string;
+  source: 'gemini' | 'fallback';
+  timestamp: string;
+}
+
+export async function sendChatMessage(params: SendChatParams): Promise<ChatApiResponse> {
+  const res = await fetch(`${API_BASE}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to send message to assistant');
+  }
+
+  return await res.json();
+}
+
 
 

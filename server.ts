@@ -8,6 +8,8 @@ import { createServer as createViteServer } from 'vite';
 import { Appointment, Review, Salon, Service, Technician, User, Reel, Announcement } from './src/types';
 import db, { testConnection, healthCheck } from './src/config/db.js';
 import { sanitizeString, sanitizeEmail, sanitizeNumber, sanitizeBoolean } from './src/lib/sanitization.js';
+import { handleChatMessage } from './src/server/geminiChat';
+import { calculateAppointmentCancellationTier, parseAppointmentDateTime, getAccountReliabilityInfo } from './src/lib/cancellationPolicy.js';
 
 // Load environment variables
 const PORT = 3000;
@@ -340,6 +342,66 @@ async function startServer() {
     } catch (error) {
       console.error('Update user profile error:', error);
       res.status(500).json({ error: 'Server error updating user profile' });
+    }
+  });
+
+  // Get Single User Profile
+  app.get('/api/users/:id', async (req, res) => {
+    const userId = Number(req.params.id);
+    try {
+      const [rows] = await db.execute(
+        'SELECT id, fullname, email, phone, user_type, avatar, status, cancellation_strikes, reliability_score, created_at FROM users WHERE id = ?',
+        [userId]
+      );
+      const user = (rows as any[])[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json(user);
+    } catch (error) {
+      console.error('Get user error:', error);
+      res.status(500).json({ error: 'Server error fetching user' });
+    }
+  });
+
+  // Get Customer Booking Reliability & Sanction Status
+  app.get('/api/users/:id/reliability', async (req, res) => {
+    const userId = Number(req.params.id);
+    try {
+      const [userRows] = await db.execute(
+        'SELECT id, fullname, user_type, cancellation_strikes, reliability_score FROM users WHERE id = ?',
+        [userId]
+      );
+      const user = (userRows as any[])[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const [apptRows] = await db.execute(
+        'SELECT id, status, cancellation_tier, cancellation_fee, cancellation_reason FROM appointments WHERE customer_id = ?',
+        [userId]
+      );
+      const appts = (apptRows as any[]) || [];
+      const totalBookings = appts.length;
+      const completedBookings = appts.filter((a) => a.status === 'completed').length;
+      const cancelledBookings = appts.filter((a) => a.status === 'cancelled').length;
+      const strikes = Number(user.cancellation_strikes || 0);
+      const score = user.reliability_score !== undefined ? Number(user.reliability_score) : Math.max(30, 100 - strikes * 15);
+
+      const reliabilityInfo = getAccountReliabilityInfo(strikes, score);
+
+      res.json({
+        success: true,
+        user_id: userId,
+        fullname: user.fullname,
+        strikes,
+        score,
+        total_bookings: totalBookings,
+        completed_bookings: completedBookings,
+        cancelled_bookings: cancelledBookings,
+        standing: reliabilityInfo.title,
+        tier: reliabilityInfo.tier,
+        info: reliabilityInfo,
+      });
+    } catch (error) {
+      console.error('User reliability check error:', error);
+      res.status(500).json({ error: 'Server error retrieving user reliability status' });
     }
   });
 
@@ -1327,10 +1389,68 @@ async function startServer() {
     }
   });
 
+  // Cancel Product Order (Structured Multi-Step Cancellation)
+  app.post('/api/product-orders/:id/cancel', async (req, res) => {
+    const id = Number(req.params.id);
+    const { cancellation_reason, cancellation_notes, cancelled_by } = req.body;
+
+    try {
+      const [orderRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
+      const order = (orderRows as any[])[0];
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      if (order.status === 'cancelled') {
+        return res.status(400).json({ error: 'Order is already cancelled' });
+      }
+      if (order.status === 'completed') {
+        return res.status(400).json({ error: 'Completed pickup orders cannot be cancelled' });
+      }
+
+      // Restore product stock in salon inventory
+      const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+      let restockedCount = 0;
+      for (const item of items) {
+        const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
+        const prod = (prodRows as any[])[0];
+        if (prod) {
+          const restoredStock = Number(prod.stock_quantity) + Number(item.quantity);
+          await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [restoredStock, Number(item.product_id)]);
+          restockedCount += Number(item.quantity);
+        }
+      }
+
+      const cancelledAt = new Date().toISOString();
+      const reason = cancellation_reason || 'Client cancelled pickup reservation';
+      const notes = cancellation_notes || '';
+      const by = cancelled_by || 'customer';
+
+      await db.execute(
+        'UPDATE product_orders SET status = ?, cancellation_reason = ?, cancellation_notes = ?, cancelled_at = ?, cancelled_by = ?, restocked_items_count = ? WHERE id = ?',
+        ['cancelled', reason, notes, cancelledAt, by, restockedCount, id]
+      );
+
+      const [updatedRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
+      const updated = (updatedRows as any[])[0];
+
+      res.json({
+        success: true,
+        order: {
+          ...updated,
+          items: typeof updated.items === 'string' ? JSON.parse(updated.items) : updated.items,
+        },
+        restocked_items_count: restockedCount,
+        message: `Pickup reservation cancelled. ${restockedCount} item(s) returned to salon shelf stock.`,
+      });
+    } catch (error) {
+      console.error('Cancel product order error:', error);
+      res.status(500).json({ error: 'Server error cancelling product order' });
+    }
+  });
+
   // Update Product Order Status (Salon Owner / Customer Cancel)
   app.patch('/api/product-orders/:id/status', async (req, res) => {
     const id = Number(req.params.id);
-    const { status } = req.body;
+    const { status, cancellation_reason, cancellation_notes, cancelled_by } = req.body;
 
     const validStatuses = ['pending_pickup', 'ready_for_pickup', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
@@ -1345,6 +1465,7 @@ async function startServer() {
       const prevStatus = order.status;
 
       // If cancelling an order, restore product stock
+      let restockedCount = 0;
       if (status === 'cancelled' && prevStatus !== 'cancelled') {
         const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
         for (const item of items) {
@@ -1353,11 +1474,24 @@ async function startServer() {
           if (prod) {
             const restoredStock = Number(prod.stock_quantity) + Number(item.quantity);
             await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [restoredStock, Number(item.product_id)]);
+            restockedCount += Number(item.quantity);
           }
         }
       }
 
-      await db.execute('UPDATE product_orders SET status = ? WHERE id = ?', [status, id]);
+      if (status === 'cancelled') {
+        const reason = cancellation_reason || order.cancellation_reason || 'Status updated to cancelled';
+        const notes = cancellation_notes || order.cancellation_notes || '';
+        const by = cancelled_by || 'salon_owner';
+        const cancelledAt = new Date().toISOString();
+
+        await db.execute(
+          'UPDATE product_orders SET status = ?, cancellation_reason = ?, cancellation_notes = ?, cancelled_at = ?, cancelled_by = ?, restocked_items_count = ? WHERE id = ?',
+          [status, reason, notes, cancelledAt, by, restockedCount, id]
+        );
+      } else {
+        await db.execute('UPDATE product_orders SET status = ? WHERE id = ?', [status, id]);
+      }
 
       const [updatedRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
       const updated = (updatedRows as any[])[0];
@@ -1761,10 +1895,185 @@ async function startServer() {
     }
   });
 
+  // Cancel Appointment (Structured Multi-Step Cancellation with Tiers, Fees & Sanctions)
+  app.post('/api/appointments/:id/cancel', async (req, res) => {
+    const id = Number(req.params.id);
+    const { cancellation_reason, cancellation_notes, cancelled_by } = req.body;
+
+    try {
+      const [apptRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
+      const appointment = (apptRows as any[])[0];
+      if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
+
+      if (appointment.status === 'cancelled') {
+        return res.status(400).json({ error: 'This appointment is already cancelled.' });
+      }
+      if (appointment.status === 'completed') {
+        return res.status(400).json({ error: 'Completed appointments cannot be cancelled.' });
+      }
+
+      // Calculate cancellation tier, penalty fee, and strikes based on appointment date/time
+      const policyCalc = calculateAppointmentCancellationTier(
+        appointment.appointment_date,
+        appointment.appointment_time,
+        Number(appointment.total_price || appointment.service_price || 0)
+      );
+
+      const tier = policyCalc.tier;
+      const cancellationFee = policyCalc.fee;
+      const strikeApplied = policyCalc.strike;
+      const strikeCount = policyCalc.strikeCount;
+      const cancelledAt = new Date().toISOString();
+      const by = cancelled_by || 'customer';
+      const reason = cancellation_reason || 'Client requested cancellation';
+      const notes = cancellation_notes || '';
+
+      // Update appointment record
+      await db.execute(
+        `UPDATE appointments SET 
+          status = 'cancelled', 
+          cancellation_reason = ?, 
+          cancellation_notes = ?, 
+          cancellation_tier = ?, 
+          cancellation_fee = ?, 
+          cancellation_strike = ?, 
+          cancelled_at = ?, 
+          cancelled_by = ? 
+        WHERE id = ?`,
+        [reason, notes, tier, cancellationFee, strikeApplied ? 1 : 0, cancelledAt, by, id]
+      );
+
+      // If customer cancelled and strikes apply, update customer account strikes & reliability
+      let updatedUserStrikes = 0;
+      let updatedReliabilityScore = 100;
+      if (by === 'customer' && strikeApplied && appointment.customer_id) {
+        const [userRows] = await db.execute('SELECT id, cancellation_strikes, reliability_score FROM users WHERE id = ?', [appointment.customer_id]);
+        const user = (userRows as any[])[0];
+        if (user) {
+          updatedUserStrikes = (Number(user.cancellation_strikes) || 0) + strikeCount;
+          updatedReliabilityScore = Math.max(30, 100 - (updatedUserStrikes * 15));
+          await db.execute(
+            'UPDATE users SET cancellation_strikes = ?, reliability_score = ? WHERE id = ?',
+            [updatedUserStrikes, updatedReliabilityScore, appointment.customer_id]
+          );
+        }
+      }
+
+      // Handle deposit refunds or fee logging
+      const paidAmount = Number(appointment.paid_amount || 0);
+      let refundAmount = 0;
+      if (paidAmount > 0) {
+        if (tier === 'flexible') {
+          refundAmount = paidAmount;
+        } else if (tier === 'late') {
+          refundAmount = Math.max(0, paidAmount - cancellationFee);
+        } else {
+          refundAmount = Math.max(0, paidAmount - cancellationFee);
+        }
+        await db.execute(
+          'UPDATE appointments SET payment_status = ? WHERE id = ?',
+          [refundAmount > 0 ? 'refunded' : 'unpaid', id]
+        );
+      }
+
+      const [updatedRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
+      const updatedAppt = (updatedRows as any[])[0];
+
+      res.json({
+        success: true,
+        appointment: {
+          ...updatedAppt,
+          customer_id: Number(updatedAppt.customer_id),
+          salon_id: Number(updatedAppt.salon_id),
+          service_id: Number(updatedAppt.service_id),
+          technician_id: updatedAppt.technician_id ? Number(updatedAppt.technician_id) : null,
+          total_price: Number(updatedAppt.total_price) || 0,
+          cancellation_fee: cancellationFee,
+          cancellation_tier: tier,
+        },
+        policy: policyCalc,
+        cancellation_fee: cancellationFee,
+        cancellation_tier: tier,
+        strike_applied: strikeApplied,
+        strike_count: strikeCount,
+        refund_amount: refundAmount,
+        user_strikes: updatedUserStrikes,
+        reliability_score: updatedReliabilityScore,
+        message: `Appointment successfully cancelled. ${cancellationFee > 0 ? `Late cancellation fee of ₱${cancellationFee.toLocaleString()} assessed.` : 'No cancellation fees charged.'}`,
+      });
+    } catch (error) {
+      console.error('Cancel appointment error:', error);
+      res.status(500).json({ 
+        error: 'Server error cancelling appointment',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Reschedule Appointment (Retention alternative with ZERO penalty fees or strikes)
+  app.post('/api/appointments/:id/reschedule', async (req, res) => {
+    const id = Number(req.params.id);
+    const { new_date, new_time, notes } = req.body;
+
+    if (!new_date || !new_time) {
+      return res.status(400).json({ error: 'New appointment date and time are required' });
+    }
+
+    try {
+      const [apptRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
+      const appointment = (apptRows as any[])[0];
+      if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
+
+      if (appointment.status === 'completed') {
+        return res.status(400).json({ error: 'Completed appointments cannot be rescheduled' });
+      }
+
+      const oldSchedule = `${appointment.appointment_date} at ${appointment.appointment_time}`;
+      const rescheduleNote = `[Rescheduled from ${oldSchedule}${notes ? `: ${notes}` : ''}]`;
+      const combinedNotes = appointment.notes ? `${appointment.notes}\n${rescheduleNote}` : rescheduleNote;
+      const currentRescheduleCount = Number(appointment.reschedule_count || 0) + 1;
+
+      await db.execute(
+        `UPDATE appointments SET 
+          appointment_date = ?, 
+          appointment_time = ?, 
+          status = 'confirmed', 
+          notes = ?, 
+          reschedule_count = ?,
+          cancellation_fee = 0,
+          cancellation_strike = 0
+        WHERE id = ?`,
+        [new_date, new_time, combinedNotes, currentRescheduleCount, id]
+      );
+
+      const [updatedRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
+      const updatedAppt = (updatedRows as any[])[0];
+
+      res.json({
+        success: true,
+        appointment: {
+          ...updatedAppt,
+          customer_id: Number(updatedAppt.customer_id),
+          salon_id: Number(updatedAppt.salon_id),
+          service_id: Number(updatedAppt.service_id),
+          technician_id: updatedAppt.technician_id ? Number(updatedAppt.technician_id) : null,
+          total_price: Number(updatedAppt.total_price) || 0,
+        },
+        message: `Appointment successfully rescheduled to ${new_date} at ${new_time} with ₱0 penalty fee!`,
+      });
+    } catch (error) {
+      console.error('Reschedule appointment error:', error);
+      res.status(500).json({ 
+        error: 'Server error rescheduling appointment',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Update Appointment Status
   app.patch('/api/appointments/:id/status', async (req, res) => {
     const id = Number(req.params.id);
-    const { status } = req.body;
+    const { status, cancellation_reason, cancellation_notes, cancellation_tier, cancellation_fee, cancelled_by } = req.body;
     
     // Validate status
     const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
@@ -1778,8 +2087,32 @@ async function startServer() {
     try {
       const [apptRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
       if ((apptRows as any[]).length === 0) return res.status(404).json({ error: 'Appointment not found' });
+      const currentAppt = (apptRows as any[])[0];
 
-      await db.execute('UPDATE appointments SET status = ? WHERE id = ?', [status, id]);
+      if (status === 'cancelled') {
+        const reason = cancellation_reason || currentAppt.cancellation_reason || 'Status updated to cancelled';
+        const notes = cancellation_notes || currentAppt.cancellation_notes || '';
+        const tier = cancellation_tier || currentAppt.cancellation_tier || 'flexible';
+        const fee = cancellation_fee !== undefined ? Number(cancellation_fee) : (Number(currentAppt.cancellation_fee) || 0);
+        const by = cancelled_by || 'salon_owner';
+        const cancelledAt = new Date().toISOString();
+
+        await db.execute(
+          `UPDATE appointments SET 
+            status = ?, 
+            cancellation_reason = ?, 
+            cancellation_notes = ?, 
+            cancellation_tier = ?, 
+            cancellation_fee = ?, 
+            cancelled_at = ?, 
+            cancelled_by = ? 
+          WHERE id = ?`,
+          [status, reason, notes, tier, fee, cancelledAt, by, id]
+        );
+      } else {
+        await db.execute('UPDATE appointments SET status = ? WHERE id = ?', [status, id]);
+      }
+
       const [updatedRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
       const updatedAppt = (updatedRows as any[])[0];
       
@@ -1791,6 +2124,7 @@ async function startServer() {
         service_id: Number(updatedAppt.service_id),
         technician_id: updatedAppt.technician_id ? Number(updatedAppt.technician_id) : null,
         total_price: Number(updatedAppt.total_price) || 0,
+        cancellation_fee: Number(updatedAppt.cancellation_fee) || 0,
       };
       
       res.json({ success: true, appointment: formattedAppointment });
@@ -2552,6 +2886,69 @@ async function startServer() {
     } catch (error) {
       console.error('Fetch transactions error:', error);
       res.status(500).json({ error: 'Server error fetching transactions' });
+    }
+  });
+
+  // AI Chatbot Assistant Endpoint (Customer, Salon Owner, and Admin support with strict session isolation)
+  app.post('/api/chat', async (req, res) => {
+    try {
+      const { messages, userId, userName, currentTab, salonContext } = req.body;
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: 'Messages array is required.' });
+      }
+
+      // Enforce strict server-side authentication and role assignment
+      let verifiedRole: 'customer' | 'salon_owner' | 'admin' = 'customer';
+      let verifiedUserId: number | undefined = undefined;
+      let verifiedUserName: string | undefined = userName;
+
+      if (userId) {
+        try {
+          const [userRows] = await db.execute(
+            'SELECT id, user_type, fullname, status FROM users WHERE id = ?',
+            [Number(userId)]
+          );
+          const dbUser = (userRows as any[])[0];
+          if (dbUser) {
+            if (dbUser.status !== 'active') {
+              return res.status(403).json({ error: 'Your account is suspended or inactive.' });
+            }
+            verifiedUserId = Number(dbUser.id);
+            verifiedUserName = dbUser.fullname;
+            if (dbUser.user_type === 'admin') {
+              verifiedRole = 'admin';
+            } else if (dbUser.user_type === 'salon_owner') {
+              verifiedRole = 'salon_owner';
+            } else {
+              verifiedRole = 'customer';
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Could not verify user for chat session, defaulting to customer:', dbErr);
+        }
+      }
+
+      const result = await handleChatMessage({
+        messages,
+        userRole: verifiedRole,
+        userId: verifiedUserId,
+        userName: verifiedUserName,
+        currentTab,
+        salonContext,
+      });
+
+      res.json({
+        reply: result.reply,
+        source: result.source,
+        role: verifiedRole,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('API /api/chat error:', error);
+      res.status(500).json({
+        error: 'Failed to process chat message',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   });
 

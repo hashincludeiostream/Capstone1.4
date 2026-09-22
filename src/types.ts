@@ -9,6 +9,10 @@ export interface User {
   created_at: string;
   avatar?: string;
   status?: 'active' | 'suspended' | 'banned';
+  cancellation_strikes?: number;
+  reliability_score?: number;
+  booking_cooldown_until?: string | null;
+  requires_prepayment?: boolean;
 }
 
 export interface Salon {
@@ -132,6 +136,16 @@ export interface Appointment {
   paid_amount?: number;
   remaining_balance?: number;
   transaction_reference?: string;
+  // Cancellation & Rescheduling tracking
+  cancellation_reason?: string;
+  cancellation_notes?: string;
+  cancellation_tier?: 'flexible' | 'late' | 'critical';
+  cancellation_fee?: number;
+  cancellation_strike?: boolean;
+  cancelled_at?: string;
+  cancelled_by?: 'customer' | 'salon_owner' | 'admin';
+  rescheduled_from_id?: number;
+  reschedule_count?: number;
   created_at: string;
 }
 
@@ -310,6 +324,12 @@ export interface ProductOrder {
   pickup_time?: string;
   notes?: string;
   payment_method: 'pay_in_store';
+  // Cancellation tracking
+  cancellation_reason?: string;
+  cancellation_notes?: string;
+  cancelled_at?: string;
+  cancelled_by?: 'customer' | 'salon_owner' | 'admin';
+  restocked_items_count?: number;
   created_at: string;
   updated_at?: string;
 }
