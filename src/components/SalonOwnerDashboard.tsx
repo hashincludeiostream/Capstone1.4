@@ -53,6 +53,7 @@ import { BranchOverview } from './owner/BranchOverview';
 import { OwnerLocationPicker } from './maps/OwnerLocationPicker';
 import { ProductInventoryManager } from './owner/ProductInventoryManager';
 import { LateCancellationFeesManager } from './owner/LateCancellationFeesManager';
+import { OwnerEmailReportsManager } from './owner/OwnerEmailReportsManager';
 import { EmptyState } from './EmptyState';
 import { scrollToElement } from '../utils/scrollHelper';
 
@@ -107,7 +108,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [reviews, setReviews] = useState<Review[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productOrders, setProductOrders] = useState<ProductOrder[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails'>(initialTab);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewInspoImage, setPreviewInspoImage] = useState<{ url: string; clientName: string } | null>(null);
@@ -752,6 +753,23 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           >
             <Store className="w-4 h-4 text-amber-600" />
             <span>Studio Profile & Hours</span>
+          </button>
+
+          {/* Tab 8: Email Reports & Monthly PDF */}
+          <button
+            id="owner-tab-emails"
+            onClick={() => setActiveTab('emails')}
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              activeTab === 'emails'
+                ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl shadow-2xs'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <Mail className="w-4 h-4 text-pink-600" />
+            <span>Email Reports & Alerts</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 text-[10px] font-bold">
+              PDF
+            </span>
           </button>
         </div>
 
@@ -1561,6 +1579,15 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 </div>
               </form>
             </div>
+          )}
+
+          {/* TAB 8: EMAIL REPORTS & MONTHLY PDF */}
+          {activeTab === 'emails' && (salons.find((s) => s.id === selectedSalonId) || salons[0]) && (
+            <OwnerEmailReportsManager
+              salon={salons.find((s) => s.id === selectedSalonId) || salons[0]}
+              currentUser={currentUser}
+              showToast={showToast}
+            />
           )}
         </div>
       </div>

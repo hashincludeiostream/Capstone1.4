@@ -31,8 +31,10 @@ import {
   FileText,
   AlertCircle,
   Building,
+  Mail,
 } from 'lucide-react';
 import { Salon, User, Reel, Review, Announcement, BusinessCategory } from '../types';
+import { AdminEmailReportsManager } from './admin/AdminEmailReportsManager';
 import {
   AdminReportData,
   generateAdminVisualHtmlReport,
@@ -66,7 +68,7 @@ import {
 } from '../lib/api';
 
 interface AdminDashboardProps {
-  initialTab?: 'overview' | 'salons' | 'users' | 'content' | 'announcements';
+  initialTab?: 'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports';
   onNavigateTab?: (tab: string) => void;
   targetId?: string | null;
 }
@@ -76,7 +78,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onNavigateTab,
   targetId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'salons' | 'users' | 'content' | 'announcements'>(
+  const [activeTab, setActiveTab] = useState<'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports'>(
     initialTab || 'overview'
   );
   const [stats, setStats] = useState<any>({
@@ -687,6 +689,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <Radio className="w-4 h-4" />
           <span>Promotions & Broadcasts ({announcements.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('email_reports')}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === 'email_reports'
+              ? 'bg-rose-900 text-white shadow-xs'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-pink-50/50'
+          }`}
+        >
+          <Mail className="w-4 h-4 text-pink-400" />
+          <span>Email Reports & Alerts</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700">
+            PDF
+          </span>
         </button>
       </div>
 
@@ -1512,6 +1529,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* 6. EMAIL REPORTS & SECURITY ALERTS TAB               */}
+      {/* ---------------------------------------------------- */}
+      {activeTab === 'email_reports' && (
+        <AdminEmailReportsManager showToast={showToast} />
       )}
 
       {/* ---------------------------------------------------- */}

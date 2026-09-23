@@ -34,6 +34,7 @@ class InMemoryDatabase {
     products: JSON.parse(JSON.stringify(seedProducts)),
     product_orders: JSON.parse(JSON.stringify(seedProductOrders)),
     transactions: [],
+    email_logs: [],
   };
 
   constructor() {
@@ -382,6 +383,20 @@ class InMemoryDatabase {
       return [filtered, null];
     }
 
+    // 12. Email logs
+    if (tableName === 'email_logs') {
+      let filtered = [...table];
+      if (/WHERE LOWER\(recipient_email\)\s*=\s*LOWER\(\?\)/i.test(sql)) {
+        const email = String(params[0]).toLowerCase();
+        filtered = filtered.filter((l) => (l.recipient_email || '').toLowerCase() === email);
+      } else if (/WHERE recipient_role\s*=\s*\?/i.test(sql)) {
+        const role = String(params[0]);
+        filtered = filtered.filter((l) => l.recipient_role === role);
+      }
+      filtered.sort((a, b) => new Date(b.sent_at || 0).getTime() - new Date(a.sent_at || 0).getTime());
+      return [filtered, null];
+    }
+
     // Fallback for sorting
     if (/ORDER BY\s+id\s+ASC/i.test(sql)) {
       results.sort((a, b) => a.id - b.id);
@@ -435,10 +450,31 @@ class InMemoryDatabase {
         const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/i);
         if (setMatch) {
           const assignments = setMatch[1].split(',').map((s) => s.trim());
-          assignments.forEach((assignment, index) => {
-            const colName = assignment.split('=')[0].trim().replace(/[`]/g, '');
-            if (index < params.length - 1) {
-              record[colName] = params[index];
+          let paramIdx = 0;
+          assignments.forEach((assignment) => {
+            const parts = assignment.split('=');
+            const colName = parts[0].trim().replace(/[`]/g, '');
+            const rawVal = parts.slice(1).join('=').trim();
+
+            if (rawVal === '?') {
+              if (paramIdx < params.length - 1) {
+                record[colName] = params[paramIdx++];
+              }
+            } else if (/COALESCE\([^,]+,\s*\?\)/i.test(rawVal)) {
+              const fallbackVal = paramIdx < params.length - 1 ? params[paramIdx++] : null;
+              record[colName] = record[colName] ?? fallbackVal;
+            } else if (/^\d+$/.test(rawVal)) {
+              record[colName] = Number(rawVal);
+            } else if (/^'([^']*)'$/.test(rawVal)) {
+              record[colName] = rawVal.slice(1, -1);
+            } else if (rawVal.toLowerCase() === 'null') {
+              record[colName] = null;
+            } else if (rawVal.toLowerCase() === 'true') {
+              record[colName] = 1;
+            } else if (rawVal.toLowerCase() === 'false') {
+              record[colName] = 0;
+            } else if (paramIdx < params.length - 1) {
+              record[colName] = params[paramIdx++];
             }
           });
         }

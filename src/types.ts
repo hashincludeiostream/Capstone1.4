@@ -13,6 +13,33 @@ export interface User {
   reliability_score?: number;
   booking_cooldown_until?: string | null;
   requires_prepayment?: boolean;
+  email_verified?: boolean;
+  google_verified?: boolean;
+  provider?: 'google' | 'local';
+  notification_preferences?: {
+    email_bookings?: boolean;
+    email_orders?: boolean;
+    email_promos?: boolean;
+    email_monthly_reports?: boolean;
+    email_registration_alerts?: boolean;
+  };
+}
+
+export interface EmailLog {
+  id: number | string;
+  recipient_email: string;
+  recipient_name?: string;
+  recipient_role: UserRole;
+  subject: string;
+  category: 'booking' | 'order' | 'promo' | 'report' | 'verification' | 'alert';
+  content_preview: string;
+  html_body: string;
+  has_pdf_attachment?: boolean;
+  attachment_name?: string;
+  pdf_html?: string;
+  sent_at: string;
+  status: 'sent' | 'delivered' | 'failed';
+  sender_email?: string;
 }
 
 export interface Salon {
@@ -273,6 +300,7 @@ export interface PlatformStats {
   total_customers: number;
   total_salon_owners: number;
   total_admins: number;
+  total_users?: number;
   total_salons: number;
   verified_salons: number;
   pending_salons: number;
@@ -281,6 +309,7 @@ export interface PlatformStats {
   confirmed_appointments: number;
   completed_appointments: number;
   total_reviews: number;
+  average_rating?: number;
   total_reels: number;
   total_announcements: number;
   active_announcements: number;

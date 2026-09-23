@@ -22,6 +22,7 @@ import {
   ShoppingBag,
   Package,
   Compass,
+  Mail,
 } from 'lucide-react';
 import {
   User,
@@ -61,6 +62,7 @@ interface NavbarProps {
   adminTotalUsers?: number;
   adminTotalAppointments?: number;
   favoritesCount?: number;
+  onOpenEmailHistory?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -89,6 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   adminTotalUsers = 0,
   adminTotalAppointments = 0,
   favoritesCount = 0,
+  onOpenEmailHistory,
 }) => {
   const handleNavigation = (tab: string, targetDomId?: string) => {
     if (onNavigate) {
@@ -190,6 +193,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               favoritesCount={favoritesCount}
               onNavigate={handleNavigation}
             />
+
+            {/* Email Notifications & PDF Reports Inbox Button */}
+            {currentUser && onOpenEmailHistory && (
+              <button
+                id="navbar-email-logs-btn"
+                onClick={onOpenEmailHistory}
+                title="Email Notifications & PDF Reports"
+                className="relative p-2 rounded-full text-gray-600 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
+              >
+                <Mail className="w-5 h-5" />
+                <span className="sr-only">Delivered Email Notifications</span>
+              </button>
+            )}
 
             {/* User Account / Profile Menu */}
             {currentUser ? (
@@ -309,6 +325,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <UserIcon className="w-4 h-4 text-pink-600" />
                             <span>My Profile & Settings</span>
                           </button>
+
+                          <button
+                            onClick={() => {
+                              onOpenEmailHistory?.();
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <Mail className="w-4 h-4 text-pink-600" />
+                            <span>Email Receipts & Alerts</span>
+                          </button>
                         </>
                       )}
 
@@ -323,6 +350,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                           >
                             <Store className="w-4 h-4 text-purple-600" />
                             <span>Salon Management Suite</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onOpenEmailHistory?.();
+                              setUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-purple-900 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <Mail className="w-4 h-4 text-purple-600" />
+                            <span>Email Reports & Monthly PDF</span>
                           </button>
                           <button
                             onClick={() => {

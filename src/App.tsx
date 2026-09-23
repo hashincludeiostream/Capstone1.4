@@ -58,6 +58,7 @@ import { ProductDetailModal } from './components/products/ProductDetailModal';
 import { CartDrawer } from './components/products/CartDrawer';
 import { ProductCheckoutModal } from './components/products/ProductCheckoutModal';
 import { CustomerOrdersView } from './components/products/CustomerOrdersView';
+import { EmailLogsModal } from './components/email/EmailLogsModal';
 import { ChatWidget } from './components/chat/ChatWidget';
 import { scrollToElement } from './utils/scrollHelper';
 
@@ -134,6 +135,7 @@ const AppContent: React.FC = () => {
   });
   const [profileCustomizationOpen, setProfileCustomizationOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [showEmailLogsModal, setShowEmailLogsModal] = useState(false);
 
   // E-Commerce / Products state
   const [products, setProducts] = useState<Product[]>([]);
@@ -772,6 +774,7 @@ const AppContent: React.FC = () => {
         adminTotalUsers={adminTotalUsers}
         adminTotalAppointments={adminTotalAppointments}
         favoritesCount={favorites.length}
+        onOpenEmailHistory={() => setShowEmailLogsModal(true)}
       />
 
       {/* Live Site-Wide Announcements Broadcasted by Super Admin */}
@@ -1692,6 +1695,14 @@ const AppContent: React.FC = () => {
           setBookingModalOpen(true);
         }}
       />
+
+      {/* 12. Email Notifications & Monthly Reports Audit Modal */}
+      {showEmailLogsModal && currentUser && (
+        <EmailLogsModal
+          currentUser={currentUser}
+          onClose={() => setShowEmailLogsModal(false)}
+        />
+      )}
     </div>
   );
 };
