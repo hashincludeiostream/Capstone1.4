@@ -67,6 +67,9 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
 
   const filteredOrders = orders.filter((order) => {
     if (filterStatus === 'all') return true;
+    if (filterStatus === 'unclaimed') {
+      return order.status === 'unclaimed' || Boolean(order.is_overdue_unclaimed);
+    }
     return order.status === filterStatus;
   });
 
@@ -82,8 +85,26 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
     onRefreshOrders();
   };
 
-  const getStatusBadge = (status: ProductOrderStatus) => {
-    switch (status) {
+  const getStatusBadge = (order: ProductOrder) => {
+    if (order.status === 'unclaimed') {
+      return (
+        <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold flex items-center gap-1.5 border border-rose-200">
+          <PackageX className="w-3.5 h-3.5 text-rose-600" />
+          <span>In-Store Reservation Expired (Unclaimed)</span>
+        </span>
+      );
+    }
+
+    if (order.is_overdue_unclaimed && order.status !== 'cancelled' && order.status !== 'completed') {
+      return (
+        <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center gap-1.5 border border-amber-200">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+          <span>Pickup Date Passed (Not Claimed Yet)</span>
+        </span>
+      );
+    }
+
+    switch (order.status) {
       case 'pending_pickup':
         return (
           <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center gap-1.5">
@@ -149,8 +170,9 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {[
           { id: 'all', label: 'All Reservations' },
-          { id: 'pending_pickup', label: 'Pending Pickup' },
           { id: 'ready_for_pickup', label: 'Ready for Collection' },
+          { id: 'pending_pickup', label: 'Pending Pickup' },
+          { id: 'unclaimed', label: '⚠️ Unclaimed / Overdue' },
           { id: 'completed', label: 'Completed' },
           { id: 'cancelled', label: 'Cancelled' },
         ].map((tab) => (
@@ -219,12 +241,60 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-3 self-start sm:self-auto">
-                    {getStatusBadge(order.status)}
+                    {getStatusBadge(order)}
                   </div>
                 </div>
 
                 {/* Card Body */}
                 <div className="p-5 sm:p-6 space-y-4">
+                  {/* Unclaimed Notice Banner */}
+                  {order.status === 'unclaimed' && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-1.5 text-rose-900">
+                      <div className="flex items-center gap-2 font-bold text-rose-950">
+                        <PackageX className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>In-Store Reservation Expired — Order Not Claimed</span>
+                      </div>
+                      <p className="text-[11px] text-rose-800 leading-relaxed pl-6">
+                        This reservation was scheduled for in-store pickup on <strong>{order.pickup_date}</strong>. Because it remained uncollected past the scheduled pickup window, the reserved products have been returned to salon shelf inventory for other clients.
+                      </p>
+                      {order.unclaimed_reason && (
+                        <p className="text-[11px] text-rose-700 italic pl-6">
+                          Salon Record: "{order.unclaimed_reason}"
+                        </p>
+                      )}
+                      <div className="pl-6 pt-1 flex items-center gap-2">
+                        <span className="text-[11px] text-rose-700">Still need these beauty products?</span>
+                        <button
+                          onClick={onBrowseProducts}
+                          className="text-xs font-bold text-pink-700 hover:text-pink-900 underline cursor-pointer"
+                        >
+                          Place a New Reservation
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Overdue Warning Banner (Not Claimed Yet) */}
+                  {order.is_overdue_unclaimed && order.status !== 'unclaimed' && order.status !== 'cancelled' && order.status !== 'completed' && (
+                    <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs space-y-1 text-amber-900">
+                      <div className="flex items-center gap-2 font-bold text-amber-950">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Pickup Window Passed — Package Not Claimed Yet</span>
+                      </div>
+                      <p className="text-[11px] text-amber-800 leading-relaxed pl-6">
+                        Your scheduled pickup date was <strong>{order.pickup_date}</strong>. Please visit {order.salon_name || 'the salon branch'} as soon as possible to claim your reserved products before they are released back to public shelf stock.
+                      </p>
+                      {order.salon_phone && (
+                        <p className="text-[11px] text-stone-600 pl-6">
+                          Contact salon counter:{' '}
+                          <a href={`tel:${order.salon_phone}`} className="font-bold text-stone-900 underline">
+                            {order.salon_phone}
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Pickup Logistics Bar */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 text-xs">
                     <div className="flex items-start gap-2 text-stone-700">
@@ -247,7 +317,7 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
                   </div>
 
                   {/* Ready alert if marked ready */}
-                  {isReady && (
+                  {isReady && !order.is_overdue_unclaimed && (
                     <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5 text-xs text-emerald-900">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       <div>
@@ -317,10 +387,25 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                       <div className="text-xs text-stone-600">
-                        <span>Due at counter upon pickup: </span>
-                        <strong className="text-sm font-black text-stone-900">
-                          ₱{order.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </strong>
+                        {order.status === 'unclaimed' ? (
+                          <span className="text-rose-700 font-semibold">
+                            Reservation Expired • Stock Released to Store
+                          </span>
+                        ) : order.status === 'completed' ? (
+                          <span className="text-emerald-700 font-semibold">
+                            Total Settled at Counter:{' '}
+                            <strong className="text-sm font-black text-stone-900">
+                              ₱{order.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </strong>
+                          </span>
+                        ) : (
+                          <>
+                            <span>Due at counter upon pickup: </span>
+                            <strong className="text-sm font-black text-stone-900">
+                              ₱{order.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </strong>
+                          </>
+                        )}
                       </div>
                     </div>
 

@@ -1,4 +1,14 @@
+import { SalonCancellationPolicyConfig } from '../types';
+
 export type CancellationTier = 'flexible' | 'late' | 'critical';
+
+export interface GracePeriodEvaluation {
+  outside: boolean;
+  elapsedMinutes: number;
+  graceMinutes: number;
+  remainingGraceMinutes: number;
+  formattedElapsed: string;
+}
 
 export interface CancellationTierCalculation {
   hoursRemaining: number;
@@ -12,6 +22,7 @@ export interface CancellationTierCalculation {
   badgeBg: string;
   badgeText: string;
   badgeBorder: string;
+  gracePeriod?: GracePeriodEvaluation;
 }
 
 export interface CancellationReasonOption {
@@ -128,19 +139,88 @@ export function parseAppointmentDateTime(dateStr: string, timeStr: string): Date
 }
 
 /**
+ * Evaluates whether an appointment cancellation falls within or outside
+ * the 30-minute grace period from the time of booking creation.
+ */
+export function evaluateGracePeriod(
+  createdAtStr?: string,
+  cancelledAtStr?: string,
+  graceMinutes: number = 30
+): GracePeriodEvaluation {
+  if (!createdAtStr) {
+    return {
+      outside: true,
+      elapsedMinutes: 999,
+      graceMinutes,
+      remainingGraceMinutes: 0,
+      formattedElapsed: 'Outside 30m window',
+    };
+  }
+
+  const createdTime = new Date(createdAtStr).getTime();
+  const cancelTime = cancelledAtStr ? new Date(cancelledAtStr).getTime() : Date.now();
+  const diffMs = Math.max(0, cancelTime - createdTime);
+  const elapsedMinutes = Math.floor(diffMs / (1000 * 60));
+  const remainingGraceMinutes = Math.max(0, graceMinutes - elapsedMinutes);
+  const outside = elapsedMinutes > graceMinutes;
+
+  let formattedElapsed = `${elapsedMinutes}m`;
+  if (elapsedMinutes < 60) {
+    formattedElapsed = `${elapsedMinutes} min${elapsedMinutes === 1 ? '' : 's'}`;
+  } else {
+    const hours = Math.floor(elapsedMinutes / 60);
+    const mins = elapsedMinutes % 60;
+    formattedElapsed = `${hours}h ${mins}m`;
+  }
+
+  return {
+    outside,
+    elapsedMinutes,
+    graceMinutes,
+    remainingGraceMinutes,
+    formattedElapsed,
+  };
+}
+
+/**
  * Evaluates the cancellation tier, policy fee, and strike sanction
- * based on how much advance notice the customer provides.
+ * based on how much advance notice the customer provides, taking
+ * into account the salon's 30-minute booking grace period.
  */
 export function calculateAppointmentCancellationTier(
   appointmentDate: string,
   appointmentTime: string,
-  servicePrice: number = 0
+  servicePrice: number = 0,
+  createdAt?: string,
+  salonConfig?: SalonCancellationPolicyConfig
 ): CancellationTierCalculation {
   const apptDate = parseAppointmentDateTime(appointmentDate, appointmentTime);
   const now = new Date();
   const diffMs = apptDate.getTime() - now.getTime();
   const hoursRemaining = Math.max(0, Number((diffMs / (1000 * 60 * 60)).toFixed(1)));
   const price = Number(servicePrice) || 0;
+
+  // 1. Check 30-Minute Grace Period from time of booking
+  const graceMinutes = salonConfig?.grace_period_minutes ?? 30;
+  const isGraceEnabled = salonConfig?.enable_grace_period !== false;
+  const graceEval = createdAt ? evaluateGracePeriod(createdAt, undefined, graceMinutes) : undefined;
+
+  if (isGraceEnabled && graceEval && !graceEval.outside) {
+    return {
+      hoursRemaining,
+      tier: 'flexible',
+      fee: 0,
+      strike: false,
+      strikeCount: 0,
+      title: 'Within 30-Minute Grace Period (Fee Waived)',
+      description: `You are cancelling within ${graceEval.formattedElapsed} of placing this booking (${graceEval.remainingGraceMinutes}m grace remaining). Under salon policy, all cancellations made within the 30-minute grace window are 100% free with no penalties.`,
+      depositRefundPercentage: 100,
+      badgeBg: 'bg-emerald-50',
+      badgeText: 'text-emerald-700',
+      badgeBorder: 'border-emerald-200',
+      gracePeriod: graceEval,
+    };
+  }
 
   // Tier 1: Flexible Notice (> 24 hours)
   if (hoursRemaining >= 24) {
@@ -157,47 +237,56 @@ export function calculateAppointmentCancellationTier(
       badgeBg: 'bg-emerald-50',
       badgeText: 'text-emerald-700',
       badgeBorder: 'border-emerald-200',
+      gracePeriod: graceEval,
     };
   }
 
-  // Tier 2: Late Notice (between 4 and 24 hours)
+  // Tier 2: Late Notice (between 4 and 24 hours) - Cancelled outside 30-minute grace period
+  const latePercent = (salonConfig?.late_fee_percentage ?? 25) / 100;
+  const minLateFee = salonConfig?.min_late_fee ?? 150;
+  const lateFee = Math.max(minLateFee, Math.round(price * latePercent));
+
   if (hoursRemaining >= 4 && hoursRemaining < 24) {
-    const fee = Math.max(150, Math.round(price * 0.25));
     return {
       hoursRemaining,
       tier: 'late',
-      fee,
+      fee: lateFee,
       strike: true,
       strikeCount: 1,
       title: 'Late Notice Window (4h to 24h Advance)',
       description:
-        'Your dedicated specialist was assigned and the station reserved. A 25% late cancellation fee (₱' +
-        fee.toLocaleString() +
+        `This appointment was cancelled outside the 30-minute grace period. A ${Math.round(latePercent * 100)}% late cancellation fee (₱` +
+        lateFee.toLocaleString() +
         ') is assessed to partially compensate the nail technician for lost working hours, and 1 strike is recorded.',
       depositRefundPercentage: 75,
       badgeBg: 'bg-amber-50',
       badgeText: 'text-amber-800',
       badgeBorder: 'border-amber-200',
+      gracePeriod: graceEval,
     };
   }
 
-  // Tier 3: Critical Lockout (< 4 hours notice or same-day no-show)
-  const fee = Math.max(250, Math.round(price * 0.5));
+  // Tier 3: Critical Lockout (< 4 hours notice or same-day no-show) - Cancelled outside 30-minute grace period
+  const critPercent = (salonConfig?.critical_fee_percentage ?? 50) / 100;
+  const minCritFee = salonConfig?.min_critical_fee ?? 250;
+  const criticalFee = Math.max(minCritFee, Math.round(price * critPercent));
+
   return {
     hoursRemaining,
     tier: 'critical',
-    fee,
+    fee: criticalFee,
     strike: true,
     strikeCount: 2,
     title: 'Critical Lockout Window (< 4h Notice)',
     description:
-      'The nail technician is on-site and tools are sterilized for your slot. Cancelling on such short notice leaves an empty chair that cannot be rebooked. A 50% fee (₱' +
-      fee.toLocaleString() +
+      `The nail technician is on-site and tools are sterilized for your slot. Cancelling outside the 30-minute grace period with under 4 hours notice leaves an empty chair. A ${Math.round(critPercent * 100)}% fee (₱` +
+      criticalFee.toLocaleString() +
       ') applies, plus 2 account strikes.',
     depositRefundPercentage: 50,
     badgeBg: 'bg-rose-50',
     badgeText: 'text-rose-800',
     badgeBorder: 'border-rose-200',
+    gracePeriod: graceEval,
   };
 }
 

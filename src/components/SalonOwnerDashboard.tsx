@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Image as ImageIcon,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
@@ -51,6 +52,7 @@ import { StoreOverviewReports } from './owner/StoreOverviewReports';
 import { BranchOverview } from './owner/BranchOverview';
 import { OwnerLocationPicker } from './maps/OwnerLocationPicker';
 import { ProductInventoryManager } from './owner/ProductInventoryManager';
+import { LateCancellationFeesManager } from './owner/LateCancellationFeesManager';
 import { EmptyState } from './EmptyState';
 import { scrollToElement } from '../utils/scrollHelper';
 
@@ -67,7 +69,7 @@ const DEFAULT_WORKING_HOURS: WorkingHour[] = [
 
 interface SalonOwnerDashboardProps {
   currentUser: User;
-  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory';
+  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees';
   onOpenRegisterSalon?: () => void;
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
@@ -105,7 +107,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [reviews, setReviews] = useState<Review[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productOrders, setProductOrders] = useState<ProductOrder[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees'>(initialTab);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewInspoImage, setPreviewInspoImage] = useState<{ url: string; clientName: string } | null>(null);
@@ -132,6 +134,8 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         scrollToElement(targetId);
       } else if (targetId.startsWith('owner-order-')) {
         setActiveTab('inventory');
+      } else if (targetId.startsWith('owner-cancellation-')) {
+        setActiveTab('cancellation-fees');
       }
     }
   }, [targetId]);
@@ -497,6 +501,12 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     [products]
   );
 
+  const lateCancellationCount = useMemo(() => {
+    return appointments.filter(
+      (a) => a.status === 'cancelled' && (a.outside_grace_period || (Number(a.cancellation_fee || 0) > 0))
+    ).length;
+  }, [appointments]);
+
   // Filter Bookings Queue
   const filteredBookings = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -645,6 +655,25 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
             {pendingCount > 0 && (
               <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
                 {pendingCount}
+              </span>
+            )}
+          </button>
+
+          {/* Tab: Late Cancellation Fees (30-min Grace) */}
+          <button
+            id="owner-tab-cancellation-fees"
+            onClick={() => setActiveTab('cancellation-fees')}
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              activeTab === 'cancellation-fees'
+                ? 'border-rose-600 text-rose-950 font-bold bg-white/80 rounded-t-xl shadow-2xs'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-600" />
+            <span>Cancellation Fees & Grace</span>
+            {lateCancellationCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {lateCancellationCount}
               </span>
             )}
           </button>
@@ -972,23 +1001,40 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
                         {/* Cancellation Reason and Policy info for Salon Owner */}
                         {appt.status === 'cancelled' && (
-                          <div className="mt-2.5 p-2.5 bg-red-50/70 border border-red-200 rounded-xl text-xs text-red-900 space-y-1">
-                            <div className="font-bold flex items-center gap-1.5 text-red-950">
-                              <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                              <span>
+                          <div className="mt-2.5 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-xs text-rose-900 space-y-1.5">
+                            <div className="font-bold flex items-center justify-between gap-2 text-rose-950">
+                              <span className="flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                                 Cancellation Log ({appt.cancelled_by === 'customer' ? 'By Client' : 'By Salon'}): {appt.cancellation_reason || 'Client cancelled appointment'}
                               </span>
+                              {appt.outside_grace_period ? (
+                                <span className="px-2 py-0.5 rounded-md bg-rose-200 text-rose-900 font-bold text-[10px]">
+                                  Outside 30m Grace
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                  Within 30m Grace
+                                </span>
+                              )}
                             </div>
-                            {appt.cancellation_tier && (
-                              <div className="text-[11px] text-red-800 flex items-center gap-2 pl-5">
-                                <span>Policy: <strong>{appt.cancellation_tier.toUpperCase()}</strong></span>
-                                {Number(appt.cancellation_fee || 0) > 0 && (
-                                  <span>• Penalty Fee: <strong>₱{Number(appt.cancellation_fee).toLocaleString()}</strong></span>
-                                )}
-                              </div>
-                            )}
+                            <div className="text-[11px] text-rose-800 flex flex-wrap items-center gap-x-3 gap-y-1 pl-5">
+                              {appt.cancellation_tier && (
+                                <span>Policy Tier: <strong>{appt.cancellation_tier.toUpperCase()}</strong></span>
+                              )}
+                              {Number(appt.cancellation_fee || 0) > 0 ? (
+                                <span>• Late Fee: <strong className="text-rose-900">₱{Number(appt.cancellation_fee).toLocaleString()}</strong> ({appt.cancellation_fee_status || 'assessed'})</span>
+                              ) : (
+                                <span>• Fee Waived / Grace Window (₱0.00)</span>
+                              )}
+                              <button
+                                onClick={() => setActiveTab('cancellation-fees')}
+                                className="text-purple-700 hover:text-purple-900 underline font-bold cursor-pointer"
+                              >
+                                View in Late Fee Manager &rarr;
+                              </button>
+                            </div>
                             {appt.cancellation_notes && (
-                              <p className="text-[11px] text-red-700 italic pl-5">"{appt.cancellation_notes}"</p>
+                              <p className="text-[11px] text-rose-700 italic pl-5">"{appt.cancellation_notes}"</p>
                             )}
                           </div>
                         )}
@@ -1029,6 +1075,19 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: LATE CANCELLATION FEES & 30-MIN GRACE POLICY */}
+          {activeTab === 'cancellation-fees' && (
+            <div className="animate-in fade-in duration-200">
+              <LateCancellationFeesManager
+                salon={activeSalon || null}
+                salons={salons}
+                appointments={appointments}
+                onRefresh={loadDashboardData}
+                onSelectSalon={(sId) => setSelectedSalonId(sId)}
+              />
             </div>
           )}
 

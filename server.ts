@@ -1235,19 +1235,29 @@ async function startServer() {
       }
 
       const [rows] = await db.execute(query, params);
-      let orders = (rows as any[]).map((order: any) => ({
-        ...order,
-        id: Number(order.id),
-        salon_id: Number(order.salon_id),
-        customer_id: Number(order.customer_id),
-        total_amount: Number(order.total_amount) || 0,
-        total_items: Number(order.total_items) || 0,
-        items: typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []),
-        payment_method: 'pay_in_store',
-      }));
+      const todayStr = new Date().toISOString().split('T')[0];
+      let orders = (rows as any[]).map((order: any) => {
+        const isPastPickup = Boolean(order.pickup_date && order.pickup_date < todayStr);
+        const isOverdue = isPastPickup && (order.status === 'pending_pickup' || order.status === 'ready_for_pickup');
+        return {
+          ...order,
+          id: Number(order.id),
+          salon_id: Number(order.salon_id),
+          customer_id: Number(order.customer_id),
+          total_amount: Number(order.total_amount) || 0,
+          total_items: Number(order.total_items) || 0,
+          items: typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []),
+          payment_method: 'pay_in_store',
+          is_overdue_unclaimed: isOverdue,
+        };
+      });
 
       if (status && status !== 'all') {
-        orders = orders.filter((o) => o.status === status);
+        if (status === 'unclaimed') {
+          orders = orders.filter((o) => o.status === 'unclaimed' || o.is_overdue_unclaimed);
+        } else {
+          orders = orders.filter((o) => o.status === status);
+        }
       }
 
       // Sort newest first
@@ -1447,12 +1457,12 @@ async function startServer() {
     }
   });
 
-  // Update Product Order Status (Salon Owner / Customer Cancel)
+  // Update Product Order Status (Salon Owner / Customer Cancel / Unclaimed)
   app.patch('/api/product-orders/:id/status', async (req, res) => {
     const id = Number(req.params.id);
-    const { status, cancellation_reason, cancellation_notes, cancelled_by } = req.body;
+    const { status, cancellation_reason, cancellation_notes, cancelled_by, unclaimed_reason } = req.body;
 
-    const validStatuses = ['pending_pickup', 'ready_for_pickup', 'completed', 'cancelled'];
+    const validStatuses = ['pending_pickup', 'ready_for_pickup', 'completed', 'cancelled', 'unclaimed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid order status' });
     }
@@ -1464,9 +1474,14 @@ async function startServer() {
 
       const prevStatus = order.status;
 
-      // If cancelling an order, restore product stock
+      // If cancelling or marking as unclaimed, restore product stock if not already restored
       let restockedCount = 0;
-      if (status === 'cancelled' && prevStatus !== 'cancelled') {
+      const shouldRestoreStock =
+        (status === 'cancelled' || status === 'unclaimed') &&
+        prevStatus !== 'cancelled' &&
+        prevStatus !== 'unclaimed';
+
+      if (shouldRestoreStock) {
         const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
         for (const item of items) {
           const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
@@ -1489,6 +1504,15 @@ async function startServer() {
           'UPDATE product_orders SET status = ?, cancellation_reason = ?, cancellation_notes = ?, cancelled_at = ?, cancelled_by = ?, restocked_items_count = ? WHERE id = ?',
           [status, reason, notes, cancelledAt, by, restockedCount, id]
         );
+      } else if (status === 'unclaimed') {
+        const reason = unclaimed_reason || cancellation_reason || order.unclaimed_reason || 'Order not claimed at salon by scheduled pickup date';
+        const notes = cancellation_notes || order.cancellation_notes || 'Items released back to salon store inventory';
+        const unclaimedAt = new Date().toISOString();
+
+        await db.execute(
+          'UPDATE product_orders SET status = ?, unclaimed_reason = ?, cancellation_notes = ?, unclaimed_at = ?, restocked_items_count = ? WHERE id = ?',
+          [status, reason, notes, unclaimedAt, restockedCount, id]
+        );
       } else {
         await db.execute('UPDATE product_orders SET status = ? WHERE id = ?', [status, id]);
       }
@@ -1507,11 +1531,65 @@ async function startServer() {
             ? 'Order marked as completed & settled in physical store.'
             : status === 'ready_for_pickup'
             ? 'Order is marked ready for in-store customer pickup.'
+            : status === 'unclaimed'
+            ? 'Order marked as unclaimed. Reserved items returned to shelf inventory.'
             : `Order status updated to ${status}.`,
       });
     } catch (error) {
       console.error('Update product order status error:', error);
       res.status(500).json({ error: 'Server error updating order status' });
+    }
+  });
+
+  // Batch Auto-Mark Overdue In-Store Orders as Unclaimed
+  app.post('/api/product-orders/batch-mark-unclaimed', async (req, res) => {
+    const { salon_id } = req.body;
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      let query = "SELECT * FROM product_orders WHERE status IN ('pending_pickup', 'ready_for_pickup') AND pickup_date < ?";
+      const params: any[] = [todayStr];
+
+      if (salon_id) {
+        query += ' AND salon_id = ?';
+        params.push(Number(salon_id));
+      }
+
+      const [overdueRows] = await db.execute(query, params);
+      const overdueOrders = overdueRows as any[];
+      let updatedCount = 0;
+      let totalRestockedUnits = 0;
+
+      for (const order of overdueOrders) {
+        let restockedForOrder = 0;
+        const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+        for (const item of items) {
+          const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
+          const prod = (prodRows as any[])[0];
+          if (prod) {
+            const restoredStock = Number(prod.stock_quantity) + Number(item.quantity);
+            await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [restoredStock, Number(item.product_id)]);
+            restockedForOrder += Number(item.quantity);
+            totalRestockedUnits += Number(item.quantity);
+          }
+        }
+
+        const unclaimedAt = new Date().toISOString();
+        await db.execute(
+          'UPDATE product_orders SET status = ?, unclaimed_reason = ?, unclaimed_at = ?, restocked_items_count = ? WHERE id = ?',
+          ['unclaimed', 'Scheduled in-store pickup window expired without customer claiming', unclaimedAt, restockedForOrder, order.id]
+        );
+        updatedCount++;
+      }
+
+      res.json({
+        success: true,
+        updatedCount,
+        totalRestockedUnits,
+        message: `Successfully marked ${updatedCount} overdue order(s) as unclaimed and restored ${totalRestockedUnits} product unit(s) to store inventory.`,
+      });
+    } catch (error) {
+      console.error('Batch mark unclaimed error:', error);
+      res.status(500).json({ error: 'Failed to batch process unclaimed orders' });
     }
   });
 
@@ -1912,11 +1990,25 @@ async function startServer() {
         return res.status(400).json({ error: 'Completed appointments cannot be cancelled.' });
       }
 
-      // Calculate cancellation tier, penalty fee, and strikes based on appointment date/time
+      // Get salon's custom cancellation policy if configured
+      let salonConfig: any = null;
+      if (appointment.salon_id) {
+        const [salonRows] = await db.execute('SELECT * FROM salons WHERE id = ?', [appointment.salon_id]);
+        const salon = (salonRows as any[])[0];
+        if (salon?.cancellation_policy_config) {
+          salonConfig = typeof salon.cancellation_policy_config === 'string'
+            ? JSON.parse(salon.cancellation_policy_config)
+            : salon.cancellation_policy_config;
+        }
+      }
+
+      // Calculate cancellation tier, penalty fee, and strikes based on appointment date/time and booking grace period
       const policyCalc = calculateAppointmentCancellationTier(
         appointment.appointment_date,
         appointment.appointment_time,
-        Number(appointment.total_price || appointment.service_price || 0)
+        Number(appointment.total_price || appointment.service_price || 0),
+        appointment.created_at,
+        salonConfig
       );
 
       const tier = policyCalc.tier;
@@ -1927,6 +2019,10 @@ async function startServer() {
       const by = cancelled_by || 'customer';
       const reason = cancellation_reason || 'Client requested cancellation';
       const notes = cancellation_notes || '';
+      const outsideGracePeriod = policyCalc.gracePeriod ? (policyCalc.gracePeriod.outside ? 1 : 0) : 1;
+      const cancellationFeeStatus = cancellationFee > 0 ? 'assessed' : 'waived';
+      const gracePeriodMinutes = policyCalc.gracePeriod?.graceMinutes ?? (salonConfig?.grace_period_minutes ?? 30);
+      const cancellationElapsedMinutes = policyCalc.gracePeriod?.elapsedMinutes ?? 0;
 
       // Update appointment record
       await db.execute(
@@ -1938,9 +2034,26 @@ async function startServer() {
           cancellation_fee = ?, 
           cancellation_strike = ?, 
           cancelled_at = ?, 
-          cancelled_by = ? 
+          cancelled_by = ?,
+          cancellation_fee_status = ?,
+          outside_grace_period = ?,
+          grace_period_minutes = ?,
+          cancellation_elapsed_minutes = ?
         WHERE id = ?`,
-        [reason, notes, tier, cancellationFee, strikeApplied ? 1 : 0, cancelledAt, by, id]
+        [
+          reason,
+          notes,
+          tier,
+          cancellationFee,
+          strikeApplied ? 1 : 0,
+          cancelledAt,
+          by,
+          cancellationFeeStatus,
+          outsideGracePeriod,
+          gracePeriodMinutes,
+          cancellationElapsedMinutes,
+          id
+        ]
       );
 
       // If customer cancelled and strikes apply, update customer account strikes & reliability
@@ -2067,6 +2180,93 @@ async function startServer() {
         error: 'Server error rescheduling appointment',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  // Update Late Cancellation Fee Status (Salon Owner: waive fee or mark collected)
+  app.patch('/api/appointments/:id/late-fee', async (req, res) => {
+    const id = Number(req.params.id);
+    const { status, waived_reason, notes } = req.body;
+
+    if (!status || !['waived', 'collected', 'assessed'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required: waived, collected, or assessed' });
+    }
+
+    try {
+      const [apptRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
+      const appointment = (apptRows as any[])[0];
+      if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
+
+      let feeWaivedReason = waived_reason || appointment.cancellation_fee_waived_reason || '';
+      let cancellationNotes = notes !== undefined ? notes : (appointment.cancellation_notes || '');
+
+      await db.execute(
+        'UPDATE appointments SET cancellation_fee_status = ?, cancellation_fee_waived_reason = ?, cancellation_notes = ? WHERE id = ?',
+        [status, feeWaivedReason, cancellationNotes, id]
+      );
+
+      const [updatedRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
+      const updated = (updatedRows as any[])[0];
+
+      res.json({
+        success: true,
+        appointment: {
+          ...updated,
+          customer_id: Number(updated.customer_id),
+          salon_id: Number(updated.salon_id),
+          service_id: Number(updated.service_id),
+          total_price: Number(updated.total_price) || 0,
+          cancellation_fee: Number(updated.cancellation_fee) || 0,
+        },
+        message:
+          status === 'waived'
+            ? 'Late cancellation fee successfully waived by salon owner.'
+            : status === 'collected'
+            ? 'Late cancellation fee marked as collected.'
+            : 'Fee status updated.',
+      });
+    } catch (error) {
+      console.error('Update late fee status error:', error);
+      res.status(500).json({ error: 'Server error updating late cancellation fee status' });
+    }
+  });
+
+  // Configure Salon Late Cancellation Policy & Grace Period
+  app.patch('/api/salons/:id/cancellation-policy', async (req, res) => {
+    const salonId = Number(req.params.id);
+    const { config } = req.body;
+
+    if (!config) {
+      return res.status(400).json({ error: 'Cancellation policy configuration object is required' });
+    }
+
+    try {
+      const [salonRows] = await db.execute('SELECT * FROM salons WHERE id = ?', [salonId]);
+      const salon = (salonRows as any[])[0];
+      if (!salon) return res.status(404).json({ error: 'Salon not found' });
+
+      const configStr = typeof config === 'string' ? config : JSON.stringify(config);
+      await db.execute(
+        'UPDATE salons SET cancellation_policy_config = ? WHERE id = ?',
+        [configStr, salonId]
+      );
+
+      const [updatedRows] = await db.execute('SELECT * FROM salons WHERE id = ?', [salonId]);
+      const updated = (updatedRows as any[])[0];
+
+      res.json({
+        success: true,
+        salon: {
+          ...updated,
+          cancellation_policy_config: typeof updated.cancellation_policy_config === 'string'
+            ? JSON.parse(updated.cancellation_policy_config)
+            : updated.cancellation_policy_config,
+        },
+        message: 'Salon late cancellation fee policy and grace period successfully updated.',
+      });
+    } catch (error) {
+      console.error('Update cancellation policy error:', error);
+      res.status(500).json({ error: 'Server error updating cancellation policy' });
     }
   });
 

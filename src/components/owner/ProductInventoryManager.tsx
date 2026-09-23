@@ -23,6 +23,8 @@ import {
   Layers,
   Eye,
   RefreshCw,
+  PackageX,
+  ShieldAlert,
 } from 'lucide-react';
 import { Product, ProductOrder, Salon } from '../../types';
 import {
@@ -31,6 +33,7 @@ import {
   updateProductStock,
   deleteProduct,
   updateProductOrderStatus,
+  batchMarkUnclaimedOrders,
 } from '../../lib/api';
 import { scrollToElement } from '../../utils/scrollHelper';
 
@@ -103,6 +106,39 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
     if (!salon) return orders;
     return orders.filter((o) => o.salon_id === salon.id);
   }, [orders, salon]);
+
+  // Order Sub-tab Filters & State
+  const [orderFilter, setOrderFilter] = useState<'all' | 'pending' | 'ready' | 'unclaimed' | 'completed' | 'cancelled'>('all');
+  const [isBatchingUnclaimed, setIsBatchingUnclaimed] = useState(false);
+  const [unclaimedToast, setUnclaimedToast] = useState<string | null>(null);
+
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const overdueOrders = useMemo(() => {
+    return salonOrders.filter((o) => {
+      const isPast = Boolean((o.pickup_date && o.pickup_date < todayStr) || o.is_overdue_unclaimed);
+      return isPast && (o.status === 'pending_pickup' || o.status === 'ready_for_pickup');
+    });
+  }, [salonOrders, todayStr]);
+
+  const unclaimedOrders = useMemo(() => {
+    return salonOrders.filter((o) => o.status === 'unclaimed');
+  }, [salonOrders]);
+
+  const filteredOrders = useMemo(() => {
+    return salonOrders.filter((o) => {
+      if (orderFilter === 'all') return true;
+      if (orderFilter === 'pending') return o.status === 'pending_pickup';
+      if (orderFilter === 'ready') return o.status === 'ready_for_pickup';
+      if (orderFilter === 'unclaimed') {
+        const isPast = Boolean((o.pickup_date && o.pickup_date < todayStr) || o.is_overdue_unclaimed);
+        return o.status === 'unclaimed' || (isPast && (o.status === 'pending_pickup' || o.status === 'ready_for_pickup'));
+      }
+      if (orderFilter === 'completed') return o.status === 'completed';
+      if (orderFilter === 'cancelled') return o.status === 'cancelled';
+      return true;
+    });
+  }, [salonOrders, orderFilter, todayStr]);
 
   // Inventory Metrics & Low Stock Notification Detection
   const metrics = useMemo(() => {
@@ -296,6 +332,33 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
       onRefresh();
     } catch (err) {
       console.error('Failed to update order status:', err);
+    }
+  };
+
+  const handleMarkUnclaimed = async (orderId: number) => {
+    try {
+      await updateProductOrderStatus(orderId, 'unclaimed', {
+        unclaimed_reason: 'Client did not collect package at salon counter within the scheduled in-store pickup window',
+      });
+      setUnclaimedToast('Package marked as unclaimed! Reserved products successfully restored to salon inventory.');
+      setTimeout(() => setUnclaimedToast(null), 4500);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to mark order as unclaimed');
+    }
+  };
+
+  const handleBatchMarkUnclaimed = async () => {
+    try {
+      setIsBatchingUnclaimed(true);
+      const res = await batchMarkUnclaimedOrders(salon?.id);
+      setUnclaimedToast(res.message);
+      setTimeout(() => setUnclaimedToast(null), 5000);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to batch process unclaimed orders');
+    } finally {
+      setIsBatchingUnclaimed(false);
     }
   };
 
@@ -720,30 +783,124 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
       {/* SUB-TAB 2: IN-STORE PICKUP RESERVATIONS */}
       {activeSubTab === 'orders' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex items-center justify-between text-xs text-stone-600">
+          {unclaimedToast && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{unclaimedToast}</span>
+            </div>
+          )}
+
+          {/* Overdue Unclaimed Orders Attention Banner */}
+          {overdueOrders.length > 0 && (
+            <div className="bg-amber-50 border border-amber-300 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                    <span>{overdueOrders.length} In-Store Order{overdueOrders.length !== 1 ? 's' : ''} Overdue for Pickup</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">Action Recommended</span>
+                  </div>
+                  <p className="text-xs text-amber-800 mt-1 max-w-xl leading-relaxed">
+                    These reservations have exceeded their scheduled pickup date without customer collection. You can batch-mark them as unclaimed to immediately return reserved products to your shelf stock.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleBatchMarkUnclaimed}
+                disabled={isBatchingUnclaimed}
+                className="px-4 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold shadow-2xs transition-colors flex items-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                <PackageX className="w-4 h-4" />
+                <span>{isBatchingUnclaimed ? 'Processing Restock...' : `Auto-Restock All Overdue (${overdueOrders.length})`}</span>
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-stone-600">
             <span>
-              Showing {salonOrders.length} customer pickup order{salonOrders.length !== 1 ? 's' : ''} for {salon?.salon_name || 'your salon'}.
+              Showing {filteredOrders.length} of {salonOrders.length} customer pickup order{salonOrders.length !== 1 ? 's' : ''} for {salon?.salon_name || 'your salon'}.
             </span>
             <span className="text-stone-400">
               Payments are settled physically at your salon counter upon collection.
             </span>
           </div>
 
-          {salonOrders.length === 0 ? (
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            <button
+              onClick={() => setOrderFilter('all')}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                orderFilter === 'all' ? 'bg-stone-900 text-white shadow-2xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              All Orders ({salonOrders.length})
+            </button>
+            <button
+              onClick={() => setOrderFilter('ready')}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                orderFilter === 'ready' ? 'bg-blue-600 text-white shadow-2xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Ready for Collection ({salonOrders.filter((o) => o.status === 'ready_for_pickup').length})
+            </button>
+            <button
+              onClick={() => setOrderFilter('pending')}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                orderFilter === 'pending' ? 'bg-amber-600 text-white shadow-2xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Pending Preparation ({salonOrders.filter((o) => o.status === 'pending_pickup').length})
+            </button>
+            <button
+              onClick={() => setOrderFilter('unclaimed')}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                orderFilter === 'unclaimed' ? 'bg-rose-600 text-white shadow-2xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              ⚠️ Unclaimed &amp; Overdue ({overdueOrders.length + unclaimedOrders.length})
+            </button>
+            <button
+              onClick={() => setOrderFilter('completed')}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                orderFilter === 'completed' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Settled in Store ({salonOrders.filter((o) => o.status === 'completed').length})
+            </button>
+            <button
+              onClick={() => setOrderFilter('cancelled')}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                orderFilter === 'cancelled' ? 'bg-stone-700 text-white shadow-2xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Cancelled ({salonOrders.filter((o) => o.status === 'cancelled').length})
+            </button>
+          </div>
+
+          {filteredOrders.length === 0 ? (
             <div className="py-20 text-center bg-white rounded-3xl border border-stone-200 p-8">
               <ShoppingBag className="w-10 h-10 text-stone-300 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-stone-900">No pickup orders yet</h3>
+              <h3 className="text-base font-bold text-stone-900">No pickup orders under this filter</h3>
               <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
-                When customers reserve retail products from your salon catalog, their in-store pickup reservations will appear here.
+                {orderFilter !== 'all'
+                  ? 'There are currently no orders in this category. Switch filters to view other reservations.'
+                  : 'When customers reserve retail products from your salon catalog, their in-store pickup reservations will appear here.'}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {salonOrders.map((order) => {
+              {filteredOrders.map((order) => {
                 const isPending = order.status === 'pending_pickup';
                 const isReady = order.status === 'ready_for_pickup';
                 const isCompleted = order.status === 'completed';
                 const isCancelled = order.status === 'cancelled';
+                const isUnclaimed = order.status === 'unclaimed';
+                const isOverdue =
+                  Boolean((order.pickup_date && order.pickup_date < todayStr) || order.is_overdue_unclaimed) &&
+                  (isPending || isReady);
 
                 return (
                   <div
@@ -754,8 +911,16 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
                     {/* Order Bar */}
                     <div className="p-4 sm:p-5 border-b border-stone-100 bg-stone-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
-                          <ShoppingBag className="w-4 h-4" />
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isUnclaimed
+                              ? 'bg-rose-100 text-rose-700'
+                              : isOverdue
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}
+                        >
+                          {isUnclaimed ? <PackageX className="w-4 h-4" /> : <ShoppingBag className="w-4 h-4" />}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -765,6 +930,11 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
                             <span className="text-xs text-stone-400">
                               • Reserved {new Date(order.created_at).toLocaleDateString()}
                             </span>
+                            {isOverdue && !isUnclaimed && (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
+                                Overdue
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 text-xs text-stone-600 mt-0.5">
                             <span className="font-semibold text-stone-900 flex items-center gap-1">
@@ -780,14 +950,14 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
                       </div>
 
                       {/* Status Badges & Action Buttons */}
-                      <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+                      <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
                         {isPending && (
                           <button
                             onClick={() => handleUpdateOrderStatus(order.id, 'ready_for_pickup')}
                             className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Mark Ready for Pickup</span>
+                            <span>Mark Ready</span>
                           </button>
                         )}
 
@@ -801,13 +971,32 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
                           </button>
                         )}
 
-                        {!isCompleted && !isCancelled && (
+                        {/* Unclaimed Action for active orders */}
+                        {(isPending || isReady) && (
+                          <button
+                            onClick={() => handleMarkUnclaimed(order.id)}
+                            className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                            title="Mark as unclaimed and immediately return products to stock"
+                          >
+                            <PackageX className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Mark Unclaimed &amp; Restock</span>
+                          </button>
+                        )}
+
+                        {!isCompleted && !isCancelled && !isUnclaimed && (
                           <button
                             onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
                             className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-red-50 text-stone-400 hover:text-red-600 text-xs font-semibold transition-colors cursor-pointer"
                           >
                             Cancel
                           </button>
+                        )}
+
+                        {isUnclaimed && (
+                          <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-bold border border-rose-200 flex items-center gap-1.5">
+                            <PackageX className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Unclaimed (Stock Restored)</span>
+                          </span>
                         )}
 
                         {isCompleted && (
@@ -827,6 +1016,34 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
 
                     {/* Order Body */}
                     <div className="p-5 sm:p-6 space-y-4">
+                      {/* Unclaimed Record Banner */}
+                      {isUnclaimed && (
+                        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-1 text-rose-900">
+                          <div className="flex items-center gap-2 font-bold text-rose-950">
+                            <PackageX className="w-4 h-4 text-rose-600 shrink-0" />
+                            <span>Order Not Claimed by Customer — Shelf Stock Released</span>
+                          </div>
+                          <p className="text-[11px] text-rose-800 pl-6">
+                            {order.unclaimed_reason || 'Client did not pick up reservation within scheduled window.'}
+                            {order.unclaimed_at && ` • Processed on ${new Date(order.unclaimed_at).toLocaleString()}`}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Overdue Warning Banner */}
+                      {isOverdue && !isUnclaimed && (
+                        <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs space-y-1 text-amber-900">
+                          <div className="flex items-center gap-2 font-bold text-amber-950">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>Target Pickup Date Passed ({order.pickup_date})</span>
+                          </div>
+                          <p className="text-[11px] text-amber-800 pl-6">
+                            Client has not claimed this package yet. You can contact them at{' '}
+                            <strong>{order.customer_phone}</strong> or click "Mark Unclaimed &amp; Restock" to release the items back into inventory.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Pickup Details */}
                       <div className="flex items-center gap-4 text-xs text-stone-600 bg-stone-50 p-3 rounded-2xl border border-stone-200/80">
                         <div className="flex items-center gap-1.5">

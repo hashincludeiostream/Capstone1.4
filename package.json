@@ -9,7 +9,7 @@
     "lint": "tsc --noEmit",
     "seed:firebase": "tsx scripts/seedToFirestore.ts",
     "verify:firebase": "tsx scripts/verifyFirestore.ts",
-    "start": "node dist/server.cjs"
+    "start": "node server.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

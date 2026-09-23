@@ -57,7 +57,8 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
   const policy: CancellationTierCalculation = calculateAppointmentCancellationTier(
     appointment.appointment_date,
     appointment.appointment_time,
-    price
+    price,
+    appointment.created_at
   );
 
   const selectedReasonObj = APPOINTMENT_CANCELLATION_REASONS.find(
@@ -192,6 +193,31 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
                   </div>
                 </div>
               </div>
+
+              {/* Grace Period Indicator */}
+              {policy.gracePeriod && (
+                <div
+                  className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
+                    !policy.gracePeriod.outside
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}
+                >
+                  <Clock className={`w-4 h-4 shrink-0 mt-0.5 ${!policy.gracePeriod.outside ? 'text-emerald-600' : 'text-amber-600'}`} />
+                  <div className="space-y-0.5">
+                    <span className="font-bold flex items-center gap-1.5">
+                      {!policy.gracePeriod.outside
+                        ? '30-Minute Grace Period Active (Fee Waived)'
+                        : 'Outside 30-Minute Grace Period'}
+                    </span>
+                    <p className="text-[11px] leading-relaxed opacity-90">
+                      {!policy.gracePeriod.outside
+                        ? `Booked ${policy.gracePeriod.formattedElapsed} ago (${policy.gracePeriod.remainingGraceMinutes}m remaining). Cancellations within 30 minutes of booking are 100% free of charge!`
+                        : `Booked ${policy.gracePeriod.formattedElapsed} ago (exceeded the ${policy.gracePeriod.graceMinutes}-min grace period). Standard salon late cancellation fees apply.`}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Policy Tier Assessment */}
               <div className={`p-4 rounded-xl border ${policy.badgeBg} ${policy.badgeBorder}`}>

@@ -42,6 +42,20 @@ export interface Salon {
   maps_embed_url?: string;
   featured?: boolean;
   monthly_target_bookings?: number;
+  cancellation_policy_config?: SalonCancellationPolicyConfig;
+}
+
+export interface SalonCancellationPolicyConfig {
+  grace_period_minutes: number; // default: 30
+  late_fee_type: 'percentage' | 'fixed'; // default: 'percentage'
+  late_fee_percentage: number; // default: 25 (%)
+  critical_fee_percentage: number; // default: 50 (%)
+  min_late_fee: number; // default: 150 (PHP)
+  min_critical_fee: number; // default: 250 (PHP)
+  allow_owner_waiver: boolean; // default: true
+  enable_grace_period: boolean; // default: true
+  auto_charge_deposit: boolean; // default: true
+  unclaimed_order_grace_hours?: number; // default: 48 (hours before in-store order is considered overdue/unclaimed)
 }
 
 export interface Service {
@@ -141,6 +155,11 @@ export interface Appointment {
   cancellation_notes?: string;
   cancellation_tier?: 'flexible' | 'late' | 'critical';
   cancellation_fee?: number;
+  cancellation_fee_status?: 'assessed' | 'collected' | 'waived';
+  cancellation_fee_waived_reason?: string;
+  outside_grace_period?: boolean;
+  grace_period_minutes?: number;
+  cancellation_elapsed_minutes?: number;
   cancellation_strike?: boolean;
   cancelled_at?: string;
   cancelled_by?: 'customer' | 'salon_owner' | 'admin';
@@ -303,7 +322,7 @@ export interface ProductOrderItem {
   volume_or_size?: string;
 }
 
-export type ProductOrderStatus = 'pending_pickup' | 'ready_for_pickup' | 'completed' | 'cancelled';
+export type ProductOrderStatus = 'pending_pickup' | 'ready_for_pickup' | 'completed' | 'cancelled' | 'unclaimed';
 
 export interface ProductOrder {
   id: number;
@@ -330,6 +349,10 @@ export interface ProductOrder {
   cancelled_at?: string;
   cancelled_by?: 'customer' | 'salon_owner' | 'admin';
   restocked_items_count?: number;
+  // Unclaimed In-Store tracking
+  unclaimed_at?: string;
+  unclaimed_reason?: string;
+  is_overdue_unclaimed?: boolean;
   created_at: string;
   updated_at?: string;
 }

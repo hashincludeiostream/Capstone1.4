@@ -16,6 +16,7 @@ import {
   Product,
   ProductOrder,
   ProductOrderStatus,
+  SalonCancellationPolicyConfig,
 } from '../types';
 import {
   createFirestoreAppointment,
@@ -896,6 +897,7 @@ export async function updateProductOrderStatus(
     reason?: string;
     notes?: string;
     cancelled_by?: string;
+    unclaimed_reason?: string;
   }
 ): Promise<{ success: boolean; order: ProductOrder; message: string }> {
   const payload: Record<string, any> = { status };
@@ -903,6 +905,7 @@ export async function updateProductOrderStatus(
     if (cancellationData.reason) payload.cancellation_reason = cancellationData.reason;
     if (cancellationData.notes) payload.cancellation_notes = cancellationData.notes;
     if (cancellationData.cancelled_by) payload.cancelled_by = cancellationData.cancelled_by;
+    if (cancellationData.unclaimed_reason) payload.unclaimed_reason = cancellationData.unclaimed_reason;
   }
 
   const res = await fetch(`${API_BASE}/product-orders/${orderId}/status`, {
@@ -953,6 +956,63 @@ export async function cancelProductOrder(
   }).catch((err) => console.warn('Firestore product order cancel sync warning:', err));
 
   return result;
+}
+
+export async function updateAppointmentLateFee(
+  appointmentId: number,
+  data: {
+    status: 'waived' | 'collected' | 'assessed';
+    waived_reason?: string;
+    notes?: string;
+  }
+): Promise<{ success: boolean; appointment: Appointment; message: string }> {
+  const res = await fetch(`${API_BASE}/appointments/${appointmentId}/late-fee`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to update late cancellation fee status');
+  }
+
+  return res.json();
+}
+
+export async function updateSalonCancellationPolicy(
+  salonId: number,
+  config: SalonCancellationPolicyConfig
+): Promise<{ success: boolean; salon: Salon; message: string }> {
+  const res = await fetch(`${API_BASE}/salons/${salonId}/cancellation-policy`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to update salon cancellation policy');
+  }
+
+  return res.json();
+}
+
+export async function batchMarkUnclaimedOrders(
+  salonId?: number
+): Promise<{ success: boolean; updatedCount: number; totalRestockedUnits: number; message: string }> {
+  const res = await fetch(`${API_BASE}/product-orders/batch-mark-unclaimed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ salon_id: salonId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to batch process unclaimed orders');
+  }
+
+  return res.json();
 }
 
 export async function fetchUserReliability(userId: number): Promise<{
