@@ -47,12 +47,23 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
   const handleGoogleAuth = async () => {
     // If user already typed an email into the input field, sign in with it directly
     if (email && email.includes('@')) {
+      const normalized = email.trim().toLowerCase();
+      if (normalized === 'hasincludeionull@gmail.com' || normalized === 'admin@nailglamhub.com' || normalized.includes('admin')) {
+        setError('This account is registered as an administrator. Please sign in via the Master Administrator Portal.');
+        return;
+      }
+
       setGoogleLoading(true);
       setError('');
       try {
         const result = await loginWithGoogle('customer', undefined, email);
         if (result.success && result.user) {
+          if (result.user.user_type !== 'customer') {
+            setError(`This account has ${result.user.user_type.replace('_', ' ')} permissions. Please use the appropriate portal.`);
+            return;
+          }
           onLoginSuccess(result.user);
+          onNavigate('customer-dashboard');
           return;
         } else {
           setError(result.error || 'Google authentication failed');
@@ -528,7 +539,14 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
         isOpen={showGoogleChooser}
         onClose={() => setShowGoogleChooser(false)}
         role="customer"
-        onSuccess={onLoginSuccess}
+        onSuccess={(user) => {
+          if (user.user_type !== 'customer') {
+            setError(`Account registered as ${user.user_type.replace('_', ' ')}. Please use the appropriate portal.`);
+            return;
+          }
+          onLoginSuccess(user);
+          onNavigate('customer-dashboard');
+        }}
       />
     </div>
   );

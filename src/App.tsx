@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem, PlatformStats, Reel, Review, Technician } from './types';
 import { initializeFirestoreData, subscribeToAppointments } from './lib/firestoreService';
-import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments, fetchStats, fetchReels, fetchReviews, fetchTechnicians, fetchServices, API_BASE } from './lib/api';
+import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments, fetchStats, fetchReels, fetchReviews, fetchTechnicians, fetchServices, verifyAdminPermission, API_BASE } from './lib/api';
 import { localStorage as safeLocalStorage } from './lib/localStorage';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -519,29 +519,52 @@ const AppContent: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Strict role view enforcement
+  // Role view authorization & live database route guard protection
   useEffect(() => {
-    if (currentUser?.user_type === 'admin') {
-      if (
-        !activeTab.startsWith('admin') &&
-        !activeTab.startsWith('login-') &&
-        !activeTab.startsWith('register') &&
-        activeTab !== 'profile'
-      ) {
-        setActiveTab('admin-dashboard');
+    let isCancelled = false;
+
+    // Restrict admin portal to super admins only with live database verification
+    if (activeTab.startsWith('admin')) {
+      if (!currentUser || currentUser.user_type !== 'admin') {
+        setActiveTab('landing');
+        showToast('Administrative authorization required.');
+        return;
       }
-    } else if (currentUser?.user_type === 'salon_owner') {
-      if (
-        !activeTab.startsWith('owner') &&
-        !activeTab.startsWith('login-') &&
-        !activeTab.startsWith('register') &&
-        activeTab !== 'profile' &&
-        activeTab !== 'owner-branches'
-      ) {
-        setActiveTab('owner-dashboard');
-      }
+
+      // Explicitly verify 'admin' flag against current user's actual permission level in the database
+      verifyAdminPermission(currentUser)
+        .then((verification) => {
+          if (isCancelled) return;
+          if (!verification.authorized) {
+            console.warn('[Route Guard] Admin credentials mismatch in database:', verification.error);
+            setActiveTab('landing');
+            showToast(verification.error || 'Access denied: User credentials do not match verified database administrator records.');
+            if (verification.user_type && verification.user_type !== currentUser.user_type) {
+              setCurrentUser((prev) => (prev ? { ...prev, user_type: verification.user_type! } : null));
+            }
+          }
+        })
+        .catch((err) => {
+          if (isCancelled) return;
+          console.error('[Route Guard] Error verifying admin credentials against database:', err);
+          setActiveTab('landing');
+          showToast('Security verification error. Redirected to landing.');
+        });
+
+      return () => {
+        isCancelled = true;
+      };
     }
-  }, [currentUser?.user_type, activeTab]);
+
+    // Restrict salon owner portal to salon owners and admins
+    if (activeTab.startsWith('owner')) {
+      if (!currentUser || (currentUser.user_type !== 'salon_owner' && currentUser.user_type !== 'admin')) {
+        setActiveTab('landing');
+        showToast('Salon owner credentials required.');
+      }
+      return;
+    }
+  }, [currentUser?.id, currentUser?.user_type, activeTab]);
 
   const handleToggleFavorite = (salonId: number) => {
     if (!currentUser || currentUser.user_type !== 'customer') {
@@ -632,21 +655,41 @@ const AppContent: React.FC = () => {
     showToast('Signed out successfully');
   };
 
-  // Centralized navigation handler with validation
-  const handleNavigate = (tab: string, targetDomId?: string) => {
-    // Validate navigation based on user role
-    if (currentUser?.user_type === 'salon_owner') {
-      const allowedTabs = ['owner-dashboard', 'owner-profile', 'explore', 'profile'];
-      if (!allowedTabs.includes(tab) && !tab.startsWith('owner-')) {
-        console.warn(`Navigation to ${tab} not allowed for salon owner`);
+  // Centralized navigation handler with robust database-verified route guards
+  const handleNavigate = async (tab: string, targetDomId?: string) => {
+    // Restrict administrative portal with explicit database permission verification
+    if (tab.startsWith('admin')) {
+      if (!currentUser || currentUser.user_type !== 'admin') {
+        setActiveTab('landing');
+        showToast('Administrative authorization required.');
         return;
       }
-    } else if (currentUser?.user_type === 'admin') {
-      const allowedTabs = ['admin-dashboard', 'admin-salons', 'admin-users', 'profile'];
-      if (!allowedTabs.includes(tab) && !tab.startsWith('admin-')) {
-        console.warn(`Navigation to ${tab} not allowed for admin`);
+
+      // Explicitly verify the 'admin' flag against current user's actual permission level in the database
+      try {
+        const verification = await verifyAdminPermission(currentUser);
+        if (!verification.authorized) {
+          console.warn('[handleNavigate Route Guard] Admin credentials mismatch in database:', verification.error);
+          setActiveTab('landing');
+          showToast(verification.error || 'Access denied: Database credentials do not match administrator permissions.');
+          if (verification.user_type && verification.user_type !== currentUser.user_type) {
+            setCurrentUser((prev) => (prev ? { ...prev, user_type: verification.user_type! } : null));
+          }
+          return;
+        }
+      } catch (err) {
+        console.error('[handleNavigate Route Guard] Verification network error:', err);
+        setActiveTab('landing');
+        showToast('Security verification error. Redirected to landing.');
         return;
       }
+    }
+
+    // Restrict salon owner portal
+    if (tab.startsWith('owner') && currentUser?.user_type !== 'salon_owner' && currentUser?.user_type !== 'admin') {
+      setActiveTab('landing');
+      showToast('Salon owner credentials required.');
+      return;
     }
 
     setActiveTab(tab);
@@ -860,6 +903,7 @@ const AppContent: React.FC = () => {
           onOpenAbout={() => setAboutContactModal({ open: true, tab: 'about' })}
           onOpenContact={() => setAboutContactModal({ open: true, tab: 'contact' })}
           onNavigate={handleNavigate}
+          onLogout={handleLogout}
           // Customer notification signals
           bookingsCount={bookingsNotificationCount}
           activeBookingsCount={activeCustomerBookings.length}
@@ -1205,18 +1249,7 @@ const AppContent: React.FC = () => {
           )}
 
           {/* 6. SALON OWNER DASHBOARD & SUB-TABS */}
-          {(activeTab.startsWith('owner') ||
-            (currentUser?.user_type === 'salon_owner' &&
-              !activeTab.startsWith('login-') &&
-              !activeTab.startsWith('register-') &&
-              activeTab !== 'profile' &&
-              activeTab !== 'products' &&
-              activeTab !== 'customer-orders' &&
-              activeTab !== 'explore' &&
-              activeTab !== 'services' &&
-              activeTab !== 'reels' &&
-              activeTab !== 'reviews' &&
-              activeTab !== 'map')) && (
+          {activeTab.startsWith('owner') && (
             currentUser?.user_type === 'salon_owner' || currentUser?.user_type === 'admin' ? (
               <SalonOwnerDashboard
                 currentUser={currentUser}
@@ -1298,10 +1331,7 @@ const AppContent: React.FC = () => {
           )}
 
           {/* 7. ADMIN DASHBOARD & GOVERNANCE SUITE */}
-          {(activeTab.startsWith('admin') ||
-            (currentUser?.user_type === 'admin' &&
-              !activeTab.startsWith('login-') &&
-              !activeTab.startsWith('register-'))) && (
+          {activeTab.startsWith('admin') && (
             currentUser?.user_type === 'admin' ? (
               <AdminDashboard
                 targetId={targetElementId}
@@ -1317,6 +1347,7 @@ const AppContent: React.FC = () => {
                     : 'overview'
                 }
                 onNavigateTab={(tab) => setActiveTab(tab)}
+                onLogout={handleLogout}
               />
             ) : currentUser ? (
               <div className="py-16 text-center bg-white rounded-3xl p-8 border border-rose-100 max-w-lg mx-auto shadow-sm">
@@ -1450,6 +1481,7 @@ const AppContent: React.FC = () => {
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Welcome, ${user.fullname}! Signed in as Client.`);
+                setActiveTab('customer-dashboard');
               }}
               onNavigate={(tab) => setActiveTab(tab)}
             />
@@ -1461,6 +1493,7 @@ const AppContent: React.FC = () => {
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Account created! Welcome, ${user.fullname}.`);
+                setActiveTab('customer-dashboard');
               }}
               onNavigate={(tab) => setActiveTab(tab)}
             />
@@ -1472,7 +1505,9 @@ const AppContent: React.FC = () => {
               initialMode="signin"
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
+                loadData();
                 showToast(`Welcome back, Partner ${user.fullname}!`);
+                setActiveTab('owner-dashboard');
               }}
               onNavigate={(tab) => setActiveTab(tab)}
             />
@@ -1485,6 +1520,7 @@ const AppContent: React.FC = () => {
                 setCurrentUser(user);
                 loadData();
                 showToast(`Salon and Partner account created for ${user.fullname}!`);
+                setActiveTab('owner-dashboard');
               }}
               onNavigate={(tab) => setActiveTab(tab)}
             />
@@ -1497,6 +1533,7 @@ const AppContent: React.FC = () => {
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Admin Console authorized for ${user.fullname}.`);
+                setActiveTab('admin-dashboard');
               }}
               onNavigate={(tab) => setActiveTab(tab)}
             />
@@ -1508,6 +1545,7 @@ const AppContent: React.FC = () => {
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Administrator account authorized for ${user.fullname}!`);
+                setActiveTab('admin-dashboard');
               }}
               onNavigate={(tab) => setActiveTab(tab)}
             />

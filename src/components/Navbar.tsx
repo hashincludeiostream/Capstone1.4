@@ -23,6 +23,7 @@ import {
   Package,
   Compass,
   Mail,
+  ExternalLink,
 } from 'lucide-react';
 import {
   User,
@@ -105,16 +106,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const isAdmin = currentUser?.user_type === 'admin';
 
-  // Hide navbar in admin mode for non-admin users
-  if (isAdminMode && !isAdmin) {
-    return null;
-  }
-
-  // Hide navbar in non-admin mode for admin users
-  if (!isAdminMode && isAdmin) {
-    return null;
-  }
-
   return (
     <header className="sticky top-0 z-40 bg-white/75 backdrop-blur-lg border-b border-pink-100/80 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -172,6 +163,31 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Bar */}
           <div className="flex items-center gap-2.5">
+            {/* Quick Admin Navigation Toggle */}
+            {currentUser?.user_type === 'admin' && (
+              activeTab.startsWith('admin') ? (
+                <button
+                  id="navbar-admin-browse-btn"
+                  onClick={() => handleNavigation('salons')}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-900 text-xs font-semibold border border-rose-200 transition-colors shadow-2xs cursor-pointer"
+                  title="Leave Admin Console to browse public salons & marketplace"
+                >
+                  <Store className="w-3.5 h-3.5 text-rose-700" />
+                  <span>Browse Salons</span>
+                </button>
+              ) : (
+                <button
+                  id="navbar-admin-console-btn"
+                  onClick={() => handleNavigation('admin-dashboard')}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  title="Return to Super Admin Governance Console"
+                >
+                  <Shield className="w-3.5 h-3.5 text-rose-200" />
+                  <span>Admin Console</span>
+                </button>
+              )
+            )}
+
             {/* Notification Button (Arranged In-Store Cart & System Notifications) */}
             <NotificationMenu
               currentUser={currentUser}
@@ -436,6 +452,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <Radio className="w-4 h-4 text-rose-600" />
                             <span>Broadcast Announcements</span>
                           </button>
+
+                          <div className="border-t border-rose-100 my-1 pt-1">
+                            <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                              Explore Public Site
+                            </p>
+                            <button
+                              onClick={() => {
+                                handleNavigation('salons');
+                                setUserDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <Store className="w-4 h-4 text-rose-600" />
+                              <span>Browse Salons Directory</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleNavigation('products');
+                                setUserDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <Package className="w-4 h-4 text-rose-600" />
+                              <span>Explore Marketplace</span>
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
@@ -558,6 +600,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Radio className="w-4 h-4 text-rose-600" />
                   <span>Broadcast Announcements</span>
                 </button>
+
+                <div className="pt-2 border-t border-rose-100">
+                  <p className="px-4 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                    Explore Platform
+                  </p>
+                  <button
+                    onClick={() => {
+                      handleNavigation('salons');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                  >
+                    <Store className="w-4 h-4 text-rose-600" />
+                    <span>Browse Salons Directory</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleNavigation('products');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                  >
+                    <Package className="w-4 h-4 text-rose-600" />
+                    <span>Explore Marketplace</span>
+                  </button>
+                </div>
 
                 <div className="pt-2 border-t border-gray-100">
                   <button

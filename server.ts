@@ -374,6 +374,66 @@ async function startServer() {
     }
   });
 
+  // Auth: Verify Administrator Credentials Against Database
+  app.post('/api/auth/verify-admin', async (req, res) => {
+    const { userId, email } = req.body;
+    if (!userId && !email) {
+      return res.status(400).json({ authorized: false, error: 'User ID or email is required for verification.' });
+    }
+
+    try {
+      let queryStr = 'SELECT id, fullname, email, user_type, status FROM users WHERE ';
+      const queryParams: any[] = [];
+      if (userId && email) {
+        queryStr += 'id = ? AND LOWER(email) = LOWER(?)';
+        queryParams.push(Number(userId), String(email).trim());
+      } else if (userId) {
+        queryStr += 'id = ?';
+        queryParams.push(Number(userId));
+      } else {
+        queryStr += 'LOWER(email) = LOWER(?)';
+        queryParams.push(String(email).trim());
+      }
+
+      const [rows] = await db.execute(queryStr, queryParams);
+      const user = (rows as any[])[0];
+
+      if (!user) {
+        return res.status(404).json({ authorized: false, error: 'Account record not found in system database.' });
+      }
+
+      if (user.user_type !== 'admin') {
+        return res.status(403).json({
+          authorized: false,
+          error: `Access denied: Account permission level in database is '${user.user_type}', but administrator privileges are required.`,
+          user_type: user.user_type,
+        });
+      }
+
+      if (user.status !== 'active') {
+        return res.status(403).json({
+          authorized: false,
+          error: 'Access denied: Administrator account is currently inactive or suspended.',
+          status: user.status,
+          user_type: user.user_type,
+        });
+      }
+
+      return res.json({
+        authorized: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          user_type: user.user_type,
+          fullname: user.fullname,
+        },
+      });
+    } catch (error) {
+      console.error('Verify admin error:', error);
+      return res.status(500).json({ authorized: false, error: 'Database verification failed due to internal server error.' });
+    }
+  });
+
   // Auth: Google Sign-In & Instant Verification
   app.post('/api/auth/google', async (req, res) => {
     const { email, fullname, avatar, user_type, admin_code } = req.body;
@@ -390,8 +450,38 @@ async function startServer() {
       const existing = (existingRows as any[])[0];
 
       if (existing) {
+        // Enforce strict role separation:
+        // 1. If an existing account is an administrator, do NOT permit client or partner logins to access it
+        if (existing.user_type === 'admin') {
+          if (user_type !== 'admin') {
+            return res.status(403).json({
+              error: 'This Google account is registered as an Administrator. Please use the Master Administrator Portal with your administrative security code.',
+              user_type: 'admin',
+            });
+          }
+          if (!admin_code || !ADMIN_CODES.includes(admin_code.trim().toUpperCase())) {
+            return res.status(403).json({
+              error: 'Valid Administrator Security Authorization Code is required to sign in as Administrator.',
+              user_type: 'admin',
+            });
+          }
+        }
+
+        // 2. If an existing account is a salon owner, prevent client portal from signing in as owner
+        if (existing.user_type === 'salon_owner' && user_type === 'customer') {
+          return res.status(403).json({
+            error: 'This Google account is registered as a Salon Partner. Please sign in via the Salon Owner / Partner Portal.',
+            user_type: 'salon_owner',
+          });
+        }
+
         let updatedRole = existing.user_type;
-        if (user_type === 'admin' && admin_code && ADMIN_CODES.includes(admin_code.trim().toUpperCase())) {
+        if (user_type === 'admin') {
+          if (!admin_code || !ADMIN_CODES.includes(admin_code.trim().toUpperCase())) {
+            return res.status(403).json({
+              error: 'Invalid Administrator Security Authorization Code.',
+            });
+          }
           updatedRole = 'admin';
         } else if (user_type === 'salon_owner' && (existing.user_type === 'customer' || !existing.user_type)) {
           updatedRole = 'salon_owner';

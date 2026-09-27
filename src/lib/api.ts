@@ -1,5 +1,6 @@
 import {
   User,
+  UserRole,
   Salon,
   Service,
   Technician,
@@ -731,6 +732,72 @@ export async function fetchUser(id: number): Promise<User> {
   const res = await fetch(`${API_BASE}/users/${id}`);
   if (!res.ok) throw new Error('Failed to fetch user');
   return await res.json();
+}
+
+export interface AdminVerificationResult {
+  authorized: boolean;
+  error?: string;
+  user_type?: UserRole;
+  user?: Partial<User>;
+}
+
+/**
+ * Robust database-level verification of administrator privileges.
+ * Explicitly verifies the 'admin' flag against current user's actual permission level in the database.
+ */
+export async function verifyAdminPermission(user: User | null): Promise<AdminVerificationResult> {
+  if (!user) {
+    return { authorized: false, error: 'No active authenticated session.' };
+  }
+
+  if (user.user_type !== 'admin') {
+    return {
+      authorized: false,
+      error: `Account permission level is '${user.user_type}', but administrator privileges are required.`,
+      user_type: user.user_type,
+    };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/verify-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, email: user.email }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.authorized) {
+      return {
+        authorized: false,
+        error: data.error || 'Access denied: Database credentials do not possess administrator permissions.',
+        user_type: data.user_type,
+      };
+    }
+
+    return {
+      authorized: true,
+      user: data.user,
+      user_type: 'admin',
+    };
+  } catch (err: any) {
+    console.warn('[Security] API verifyAdminPermission direct check error, verifying via fallback:', err);
+    try {
+      const dbUser = await fetchUser(user.id);
+      if (dbUser.user_type === 'admin' && (dbUser.status === 'active' || !dbUser.status)) {
+        return { authorized: true, user: dbUser, user_type: 'admin' };
+      }
+      return {
+        authorized: false,
+        error: `Database permission level is '${dbUser.user_type}', administrator privileges required.`,
+        user_type: dbUser.user_type,
+      };
+    } catch (fallbackErr) {
+      return {
+        authorized: false,
+        error: 'Unable to verify administrative permissions against database.',
+      };
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

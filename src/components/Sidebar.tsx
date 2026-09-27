@@ -26,6 +26,7 @@ import {
   MapPin,
   Package,
   ShoppingBag,
+  LogOut,
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -38,6 +39,7 @@ interface SidebarProps {
   onOpenContact: () => void;
   isAdminMode: boolean;
   onNavigate?: (tab: string) => void;
+  onLogout?: () => void;
   // Client notifications
   bookingsCount?: number;
   activeBookingsCount?: number;
@@ -76,6 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenContact,
   isAdminMode,
   onNavigate,
+  onLogout,
   bookingsCount = 0,
   activeBookingsCount = 0,
   totalBookingsCount = 0,
@@ -110,20 +113,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
-
-  // ----------------------------------------------------
-  // ADMIN MODE CHECK - Hide non-admin UI when in admin mode
-  // ----------------------------------------------------
-  if (isAdminMode && !isAdmin) {
-    return null; // Hide sidebar completely in admin mode for non-admin users
-  }
-
-  // ----------------------------------------------------
-  // NON-ADMIN MODE CHECK - Hide admin UI when not in admin mode
-  // ----------------------------------------------------
-  if (!isAdminMode && isAdmin) {
-    return null; // Hide sidebar completely in non-admin mode for admin users
-  }
 
   // ----------------------------------------------------
   // SUPER ADMIN SIDEBAR VIEW (Exclusive Admin Tools Only)
@@ -403,6 +392,66 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Live Platform Exploration */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 border border-pink-100 shadow-xs">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-700 px-3 py-1.5 flex items-center gap-1.5">
+            <Compass className="w-3.5 h-3.5 text-pink-600" />
+            Explore Platform
+          </p>
+          <div className="space-y-1 mt-1">
+            <button
+              id="sidebar-admin-explore-salons-btn"
+              onClick={() => handleNavigation('salons')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === 'salons' || activeTab === 'explore'
+                  ? 'bg-pink-100 text-pink-900 font-bold'
+                  : 'text-gray-700 hover:bg-pink-50'
+              }`}
+            >
+              <Store className="w-4 h-4 text-pink-600" />
+              <span>Browse Salons</span>
+            </button>
+            <button
+              id="sidebar-admin-explore-products-btn"
+              onClick={() => handleNavigation('products')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === 'products'
+                  ? 'bg-pink-100 text-pink-900 font-bold'
+                  : 'text-gray-700 hover:bg-pink-50'
+              }`}
+            >
+              <Package className="w-4 h-4 text-pink-600" />
+              <span>Marketplace Products</span>
+            </button>
+            <button
+              id="sidebar-admin-explore-map-btn"
+              onClick={() => handleNavigation('map')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === 'map'
+                  ? 'bg-pink-100 text-pink-900 font-bold'
+                  : 'text-gray-700 hover:bg-pink-50'
+              }`}
+            >
+              <MapPin className="w-4 h-4 text-pink-600" />
+              <span>Interactive Salon Map</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Admin Sign Out Button */}
+        {onLogout && (
+          <div className="pt-1">
+            <button
+              id="sidebar-admin-signout-btn"
+              onClick={onLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-all cursor-pointer shadow-2xs"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out of Master Console</span>
+            </button>
+          </div>
+        )}
 
         {/* Admin Support & Compliance Footer */}
         <div className="px-3 pt-2 text-xs text-gray-500 space-y-2 border-t border-rose-100">

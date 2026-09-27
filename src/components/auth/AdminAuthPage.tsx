@@ -55,6 +55,7 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
         const result = await loginWithGoogle('admin', codeToPass, email);
         if (result.success && result.user) {
           onLoginSuccess(result.user);
+          onNavigate('admin-dashboard');
           return;
         } else {
           setError(result.error || 'Google authentication failed');
@@ -583,7 +584,10 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
         onClose={() => setShowGoogleChooser(false)}
         role="admin"
         adminCode={adminCode || 'ADMIN2025'}
-        onSuccess={onLoginSuccess}
+        onSuccess={(user) => {
+          onLoginSuccess(user);
+          onNavigate('admin-dashboard');
+        }}
       />
     </div>
   );

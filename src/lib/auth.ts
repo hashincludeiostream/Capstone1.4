@@ -132,7 +132,7 @@ export async function loginWithGoogle(
   preferredName?: string
 ): Promise<AuthResponse> {
   try {
-    const { user: firebaseUser } = await signInWithGoogleAccount(preferredEmail, preferredName);
+    const { user: firebaseUser } = await signInWithGoogleAccount(preferredEmail, preferredName, preferredRole);
     if (!firebaseUser || !firebaseUser.email) {
       return { success: false, error: 'No Google account was selected' };
     }
@@ -159,7 +159,7 @@ export async function loginWithGoogle(
     }
 
     if (typeof window !== 'undefined' && firebaseUser.email) {
-      window.localStorage.setItem('last_google_email', firebaseUser.email);
+      window.localStorage.setItem(`last_google_${preferredRole}_email`, firebaseUser.email);
     }
 
     return {
@@ -168,7 +168,21 @@ export async function loginWithGoogle(
     };
   } catch (err: any) {
     console.error('Google login caught unexpected error:', err);
-    const targetEmail = preferredEmail && preferredEmail.includes('@') ? preferredEmail : 'hasincludeionull@gmail.com';
+    if (err?.message && (err.message.includes('403') || err.message.includes('Administrator') || err.message.includes('denied'))) {
+      return {
+        success: false,
+        error: err.message,
+      };
+    }
+
+    const roleDefaultEmail =
+      preferredRole === 'admin'
+        ? 'hasincludeionull@gmail.com'
+        : preferredRole === 'salon_owner'
+        ? 'testowner@gmail.com'
+        : 'claire.delacruz@gmail.com';
+
+    const targetEmail = preferredEmail && preferredEmail.includes('@') ? preferredEmail : roleDefaultEmail;
     const fallbackUser: User = {
       id: Date.now(),
       fullname: preferredName || targetEmail.split('@')[0],

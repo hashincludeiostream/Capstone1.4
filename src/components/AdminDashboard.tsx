@@ -32,6 +32,7 @@ import {
   AlertCircle,
   Building,
   Mail,
+  LogOut,
 } from 'lucide-react';
 import { Salon, User, Reel, Review, Announcement, BusinessCategory } from '../types';
 import { AdminEmailReportsManager } from './admin/AdminEmailReportsManager';
@@ -71,12 +72,14 @@ interface AdminDashboardProps {
   initialTab?: 'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports';
   onNavigateTab?: (tab: string) => void;
   targetId?: string | null;
+  onLogout?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   initialTab = 'overview',
   onNavigateTab,
   targetId,
+  onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports'>(
     initialTab || 'overview'
@@ -548,6 +551,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('salons')}
+              className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm border border-white/20 transition-all cursor-pointer shadow-xs"
+              title="Leave Admin Console and view public salon directory"
+            >
+              <Store className="w-3.5 h-3.5 text-rose-300" />
+              <span>Browse Public Salons</span>
+            </button>
+          )}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="px-3.5 py-2 rounded-xl bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold flex items-center gap-1.5 border border-red-500/40 transition-all cursor-pointer shadow-xs"
+              title="Sign out of Admin account"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          )}
           <button
             onClick={handleDownloadAdminHtmlReport}
             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-pink-600/30 transition-all cursor-pointer"

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../../types';
 import { loginWithGoogle } from '../../lib/auth';
-import { Check, ShieldCheck, Mail, ArrowRight, X, Loader2, Sparkles } from 'lucide-react';
+import { ShieldCheck, Mail, ArrowRight, X, Loader2, Sparkles, KeyRound } from 'lucide-react';
 
 interface GoogleAccountChooserModalProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
   isOpen,
   onClose,
   role,
-  adminCode,
+  adminCode: initialAdminCode,
   onSuccess,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -23,22 +23,74 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
   const [activeAccount, setActiveAccount] = useState<'default' | 'custom'>('default');
   const [customEmail, setCustomEmail] = useState('');
   const [customName, setCustomName] = useState('');
+  const [adminCodeInput, setAdminCodeInput] = useState(initialAdminCode || (role === 'admin' ? 'ADMIN2025' : ''));
 
   if (!isOpen) return null;
 
-  const primaryGoogleAccount = {
-    email: 'hasincludeionull@gmail.com',
-    name: 'Hasinclude I. Null',
-    avatar: 'https://ui-avatars.com/api/?name=Hasinclude+Null&background=db2777&color=fff',
+  // Stored role-specific Google account or default role profile
+  const storedRoleEmail =
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem(`last_google_${role}_email`)
+      : null;
+
+  // Strictly segregated primary Google account persona per role
+  const roleAccounts: Record<
+    UserRole,
+    { email: string; name: string; avatar: string; roleDescription: string }
+  > = {
+    customer: {
+      email: storedRoleEmail && !storedRoleEmail.toLowerCase().includes('admin') && storedRoleEmail !== 'hasincludeionull@gmail.com'
+        ? storedRoleEmail
+        : 'claire.delacruz@gmail.com',
+      name: 'Claire Dela Cruz',
+      avatar: 'https://ui-avatars.com/api/?name=Claire+Dela+Cruz&background=db2777&color=fff',
+      roleDescription: 'Verified Client Profile',
+    },
+    salon_owner: {
+      email: storedRoleEmail && !storedRoleEmail.toLowerCase().includes('admin') && storedRoleEmail !== 'hasincludeionull@gmail.com'
+        ? storedRoleEmail
+        : 'testowner@gmail.com',
+      name: 'Test Owner',
+      avatar: 'https://ui-avatars.com/api/?name=Test+Owner&background=7c3aed&color=fff',
+      roleDescription: 'Verified Salon Partner & Manager',
+    },
+    admin: {
+      email: storedRoleEmail || 'hasincludeionull@gmail.com',
+      name: 'Hasinclude I. Null',
+      avatar: 'https://ui-avatars.com/api/?name=Hasinclude+Null&background=e11d48&color=fff',
+      roleDescription: 'Platform Executive Administrator',
+    },
   };
 
+  const currentPrimaryAccount = roleAccounts[role];
+
   const handleSignIn = async (emailToUse: string, nameToUse?: string) => {
+    // Client-side guard: block admin accounts from being used in client or partner login
+    const normalizedEmail = emailToUse.trim().toLowerCase();
+    const isAdminAccount =
+      normalizedEmail === 'hasincludeionull@gmail.com' ||
+      normalizedEmail === 'admin@nailglamhub.com' ||
+      (normalizedEmail.includes('admin') && !normalizedEmail.includes('customer'));
+
+    if (role !== 'admin' && isAdminAccount) {
+      setError(
+        'This Google account has Administrator credentials. Please switch to the Administrator Portal to sign in.'
+      );
+      return;
+    }
+
     setLoading(true);
     setError('');
 
+    const effectiveAdminCode = role === 'admin' ? adminCodeInput || initialAdminCode || 'ADMIN2025' : undefined;
+
     try {
-      const result = await loginWithGoogle(role, adminCode, emailToUse, nameToUse);
+      const result = await loginWithGoogle(role, effectiveAdminCode, emailToUse.trim(), nameToUse?.trim());
       if (result.success && result.user) {
+        if (role !== 'admin' && result.user.user_type === 'admin') {
+          setError('Administrator session detected. This portal is strictly for ' + (role === 'customer' ? 'clients' : 'partners') + '.');
+          return;
+        }
         onSuccess(result.user);
         onClose();
       } else {
@@ -60,11 +112,28 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
     handleSignIn(customEmail.trim(), customName.trim());
   };
 
-  const roleLabels: Record<UserRole, { label: string; badgeColor: string }> = {
-    customer: { label: 'Client / Customer Account', badgeColor: 'bg-pink-100 text-pink-700 border-pink-200' },
-    salon_owner: { label: 'Salon Owner & Business Suite', badgeColor: 'bg-purple-100 text-purple-700 border-purple-200' },
-    admin: { label: 'Platform Executive Administrator', badgeColor: 'bg-rose-100 text-rose-800 border-rose-200' },
+  const roleLabels: Record<UserRole, { label: string; badgeColor: string; themeColor: string; buttonBg: string }> = {
+    customer: {
+      label: 'Client / Customer Account',
+      badgeColor: 'bg-pink-100 text-pink-700 border-pink-200',
+      themeColor: 'border-pink-200 hover:border-pink-500 hover:bg-pink-50/40 text-pink-600',
+      buttonBg: 'bg-pink-600 hover:bg-pink-700',
+    },
+    salon_owner: {
+      label: 'Salon Owner & Business Suite',
+      badgeColor: 'bg-purple-100 text-purple-700 border-purple-200',
+      themeColor: 'border-purple-200 hover:border-purple-500 hover:bg-purple-50/40 text-purple-600',
+      buttonBg: 'bg-purple-600 hover:bg-purple-700',
+    },
+    admin: {
+      label: 'Platform Executive Administrator',
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
+      themeColor: 'border-rose-200 hover:border-rose-600 hover:bg-rose-50/40 text-rose-700',
+      buttonBg: 'bg-rose-700 hover:bg-rose-800',
+    },
   };
+
+  const activeTheme = roleLabels[role];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -98,8 +167,8 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
           </div>
 
           <div className="mt-3 flex items-center justify-between">
-            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${roleLabels[role].badgeColor}`}>
-              {roleLabels[role].label}
+            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${activeTheme.badgeColor}`}>
+              {activeTheme.label}
             </span>
             <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" /> Instant Google Verification
@@ -110,40 +179,43 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
         {/* Content */}
         <div className="p-6 pt-4 space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs leading-relaxed">
               {error}
             </div>
           )}
 
-          {/* Account 1: Active Google Identity */}
+          {/* Role-Specific Primary Google Identity */}
           <button
             type="button"
             disabled={loading}
-            onClick={() => handleSignIn(primaryGoogleAccount.email, primaryGoogleAccount.name)}
-            className="w-full text-left p-3.5 rounded-2xl border-2 border-pink-200 hover:border-pink-500 hover:bg-pink-50/40 transition-all flex items-center justify-between group cursor-pointer disabled:opacity-50"
+            onClick={() => handleSignIn(currentPrimaryAccount.email, currentPrimaryAccount.name)}
+            className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between group cursor-pointer disabled:opacity-50 ${activeTheme.themeColor}`}
           >
             <div className="flex items-center gap-3">
               <img
-                src={primaryGoogleAccount.avatar}
-                alt={primaryGoogleAccount.name}
-                className="w-11 h-11 rounded-full border border-pink-300 shadow-2xs"
+                src={currentPrimaryAccount.avatar}
+                alt={currentPrimaryAccount.name}
+                className="w-11 h-11 rounded-full border border-gray-200 shadow-2xs"
               />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-gray-900 group-hover:text-pink-700 transition-colors">
-                    {primaryGoogleAccount.name}
+                  <span className="text-sm font-bold text-gray-900 group-hover:text-gray-950 transition-colors">
+                    {currentPrimaryAccount.name}
                   </span>
                   <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                     Active
                   </span>
                 </div>
                 <div className="text-xs text-gray-600 font-mono mt-0.5">
-                  {primaryGoogleAccount.email}
+                  {currentPrimaryAccount.email}
+                </div>
+                <div className="text-[10px] text-gray-400 font-medium mt-0.5">
+                  {currentPrimaryAccount.roleDescription}
                 </div>
               </div>
             </div>
 
-            <div className="w-8 h-8 rounded-full bg-pink-100 group-hover:bg-pink-600 text-pink-600 group-hover:text-white flex items-center justify-center transition-all shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-800 text-gray-600 group-hover:text-white flex items-center justify-center transition-all shrink-0">
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
@@ -151,6 +223,23 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
               )}
             </div>
           </button>
+
+          {/* Admin Code Field if in Admin Mode */}
+          {role === 'admin' && (
+            <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-1.5">
+              <label className="text-[11px] font-bold text-rose-900 flex items-center gap-1">
+                <KeyRound className="w-3.5 h-3.5 text-rose-700" />
+                Administrator Security Passcode
+              </label>
+              <input
+                type="password"
+                value={adminCodeInput}
+                onChange={(e) => setAdminCodeInput(e.target.value)}
+                placeholder="Enter ADMIN2025"
+                className="w-full px-3 py-1.5 text-xs border border-rose-300 rounded-xl bg-white font-mono uppercase focus:ring-2 focus:ring-rose-500 outline-none"
+              />
+            </div>
+          )}
 
           {/* Divider */}
           <div className="relative my-2">
@@ -182,7 +271,7 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
                   type="email"
                   value={customEmail}
                   onChange={(e) => setCustomEmail(e.target.value)}
-                  placeholder="yourname@gmail.com"
+                  placeholder={role === 'customer' ? 'client@gmail.com' : role === 'salon_owner' ? 'partner@gmail.com' : 'admin@gmail.com'}
                   required
                   className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none bg-white font-mono"
                 />
@@ -212,7 +301,7 @@ export const GoogleAccountChooserModal: React.FC<GoogleAccountChooserModalProps>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-2 px-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  className={`flex-1 py-2 px-3 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${activeTheme.buttonBg}`}
                 >
                   {loading ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

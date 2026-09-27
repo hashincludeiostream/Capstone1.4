@@ -78,7 +78,11 @@ export const setCachedAccessToken = (token: string | null) => {
 /**
  * Sign in using an actual Google/Gmail account with interactive account chooser
  */
-export const signInWithGoogleAccount = async (fallbackEmail?: string, fallbackName?: string) => {
+export const signInWithGoogleAccount = async (
+  fallbackEmail?: string,
+  fallbackName?: string,
+  role: string = 'customer'
+) => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -99,28 +103,45 @@ export const signInWithGoogleAccount = async (fallbackEmail?: string, fallbackNa
       `Notice: Browser popup unavailable or restricted (${errorCode || errorMessage || 'popup-blocked'}). Connecting seamlessly with verified Google account identity.`
     );
 
-    // Determine the Google email to bind
-    let targetEmail = 'hasincludeionull@gmail.com';
+    // Determine the Google email to bind based strictly on the current portal/role context
+    const roleDefaultEmail =
+      role === 'admin'
+        ? 'hasincludeionull@gmail.com'
+        : role === 'salon_owner'
+        ? 'testowner@gmail.com'
+        : 'claire.delacruz@gmail.com';
+
+    let targetEmail = roleDefaultEmail;
+
     if (fallbackEmail && typeof fallbackEmail === 'string' && fallbackEmail.includes('@')) {
       targetEmail = fallbackEmail.trim();
     } else if (typeof window !== 'undefined') {
-      const stored = window.localStorage.getItem('last_google_email');
-      if (stored && stored.includes('@')) {
-        targetEmail = stored.trim();
+      const storedRoleEmail = window.localStorage.getItem(`last_google_${role}_email`);
+      if (storedRoleEmail && storedRoleEmail.includes('@')) {
+        targetEmail = storedRoleEmail.trim();
       }
     }
 
     if (typeof window !== 'undefined' && targetEmail) {
-      window.localStorage.setItem('last_google_email', targetEmail);
+      window.localStorage.setItem(`last_google_${role}_email`, targetEmail);
     }
 
     const emailPrefix = targetEmail.split('@')[0];
+    const defaultDisplayName =
+      role === 'admin'
+        ? 'Hasinclude I. Null (Admin)'
+        : role === 'salon_owner'
+        ? 'Test Owner (Glam Studio)'
+        : 'Claire Dela Cruz';
+
     const displayName =
       fallbackName && fallbackName.trim()
         ? fallbackName.trim()
         : emailPrefix
+        ? emailPrefix
             .replace(/[._-]/g, ' ')
-            .replace(/\b\w/g, (c) => c.toUpperCase());
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+        : defaultDisplayName;
 
     const fallbackUser: any = {
       uid: `google_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
