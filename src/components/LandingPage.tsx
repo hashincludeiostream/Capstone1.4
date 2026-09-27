@@ -137,17 +137,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="relative overflow-hidden rounded-[2rem] border border-pink-100 bg-gradient-to-br from-pink-950 via-rose-700 to-purple-950 text-white shadow-2xl">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_15%,rgba(251,191,36,0.25),transparent_12%),radial-gradient(circle_at_30%_70%,rgba(244,114,182,0.45),transparent_16%)]" />
         <div className="relative grid lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="p-8 sm:p-12 lg:p-14">
+          <div className="p-6 sm:p-10 lg:p-14 2xl:p-18">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] backdrop-blur">
               <Sparkles className="w-4 h-4 text-amber-200" />
               Nail Glam Studio
             </div>
 
             <div className="mt-8">
-              <h1 className="max-w-2xl font-serif text-5xl sm:text-6xl font-black leading-none tracking-tight">
+              <h1 className="max-w-2xl 2xl:max-w-3xl font-serif text-4xl sm:text-6xl 2xl:text-7xl font-black leading-none tracking-tight">
                 Your glow-up starts here.
               </h1>
-              <p className="mt-5 max-w-xl text-sm sm:text-base leading-7 text-pink-50">
+              <p className="mt-5 max-w-xl 2xl:max-w-2xl text-sm sm:text-base 2xl:text-lg leading-7 text-pink-50">
                 Book beauty treatments, discover verified nail studios, and find the perfect salon for your next self-care ritual.
               </p>
             </div>
@@ -156,7 +156,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={onExplore}
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-black text-pink-800 transition hover:bg-pink-50 shadow-lg cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm 2xl:text-base font-black text-pink-800 transition hover:bg-pink-50 shadow-lg cursor-pointer min-h-[44px]"
               >
                 Explore Salons <ArrowRight className="w-4 h-4" />
               </button>
@@ -164,7 +164,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={onOpenLogin}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/40 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20 cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/40 bg-white/10 px-6 py-3 text-sm 2xl:text-base font-bold text-white transition hover:bg-white/20 cursor-pointer min-h-[44px]"
               >
                 Customer Sign In
               </button>
@@ -172,7 +172,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={onOpenRegisterSalon}
-                className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-300 px-6 py-3 text-sm font-black text-rose-950 transition hover:bg-amber-200 cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-300 px-6 py-3 text-sm 2xl:text-base font-black text-rose-950 transition hover:bg-amber-200 cursor-pointer min-h-[44px]"
               >
                 Register Your Studio
               </button>
@@ -290,66 +290,66 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       )}
 
       {/* Trust cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-6">
         {[
           { icon: <Sparkles className="w-5 h-5 text-pink-600" />, label: 'Beauty Experts', value: technicianCount > 0 ? `${technicianCount}+` : '0' },
           { icon: <Store className="w-5 h-5 text-purple-700" />, label: 'Verified Stores', value: `${salons.length}` },
           { icon: <Calendar className="w-5 h-5 text-rose-600" />, label: 'Easy Booking', value: '24/7' },
           { icon: <Heart className="w-5 h-5 text-pink-500" />, label: 'Beauty Matches', value: salons.length > 0 ? '1:1' : 'Ready' },
         ].map((item, idx) => (
-          <div key={idx} className="rounded-3xl border border-pink-100 bg-white p-4 shadow-sm">
+          <div key={idx} className="rounded-3xl border border-pink-100 bg-white p-5 xl:p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <span className="rounded-2xl bg-pink-50 p-2">{item.icon}</span>
-              <span className="text-2xl font-serif font-black text-gray-900">{item.value}</span>
+              <span className="rounded-2xl bg-pink-50 p-2.5">{item.icon}</span>
+              <span className="text-2xl xl:text-3xl font-serif font-black text-gray-900">{item.value}</span>
             </div>
-            <div className="mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-500">{item.label}</div>
+            <div className="mt-3 text-[11px] xl:text-xs font-bold uppercase tracking-[0.12em] text-gray-500">{item.label}</div>
           </div>
         ))}
       </section>
 
       {/* Feature categories */}
-      <section className="rounded-[2rem] border border-pink-100 bg-white p-6 shadow-sm">
+      <section className="rounded-[2rem] border border-pink-100 bg-white p-6 xl:p-8 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-pink-700">Nail Service Types</span>
-            <h2 className="mt-2 font-serif text-2xl font-black text-gray-900">Explore by Nail Studio Style</h2>
+            <span className="text-[11px] xl:text-xs font-black uppercase tracking-[0.16em] text-pink-700">Nail Service Types</span>
+            <h2 className="mt-2 font-serif text-2xl xl:text-3xl font-black text-gray-900">Explore by Nail Studio Style</h2>
           </div>
           <button
             type="button"
             onClick={onExplore}
-            className="rounded-2xl border border-pink-200 bg-pink-50 px-4 py-2 text-[11px] font-black text-pink-700 hover:bg-pink-100 transition cursor-pointer"
+            className="rounded-2xl border border-pink-200 bg-pink-50 px-4 py-2 text-[11px] xl:text-xs font-black text-pink-700 hover:bg-pink-100 transition cursor-pointer"
           >
             Browse all salons
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-4 gap-3 xl:gap-5">
           {topCategories.map((category) => (
-            <div key={category.id} className="rounded-2xl border border-pink-100 bg-gradient-to-br from-white to-pink-50 p-4">
+            <div key={category.id} className="rounded-2xl border border-pink-100 bg-gradient-to-br from-white to-pink-50 p-4 xl:p-5 hover:shadow-sm transition-all">
               <Sparkles className="w-5 h-5 text-pink-600" />
-              <div className="mt-4 text-sm font-black text-gray-900">{category.category_name}</div>
+              <div className="mt-4 text-sm xl:text-base font-black text-gray-900">{category.category_name}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* Featured salons */}
-      <section className="rounded-[2rem] border border-pink-100 bg-white p-6 shadow-sm">
+      <section className="rounded-[2rem] border border-pink-100 bg-white p-6 xl:p-8 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-pink-700">Featured Studios</span>
-            <h2 className="mt-2 font-serif text-2xl font-black text-gray-900">Today’s Top Salons</h2>
+            <span className="text-[11px] xl:text-xs font-black uppercase tracking-[0.16em] text-pink-700">Featured Studios</span>
+            <h2 className="mt-2 font-serif text-2xl xl:text-3xl font-black text-gray-900">Today’s Top Salons</h2>
           </div>
           <button
             type="button"
             onClick={onExplore}
-            className="rounded-2xl bg-pink-700 px-4 py-2 text-[11px] font-black text-white hover:bg-pink-800 transition cursor-pointer"
+            className="rounded-2xl bg-pink-700 px-4 py-2 text-[11px] xl:text-xs font-black text-white hover:bg-pink-800 transition cursor-pointer"
           >
             See the map
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 xl:gap-6 mt-5">
           {featureSalons.length > 0 ? (
             featureSalons.map((salon) => (
               <article key={salon.id} className="rounded-[1.5rem] border border-pink-100 bg-white p-4 shadow-sm hover:shadow-lg transition">
@@ -428,7 +428,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 mt-5">
             {products.slice(0, 4).map((product) => {
               const salon = salons.find((s) => s.id === product.salon_id);
               const isOutOfStock = product.stock_quantity <= 0;

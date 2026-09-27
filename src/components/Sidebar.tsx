@@ -119,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ----------------------------------------------------
   if (isAdmin) {
     return (
-      <aside className="w-64 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-5">
+      <aside className="w-64 xl:w-72 2xl:w-80 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-5">
         {/* Admin Identity Card */}
         <div className="bg-gradient-to-br from-stone-950 via-rose-950 to-purple-950 rounded-2xl p-4 text-white shadow-md border border-rose-900/40">
           <div className="flex items-center gap-2.5">
@@ -466,7 +466,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
   if (isOwner) {
     return (
-      <aside className="w-64 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-5">
+      <aside className="w-64 xl:w-72 2xl:w-80 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-5">
         {/* Salon Partner Studio Card */}
         <div className="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl p-4 text-white shadow-md border border-purple-800">
           <div className="flex items-center gap-2">
@@ -873,7 +873,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // CLIENT & GUEST SIDEBAR VIEW
   // ----------------------------------------------------
   return (
-    <aside className="w-64 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-6">
+    <aside className="w-64 xl:w-72 2xl:w-80 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-6">
       {/* Primary Discovery Menu */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-pink-100/80 shadow-xs">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1.5">

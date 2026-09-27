@@ -60,6 +60,7 @@ import { ProductCheckoutModal } from './components/products/ProductCheckoutModal
 import { CustomerOrdersView } from './components/products/CustomerOrdersView';
 import { EmailLogsModal } from './components/email/EmailLogsModal';
 import { ChatWidget } from './components/chat/ChatWidget';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { scrollToElement } from './utils/scrollHelper';
 
 export const App: React.FC = () => {
@@ -842,7 +843,7 @@ const AppContent: React.FC = () => {
                   : 'bg-stone-900 text-white border-stone-800'
               }`}
             >
-              <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-3">
+              <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 overflow-hidden">
                   {isAlert ? (
                     <AlertTriangle className="w-4 h-4 shrink-0 text-white animate-bounce" />
@@ -888,7 +889,7 @@ const AppContent: React.FC = () => {
         })}
 
       {/* Main Workspace Layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex gap-8 flex-1">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex gap-6 xl:gap-8 flex-1">
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}
@@ -934,7 +935,7 @@ const AppContent: React.FC = () => {
         />
 
         {/* Dynamic Center Stage Views */}
-        <main className="flex-1 min-w-0 pb-12">
+        <main className="flex-1 min-w-0 pb-24 lg:pb-12">
           {/* 0. LANDING PAGE VIEW */}
           {activeTab === 'landing' && (
             <LandingPage
@@ -1060,7 +1061,7 @@ const AppContent: React.FC = () => {
                   No salons match your search criteria. Try a different keyword or category.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 xl:gap-8">
                   {filteredSalons.map((salon) => (
                     <SalonCard
                       key={salon.id}
@@ -1721,7 +1722,31 @@ const AppContent: React.FC = () => {
         }}
       />
 
-      {/* 11. AI Assistant Chatbot (Accessible across Customer, Salon Owner, and Admin views) */}
+      {/* 11. Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentUser={currentUser}
+        activeTab={activeTab}
+        onNavigate={handleNavigate}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenBooking={() => {
+          setBookingSalon(salons[0] || null);
+          setBookingService(null);
+          setBookingModalOpen(true);
+        }}
+        cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+        onOpenCart={(targetProductId) => {
+          setCartOpen(true);
+          if (targetProductId) {
+            setTargetCartProductId(targetProductId);
+          }
+        }}
+        bookingsCount={bookingsNotificationCount}
+        ordersCount={ordersNotificationCount}
+        ownerPendingAppointmentsCount={ownerPendingAppointments.length}
+        adminPendingSalonsCount={adminPendingSalons.length}
+      />
+
+      {/* 12. AI Assistant Chatbot (Accessible across Customer, Salon Owner, and Admin views) */}
       <ChatWidget
         currentUser={currentUser}
         activeTab={activeTab}
@@ -1734,7 +1759,7 @@ const AppContent: React.FC = () => {
         }}
       />
 
-      {/* 12. Email Notifications & Monthly Reports Audit Modal */}
+      {/* 13. Email Notifications & Monthly Reports Audit Modal */}
       {showEmailLogsModal && currentUser && (
         <EmailLogsModal
           currentUser={currentUser}

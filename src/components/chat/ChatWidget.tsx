@@ -446,7 +446,7 @@ How can I help you today?
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 group flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
+          className="fixed bottom-20 lg:bottom-6 right-3.5 sm:right-6 z-40 group flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer min-h-[44px]"
           aria-label="Open GlamBot Chatbot"
         >
           <div className="relative">
@@ -472,8 +472,8 @@ How can I help you today?
         <div
           className={`fixed z-50 transition-all duration-300 shadow-2xl flex flex-col bg-white border border-gray-200 rounded-3xl overflow-hidden ${
             isExpanded
-              ? 'bottom-2 right-2 left-2 top-2 sm:bottom-6 sm:right-6 sm:left-auto sm:top-auto sm:w-[540px] sm:h-[680px]'
-              : 'bottom-4 right-4 sm:bottom-6 sm:right-6 w-[94vw] sm:w-[410px] h-[550px] max-h-[85vh]'
+              ? 'bottom-2 right-2 left-2 top-2 sm:bottom-6 sm:right-6 sm:left-auto sm:top-auto sm:w-[540px] xl:w-[600px] sm:h-[680px] xl:h-[740px]'
+              : 'bottom-20 lg:bottom-6 right-2 sm:right-6 w-[calc(100vw-1rem)] sm:w-[420px] 2xl:w-[480px] h-[550px] 2xl:h-[640px] max-h-[80vh]'
           }`}
         >
           {/* HEADER */}

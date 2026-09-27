@@ -1051,9 +1051,9 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
       </div>
 
       {/* Main Map + Store Directory Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[580px] relative">
+      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[580px] xl:min-h-[700px] 2xl:min-h-[780px] relative">
         {/* LEFT COLUMN: Store Cards List (4 cols) */}
-        <div className={`lg:col-span-4 border-r border-pink-100 flex flex-col bg-gray-50/50 max-h-[640px] overflow-y-auto order-2 lg:order-1 ${mobileView === 'list' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`lg:col-span-4 border-r border-pink-100 flex flex-col bg-gray-50/50 max-h-[640px] xl:max-h-[740px] 2xl:max-h-[820px] overflow-y-auto order-2 lg:order-1 ${mobileView === 'list' ? 'flex' : 'hidden lg:flex'}`}>
           <div className="p-3 bg-white border-b border-pink-100 flex items-center justify-between sticky top-0 z-10">
             <span className="text-xs font-bold text-gray-700">
               Showing {filteredSalons.length} {filteredSalons.length === 1 ? 'Location' : 'Locations'}
@@ -1240,7 +1240,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
         </div>
 
         {/* RIGHT COLUMN: Interactive Visual Map Stage (8 cols) */}
-        <div className={`lg:col-span-8 relative overflow-hidden bg-slate-900 flex flex-col order-1 lg:order-2 min-h-[440px] lg:min-h-[600px] ${mobileView === 'map' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`lg:col-span-8 relative overflow-hidden bg-slate-900 flex flex-col order-1 lg:order-2 min-h-[440px] lg:min-h-[600px] xl:min-h-[700px] 2xl:min-h-[780px] ${mobileView === 'map' ? 'flex' : 'hidden lg:flex'}`}>
           {/* Floating Quick Action: Fit All Pins */}
           <div className="absolute top-3.5 right-3.5 z-[400] flex items-center gap-2">
             <button

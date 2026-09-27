@@ -91,7 +91,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ salons, onOpenLeaveRev
           No reviews found for this salon yet.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 xl:gap-6">
           {reviews.map((rev) => (
             <div
               key={rev.id}

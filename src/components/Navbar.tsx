@@ -107,8 +107,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAdmin = currentUser?.user_type === 'admin';
 
   return (
-    <header className="sticky top-0 z-40 bg-white/75 backdrop-blur-lg border-b border-pink-100/80 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-pink-100/80 shadow-xs">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12">
         <div className="flex items-center justify-between h-18">
           {/* Brand Logo */}
           <div
@@ -499,34 +499,47 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
+                {/* Mobile Single Sign In Button */}
                 <button
-                  id="btn-nav-customer-login"
-                  onClick={() => setActiveTab('login-customer')}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-pink-300 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                  id="btn-nav-mobile-signin"
+                  onClick={onOpenAuth}
+                  className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Client Login</span>
+                  <span>Sign In</span>
                 </button>
 
-                <button
-                  id="btn-nav-partner-login"
-                  onClick={() => setActiveTab('login-owner')}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-purple-300 text-purple-700 hover:bg-purple-50 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
-                >
-                  <Store className="w-3.5 h-3.5" />
-                  <span>Partner Login</span>
-                </button>
+                {/* Tablet and Desktop Direct Portal Buttons */}
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <button
+                    id="btn-nav-customer-login"
+                    onClick={() => setActiveTab('login-customer')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-pink-300 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Client Login</span>
+                  </button>
 
-                {/* Portal Chooser Button */}
-                <button
-                  id="btn-nav-portals-more"
-                  onClick={onOpenAuth}
-                  className="px-2.5 py-2 rounded-full bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-                  title="More Login Options (Owner)"
-                >
-                  <span>Portals</span>
-                  <ChevronDown className="w-3 h-3" />
-                </button>
+                  <button
+                    id="btn-nav-partner-login"
+                    onClick={() => setActiveTab('login-owner')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-purple-300 text-purple-700 hover:bg-purple-50 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Store className="w-3.5 h-3.5" />
+                    <span>Partner Login</span>
+                  </button>
+
+                  {/* Portal Chooser Button */}
+                  <button
+                    id="btn-nav-portals-more"
+                    onClick={onOpenAuth}
+                    className="px-2.5 py-2 rounded-full bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                    title="More Login Options (Owner)"
+                  >
+                    <span>Portals</span>
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             )}
 

@@ -25,7 +25,7 @@ export const SalonCard: React.FC<SalonCardProps> = ({
   return (
     <div className="bg-white rounded-2xl border border-pink-100 shadow-xs hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group">
       {/* Cover / Image Header */}
-      <div className="relative h-48 overflow-hidden bg-pink-50">
+      <div className="relative h-48 sm:h-52 xl:h-56 overflow-hidden bg-pink-50">
         {salon.banner || salon.logo ? (
           <img
             src={salon.banner || salon.logo || undefined}
@@ -92,17 +92,17 @@ export const SalonCard: React.FC<SalonCardProps> = ({
           <div className="flex items-center justify-between mb-1">
             <h3
               onClick={() => onSelect(salon)}
-              className="text-lg font-serif font-bold text-gray-900 group-hover:text-pink-700 transition-colors cursor-pointer line-clamp-1"
+              className="text-lg xl:text-xl font-serif font-bold text-gray-900 group-hover:text-pink-700 transition-colors cursor-pointer line-clamp-1"
             >
               {salon.salon_name}
             </h3>
           </div>
 
-          <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">
+          <p className="text-xs xl:text-sm text-gray-500 line-clamp-2 mb-3 leading-relaxed">
             {salon.description}
           </p>
 
-          <div className="space-y-1.5 text-xs text-gray-600 mb-4">
+          <div className="space-y-1.5 text-xs xl:text-sm text-gray-600 mb-4">
             <div className="flex items-start gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-pink-500 shrink-0 mt-0.5" />
               <span className="line-clamp-1">{salon.address}</span>
@@ -120,13 +120,13 @@ export const SalonCard: React.FC<SalonCardProps> = ({
         <div className="pt-3 border-t border-pink-50 flex items-center gap-2">
           <button
             onClick={() => onSelect(salon)}
-            className="flex-1 py-2 px-3 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-colors text-center cursor-pointer"
+            className="flex-1 py-2 px-3 min-h-[40px] sm:min-h-[42px] rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs xl:text-sm font-semibold transition-colors text-center cursor-pointer flex items-center justify-center"
           >
             View Details
           </button>
           <button
             onClick={() => onBook(salon)}
-            className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-semibold transition-all shadow-sm shadow-pink-500/20 text-center flex items-center justify-center gap-1 cursor-pointer"
+            className="flex-1 py-2 px-3 min-h-[40px] sm:min-h-[42px] rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs xl:text-sm font-semibold transition-all shadow-sm shadow-pink-500/20 text-center flex items-center justify-center gap-1 cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Book Now</span>

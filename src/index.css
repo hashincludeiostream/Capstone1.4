@@ -15,6 +15,30 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Desktop and ultra-wide screen scaling to resolve zoomed-out perception */
+  @media (min-width: 1440px) {
+    html {
+      font-size: 16.5px;
+    }
+  }
+
+  @media (min-width: 1720px) {
+    html {
+      font-size: 17px;
+    }
+  }
+
+  @media (min-width: 2000px) {
+    html {
+      font-size: 18px;
+    }
+  }
+
+  /* Safe padding for mobile bottom bar */
+  .safe-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
   h1, h2, h3, .font-serif-display {
     font-family: var(--font-serif);
   }
