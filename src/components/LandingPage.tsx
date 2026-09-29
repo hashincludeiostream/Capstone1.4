@@ -19,12 +19,17 @@ import {
 } from 'lucide-react';
 import { Salon, BusinessCategory, User, Service, Technician, Product } from '../types';
 import { fetchServices, fetchTechnicians } from '../lib/api';
+import { HeroSection } from './HeroSection';
 
 interface LandingPageProps {
   salons: Salon[];
   categories: BusinessCategory[];
   currentUser?: User | null;
   products?: Product[];
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  selectedCategory?: number | null;
+  onSelectCategory?: (id: number | null) => void;
   onExplore: () => void;
   onOpenLogin: () => void;
   onOpenRegisterSalon: () => void;
@@ -33,6 +38,7 @@ interface LandingPageProps {
   onAddToCart?: (product: Product, quantity?: number) => void;
   onSelectProduct?: (product: Product) => void;
   onOpenProducts?: () => void;
+  onOpenBooking?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -40,6 +46,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   categories,
   currentUser,
   products = [],
+  searchQuery = '',
+  onSearchChange = () => {},
+  selectedCategory = null,
+  onSelectCategory = () => {},
   onExplore,
   onOpenLogin,
   onOpenRegisterSalon,
@@ -48,6 +58,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onAddToCart,
   onSelectProduct,
   onOpenProducts,
+  onOpenBooking = () => {},
 }) => {
   const [featuredSalon, setFeaturedSalon] = React.useState<Salon | null>(null);
   const [featuredService, setFeaturedService] = React.useState<Service | null>(null);
@@ -116,7 +127,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     loadFeaturedContent();
   }, [salons]);
 
-  const featureSalons = salons ? salons.slice(0, 3) : [];
+  // Filter salons if search query or category is applied
+  const filteredSalons = React.useMemo(() => {
+    if (!salons) return [];
+    return salons.filter((s) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q ||
+        s.salon_name?.toLowerCase().includes(q) ||
+        (s.city && s.city.toLowerCase().includes(q)) ||
+        (s.province && s.province.toLowerCase().includes(q)) ||
+        (s.address && s.address.toLowerCase().includes(q));
+      const matchesCategory = selectedCategory === null || !selectedCategory || s.category_id === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [salons, searchQuery, selectedCategory]);
+
+  const isFiltering = searchQuery.trim().length > 0 || selectedCategory !== null;
+  const featureSalons = isFiltering ? filteredSalons : (salons ? salons.slice(0, 4) : []);
   const topCategories = categories ? categories.slice(0, 4) : [];
 
   // Show loading state only during initial data fetch
@@ -133,143 +160,48 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   return (
     <div className="space-y-8">
-      {/* Hero landing screen */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-pink-100 bg-gradient-to-br from-pink-950 via-rose-700 to-purple-950 text-white shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_15%,rgba(251,191,36,0.25),transparent_12%),radial-gradient(circle_at_30%_70%,rgba(244,114,182,0.45),transparent_16%)]" />
-        <div className="relative grid lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="p-6 sm:p-10 lg:p-14 2xl:p-18">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] backdrop-blur">
-              <Sparkles className="w-4 h-4 text-amber-200" />
-              Nail Glam Studio
-            </div>
-
-            <div className="mt-8">
-              <h1 className="max-w-2xl 2xl:max-w-3xl font-serif text-4xl sm:text-6xl 2xl:text-7xl font-black leading-none tracking-tight">
-                Your glow-up starts here.
-              </h1>
-              <p className="mt-5 max-w-xl 2xl:max-w-2xl text-sm sm:text-base 2xl:text-lg leading-7 text-pink-50">
-                Book beauty treatments, discover verified nail studios, and find the perfect salon for your next self-care ritual.
-              </p>
-            </div>
-
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onExplore}
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm 2xl:text-base font-black text-pink-800 transition hover:bg-pink-50 shadow-lg cursor-pointer min-h-[44px]"
-              >
-                Explore Salons <ArrowRight className="w-4 h-4" />
-              </button>
-
+      {/* Streamlined Discovery Header with Search & Filter Bar (Hero Removed) */}
+      <div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
+          <div>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+              Discover & Book Verified Nail Salons
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              Curated beauty sanctuaries, Russian manicures, gel arts & seamless online scheduling.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onExplore}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 border border-pink-200/80 px-3.5 py-2 text-xs font-bold text-pink-700 transition cursor-pointer"
+            >
+              <span>Explore All Studios</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            {!currentUser && (
               <button
                 type="button"
                 onClick={onOpenLogin}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/40 bg-white/10 px-6 py-3 text-sm 2xl:text-base font-bold text-white transition hover:bg-white/20 cursor-pointer min-h-[44px]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 px-3.5 py-2 text-xs font-bold text-white transition shadow-xs cursor-pointer"
               >
-                Customer Sign In
+                <span>Sign In</span>
               </button>
-
-              <button
-                type="button"
-                onClick={onOpenRegisterSalon}
-                className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-300 px-6 py-3 text-sm 2xl:text-base font-black text-rose-950 transition hover:bg-amber-200 cursor-pointer min-h-[44px]"
-              >
-                Register Your Studio
-              </button>
-            </div>
-
-            <div className="mt-8 flex flex-wrap items-center gap-5 text-[11px] font-bold text-pink-50">
-              <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-amber-300" /> Verified salons</span>
-              <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-amber-300" /> Instant booking</span>
-              <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-amber-300" /> Safe & curated</span>
-            </div>
-          </div>
-
-          <div className="relative min-h-[420px] flex items-center justify-center p-8">
-            <div className="absolute left-8 top-8 h-60 w-60 rounded-full bg-amber-300/40 blur-3xl" />
-            <div className="relative w-full max-w-md rounded-[2rem] border border-white/50 bg-white/12 p-3 shadow-2xl backdrop-blur-xl">
-              <div className="rounded-[1.8rem] bg-white/90 p-4">
-                {featuredSalon ? (
-                  <div className="rounded-[1.4rem] bg-gradient-to-br from-rose-100 via-pink-50 to-purple-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black tracking-[0.18em] text-pink-800 uppercase">Today’s Beauty Match</span>
-                      <Sparkles className="w-5 h-5 text-pink-700" />
-                    </div>
-
-                    <div className="mt-6 flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-600 to-rose-400 flex items-center justify-center text-white shadow-md overflow-hidden">
-                        {featuredSalon.logo ? (
-                          <img src={featuredSalon.logo} alt={featuredSalon.salon_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Scissors className="w-8 h-8" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-pink-700 uppercase tracking-[0.13em]">Signature Studio</div>
-                        <div className="text-lg font-serif font-black text-gray-900">{featuredSalon.salon_name}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl bg-white p-3 shadow-sm">
-                        <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><MapPin className="w-4 h-4" /> {featuredSalon.city || 'Metro Studio'}</div>
-                        <div className="mt-2 text-xs text-gray-500 truncate">{featuredSalon.address?.split(',')[0] || 'Studio Address'}</div>
-                      </div>
-                      <div className="rounded-2xl bg-white p-3 shadow-sm">
-                        <div className="flex items-center gap-2 text-[11px] font-black text-purple-800"><Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {featuredSalon.review_count ? Number(featuredSalon.avg_rating).toFixed(1) : 'Not rated yet'}</div>
-                        <div className="mt-2 text-xs text-gray-500">{featuredSalon.review_count ? `${featuredSalon.review_count} reviews` : 'No reviews yet'}</div>
-                      </div>
-                    </div>
-
-                    {featuredService && (
-                      <div className="mt-4 rounded-2xl bg-pink-950 text-white p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-black uppercase tracking-[0.12em]">Today’s Ritual</span>
-                          {featuredService.duration ? (
-                            <span className="text-[11px] font-bold bg-white/12 rounded-full px-2 py-1">
-                              {featuredService.duration} min
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-3 flex items-center gap-3">
-                          <span className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
-                            <Heart className="w-5 h-5 text-pink-200" />
-                          </span>
-                          <div>
-                            <div className="text-sm font-bold">{featuredService.service_name}</div>
-                            <div className="text-[11px] text-pink-100">{featuredService.category || featuredService.category_name || 'Signature Ritual'}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-[1.4rem] bg-gradient-to-br from-rose-100/70 via-pink-50 to-purple-50 p-6 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-white shadow-sm border border-pink-200 flex items-center justify-center mx-auto text-pink-600 mb-3">
-                      <Store className="w-7 h-7" />
-                    </div>
-                    <div className="text-[11px] font-black text-pink-700 uppercase tracking-[0.16em]">Studio Spotlight</div>
-                    <h3 className="mt-2 font-serif text-lg font-black text-gray-900">No Studios Registered Yet</h3>
-                    <p className="mt-2 text-xs text-gray-600 leading-relaxed max-w-xs mx-auto">
-                      Be the first verified nail salon or beauty studio to showcase your branches, treatments, and artists on Nail Glam Hub.
-                    </p>
-                    <div className="mt-5">
-                      <button
-                        type="button"
-                        onClick={onOpenRegisterSalon}
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-pink-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-pink-800 transition shadow-sm cursor-pointer"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-300" />
-                        Register Your Studio
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      </section>
+
+        {/* Search Bar & Category Filters */}
+        <HeroSection
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelectCategory={onSelectCategory}
+          searchQuery={searchQuery}
+          onSearchChange={onSearchChange}
+          onOpenBooking={onOpenBooking}
+        />
+      </div>
 
       {!currentUser && (
         <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900 shadow-sm">

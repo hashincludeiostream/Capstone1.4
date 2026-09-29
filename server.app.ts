@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
@@ -4123,7 +4122,7 @@ async function startServer() {
   // ----------------------------------------------------
   const currentDir = typeof __dirname !== 'undefined'
     ? __dirname
-    : path.dirname(fileURLToPath(import.meta.url));
+    : process.cwd();
   const distPath = fs.existsSync(path.join(currentDir, 'index.html'))
     ? currentDir
     : path.join(process.cwd(), 'dist');

@@ -943,6 +943,10 @@ const AppContent: React.FC = () => {
               categories={categories}
               currentUser={currentUser}
               products={products}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
               onExplore={() => setActiveTab('explore')}
               onOpenLogin={() => setActiveTab('login-customer')}
               onOpenRegisterSalon={() => setActiveTab('register-owner')}
@@ -951,6 +955,11 @@ const AppContent: React.FC = () => {
               onAddToCart={(p, qty) => handleAddToCart(p, qty || 1)}
               onSelectProduct={(p) => setSelectedProductForDetail(p)}
               onOpenProducts={() => setActiveTab('products')}
+              onOpenBooking={() => {
+                setBookingSalon(salons[0] || null);
+                setBookingService(null);
+                setBookingModalOpen(true);
+              }}
             />
           )}
 
