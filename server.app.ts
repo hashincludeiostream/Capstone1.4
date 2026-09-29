@@ -2,10 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
-import { createServer as createViteServer } from 'vite';
 import { Appointment, Review, Salon, Service, Technician, User, Reel, Announcement } from './src/types';
 import db, { testConnection, healthCheck } from './src/config/db.js';
 import { sanitizeString, sanitizeEmail, sanitizeNumber, sanitizeBoolean } from './src/lib/sanitization.js';
@@ -13,7 +13,8 @@ import { handleChatMessage } from './src/server/geminiChat';
 import { calculateAppointmentCancellationTier, parseAppointmentDateTime, getAccountReliabilityInfo } from './src/lib/cancellationPolicy.js';
 
 // Load environment variables
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const isDevMode = process.execArgv.some((arg) => arg.includes('tsx')) || process.env.NODE_ENV !== 'production';
+const PORT = isDevMode ? 3000 : (Number(process.env.PORT) || 3000);
 const ADMIN_CODES = process.env.ADMIN_CODES ? process.env.ADMIN_CODES.split(',') : ['ADMIN2025', 'GLAM_ADMIN', 'ADMIN', 'SUPERADMIN'];
 let registrationRateLimitEnabled = !['false', '0', 'off'].includes(
   (process.env.ENABLE_REGISTRATION_RATE_LIMIT || 'true').trim().toLowerCase()
@@ -860,7 +861,7 @@ async function startServer() {
   });
 
   // Automated Platform Status & PDF Report for Admins
-  app.post('/api/email/reports/admin-platform', async (req, res) => {
+  const handleAdminPlatformReport = async (req: express.Request, res: express.Response) => {
     const { admin_email, admin_name } = req.body;
     try {
       let targetEmail = admin_email;
@@ -954,7 +955,10 @@ async function startServer() {
       console.error('Admin platform report error:', error);
       res.status(500).json({ error: 'Failed to generate and email admin report' });
     }
-  });
+  };
+
+  app.post('/api/email/reports/admin-platform', handleAdminPlatformReport);
+  app.post('/api/email/reports/platform-monthly', handleAdminPlatformReport);
 
   // Automated Monthly Report Routine
   async function runAutomatedMonthlyReports(force = false) {
@@ -4117,21 +4121,35 @@ async function startServer() {
   // ----------------------------------------------------
   // VITE MIDDLEWARE (Development) or STATIC (Production)
   // ----------------------------------------------------
-  const distPath = path.join(process.cwd(), 'dist');
+  const currentDir = typeof __dirname !== 'undefined'
+    ? __dirname
+    : path.dirname(fileURLToPath(import.meta.url));
+  const distPath = fs.existsSync(path.join(currentDir, 'index.html'))
+    ? currentDir
+    : path.join(process.cwd(), 'dist');
   const hasDistIndex = fs.existsSync(path.join(distPath, 'index.html'));
-  const isDevMode = !hasDistIndex || process.env.VITE_DEV_SERVER === 'true' || process.env.NODE_ENV === 'development';
+  const isTsxDev = process.execArgv.some((arg) => arg.includes('tsx')) || process.env.VITE_DEV_SERVER === 'true';
+  const isProduction = !isTsxDev && (process.env.NODE_ENV === 'production' || hasDistIndex);
 
-  if (isDevMode) {
+  if (isProduction) {
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+    }
+    app.get('*', (req, res) => {
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send('<!DOCTYPE html><html><body><div id="root"></div></body></html>');
+      }
+    });
+  } else {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {

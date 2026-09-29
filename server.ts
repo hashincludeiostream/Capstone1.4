@@ -10,13 +10,19 @@ const require = createRequire(import.meta.url);
 const distServer = path.join(__dirname, 'dist', 'server.cjs');
 const distHtml = path.join(__dirname, 'dist', 'index.html');
 
-// In production / deployed containers, when the pre-compiled server bundle exists, execute it directly
+// Check if running under tsx in development
+const isTsxDev =
+  process.execArgv.some((arg) => arg.includes('tsx')) ||
+  process.env.VITE_DEV_SERVER === 'true';
+
+// In production / deployed containers, when the pre-compiled server bundle exists and not running under tsx:
 const isBuiltProduction =
+  !isTsxDev &&
   fs.existsSync(distServer) &&
-  fs.existsSync(distHtml) &&
-  process.env.VITE_DEV_SERVER !== 'true';
+  fs.existsSync(distHtml);
 
 if (isBuiltProduction) {
+  process.env.NODE_ENV = 'production';
   require(distServer);
 } else {
   // In development, load server.app.ts
