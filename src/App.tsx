@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Megaphone,
   Shield,
+  Lock,
   MapPin,
   LayoutGrid,
   User as UserIcon,
@@ -46,6 +47,7 @@ import { AboutContactModal } from './components/AboutContactModal';
 import { CustomerAuthPage } from './components/auth/CustomerAuthPage';
 import { OwnerAuthPage } from './components/auth/OwnerAuthPage';
 import { AdminAuthPage } from './components/auth/AdminAuthPage';
+import { AdminGateModal } from './components/auth/AdminGateModal';
 import { AuthPortalModal } from './components/auth/AuthPortalModal';
 import { StoreLocationsMap } from './components/maps/StoreLocationsMap';
 import { LandingPage } from './components/LandingPage';
@@ -136,6 +138,7 @@ const AppContent: React.FC = () => {
   });
   const [profileCustomizationOpen, setProfileCustomizationOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminGateOpen, setAdminGateOpen] = useState(false);
   const [showEmailLogsModal, setShowEmailLogsModal] = useState(false);
 
   // E-Commerce / Products state
@@ -488,16 +491,118 @@ const AppContent: React.FC = () => {
     loadData();
   }, []);
 
-  // Check for admin URL parameter
+  // Check for admin URL parameter, hash, or persisted session clearance
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('admin') === 'true') {
-      setIsAdminMode(true);
-      setActiveTab('login-admin');
-    } else {
-      setIsAdminMode(false);
-    }
+    const checkAdminClearance = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasAdminQuery =
+        urlParams.get('admin') === 'true' ||
+        urlParams.get('admin') === '1' ||
+        urlParams.has('admin');
+      const hash = window.location.hash.toLowerCase();
+      const hasAdminHash =
+        hash === '#admin' ||
+        hash === '#admin-gate' ||
+        hash === '#security' ||
+        hash === '#secops';
+      const hasSessionClearance = sessionStorage.getItem('nailglamhub_admin_unlocked') === 'true';
+      const path = window.location.pathname.toLowerCase();
+      const isDirectAdminPath = path === '/admin' || path.endsWith('/admin');
+
+      if (hasSessionClearance) {
+        setIsAdminMode(true);
+        if (hasAdminQuery || hasAdminHash || isDirectAdminPath) {
+          setActiveTab(currentUser?.user_type === 'admin' ? 'admin-dashboard' : 'login-admin');
+        }
+      } else if (hasAdminQuery || hasAdminHash || isDirectAdminPath) {
+        setAdminGateOpen(true);
+      } else {
+        setIsAdminMode(false);
+      }
+    };
+
+    checkAdminClearance();
+    window.addEventListener('hashchange', checkAdminClearance);
+    window.addEventListener('popstate', checkAdminClearance);
+    return () => {
+      window.removeEventListener('hashchange', checkAdminClearance);
+      window.removeEventListener('popstate', checkAdminClearance);
+    };
+  }, [currentUser?.user_type]);
+
+  // Covert physical security triggers:
+  // 1. Keyboard shortcuts: Ctrl + Shift + A, Cmd + Shift + A, Alt + Shift + A, Ctrl + Alt + A
+  // 2. Secret typing sequence: typing "admin" or "secops" when not in an input/textarea
+  useEffect(() => {
+    let keySequence = '';
+    let sequenceTimeout: any;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Check chord combinations
+      const isAKey = e.key === 'A' || e.key === 'a';
+      if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && isAKey) ||
+        (e.altKey && e.shiftKey && isAKey) ||
+        ((e.ctrlKey || e.metaKey) && e.altKey && isAKey)
+      ) {
+        e.preventDefault();
+        setAdminGateOpen(true);
+        return;
+      }
+
+      // 2. Check covert sequence typing when not focused on an input element
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+
+      if (!isInput && e.key && e.key.length === 1) {
+        keySequence = (keySequence + e.key.toLowerCase()).slice(-10);
+        clearTimeout(sequenceTimeout);
+        sequenceTimeout = setTimeout(() => {
+          keySequence = '';
+        }, 3000);
+
+        if (
+          keySequence.endsWith('admin') ||
+          keySequence.endsWith('secops') ||
+          keySequence.endsWith('glamadmin')
+        ) {
+          keySequence = '';
+          setAdminGateOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(sequenceTimeout);
+    };
   }, []);
+
+  const handleAdminGateAuthorized = () => {
+    setIsAdminMode(true);
+    sessionStorage.setItem('nailglamhub_admin_unlocked', 'true');
+    showToast('Administrative Security Clearance Granted');
+    if (currentUser?.user_type === 'admin') {
+      setActiveTab('admin-dashboard');
+    } else {
+      setActiveTab('login-admin');
+    }
+  };
+
+  const handleLockAdminPortal = () => {
+    sessionStorage.removeItem('nailglamhub_admin_unlocked');
+    setIsAdminMode(false);
+    showToast('Administrative Portal Locked');
+    if (currentUser?.user_type === 'admin') {
+      setCurrentUser(null);
+    }
+    setActiveTab('landing');
+  };
 
   // Persist activeTab to localStorage
   useEffect(() => {
@@ -788,6 +893,8 @@ const AppContent: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isAdminMode={isAdminMode}
+        onLockAdminPortal={handleLockAdminPortal}
+        onOpenAdminGate={() => setAdminGateOpen(true)}
         onOpenAuth={() => setAuthModalOpen(true)}
         onOpenBooking={() => {
           setBookingSalon(salons[0] || null);
@@ -896,6 +1003,7 @@ const AppContent: React.FC = () => {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           isAdminMode={isAdminMode}
+          onAdminSecretTrigger={() => setAdminGateOpen(true)}
           onOpenBooking={() => {
             setBookingSalon(salons[0] || null);
             setBookingService(null);
@@ -1536,10 +1644,11 @@ const AppContent: React.FC = () => {
             />
           )}
 
-          {/* C. Super Admin Login & Register - Only accessible via URL parameter */}
+          {/* C. Super Admin Login & Register - Only accessible via URL parameter or Security Gate */}
           {activeTab === 'login-admin' && (
             <AdminAuthPage
               initialMode="signin"
+              currentUser={currentUser}
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Admin Console authorized for ${user.fullname}.`);
@@ -1552,6 +1661,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'register-admin' && (
             <AdminAuthPage
               initialMode="register"
+              currentUser={currentUser}
               onLoginSuccess={(user) => {
                 setCurrentUser(user);
                 showToast(`Administrator account authorized for ${user.fullname}!`);
@@ -1562,6 +1672,26 @@ const AppContent: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* Discreet Platform & Physical Security Footer */}
+      <footer className="w-full max-w-[1720px] mx-auto px-4 sm:px-8 py-6 border-t border-pink-100/70 mt-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500">
+        <div className="flex items-center gap-2">
+          <span>© 2026 Nail Glam Hub</span>
+          <span>•</span>
+          <span>Verified Nail Studios & Salon Management Platform</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setAdminGateOpen(true)}
+            className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+            title="Restricted Administrative Security Gate (Passcode Protected)"
+          >
+            <Lock className="w-3 h-3 text-stone-400 group-hover:text-rose-600 transition-colors" />
+            <span>SecOps Clearance</span>
+          </button>
+        </div>
+      </footer>
 
       {/* MODALS */}
       {/* 1. Salon Details Modal */}
@@ -1775,6 +1905,13 @@ const AppContent: React.FC = () => {
           onClose={() => setShowEmailLogsModal(false)}
         />
       )}
+
+      {/* 14. Restricted Administrative Security Gate Modal */}
+      <AdminGateModal
+        isOpen={adminGateOpen}
+        onClose={() => setAdminGateOpen(false)}
+        onAuthorized={handleAdminGateAuthorized}
+      />
     </div>
   );
 };

@@ -22,12 +22,14 @@ import { GoogleAccountChooserModal } from './GoogleAccountChooserModal';
 
 interface AdminAuthPageProps {
   initialMode?: 'signin' | 'register';
+  currentUser?: User | null;
   onLoginSuccess: (user: User) => void;
   onNavigate: (tab: string) => void;
 }
 
 export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
   initialMode = 'signin',
+  currentUser,
   onLoginSuccess,
   onNavigate,
 }) => {
@@ -292,6 +294,21 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
               </button>
             </div>
           </div>
+
+          {currentUser && currentUser.user_type !== 'admin' && (
+            <div className="mt-4 p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-950">
+                  Active {currentUser.user_type === 'salon_owner' ? 'Partner' : 'Customer'} Session Detected
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                  You are currently logged in as <strong className="font-semibold">{currentUser.fullname}</strong> ({currentUser.email}).
+                  Signing in with administrative credentials will safely switch your active session to the Administrator role. Your customer bookings and account data remain completely isolated and intact.
+                </p>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mt-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium animate-in fade-in duration-150 flex items-start gap-2">

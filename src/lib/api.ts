@@ -80,10 +80,76 @@ export async function fetchCategories(): Promise<BusinessCategory[]> {
     const res = await fetch(`${API_BASE}/categories`);
     if (!res.ok) throw new Error('Failed to fetch categories');
     const data = await res.json();
-    return Array.isArray(data) && data.length > 0 ? data : (seedCategories as BusinessCategory[]);
+    return Array.isArray(data) ? data : (seedCategories as BusinessCategory[]);
   } catch (err) {
     console.warn('API fetchCategories using fallback seed data:', err);
     return seedCategories as BusinessCategory[];
+  }
+}
+
+export interface DistinctServiceCategory {
+  category_name: string;
+  icon: string;
+  count: number;
+  salon_ids: number[];
+}
+
+export async function fetchServiceCategories(): Promise<DistinctServiceCategory[]> {
+  try {
+    const res = await fetch(`${API_BASE}/services/categories`);
+    if (!res.ok) throw new Error('Failed to fetch distinct service categories');
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((item: any) => ({
+        category_name: String(item.category_name || item.name || ''),
+        icon: item.icon || '💅',
+        count: Number(item.count) || 0,
+        salon_ids: Array.isArray(item.salon_ids) ? item.salon_ids.map(Number) : [],
+      }));
+    }
+  } catch (err) {
+    console.warn('API fetchServiceCategories failed, dynamically deriving from services:', err);
+  }
+
+  // Graceful fallback: dynamically derive from services endpoint
+  try {
+    const services = await fetchServices();
+    const map = new Map<string, DistinctServiceCategory>();
+    const icons: Record<string, string> = {
+      Manicure: '💅',
+      Pedicure: '🦶',
+      'Nail Art': '✨',
+      'Nail Extensions': '💎',
+      'Gel Polish': '🌈',
+      'Nail Care': '🌿',
+      'Nail Design': '🎨',
+      'Nail Services': '💅',
+    };
+
+    services.forEach((s) => {
+      const cat = (s.category || s.category_name || '').trim();
+      if (!cat) return;
+      if (!map.has(cat)) {
+        map.set(cat, {
+          category_name: cat,
+          icon: icons[cat] || '💅',
+          count: 0,
+          salon_ids: [],
+        });
+      }
+      const entry = map.get(cat)!;
+      entry.count += 1;
+      const salonId = Number(s.salon_id);
+      if (salonId && !entry.salon_ids.includes(salonId)) {
+        entry.salon_ids.push(salonId);
+      }
+    });
+
+    const list = Array.from(map.values());
+    list.sort((a, b) => b.count - a.count || a.category_name.localeCompare(b.category_name));
+    return list;
+  } catch {
+    return [];
   }
 }
 
@@ -112,9 +178,7 @@ export async function fetchSalons(params?: {
       review_count: Number(salon.review_count) || 0,
       is_active: Boolean(Number(salon.is_active)),
     }));
-    if (parsed.length > 0 || params?.search || params?.category) {
-      return parsed;
-    }
+    return parsed;
   } catch (err) {
     console.warn('API fetchSalons using fallback seed data:', err);
   }

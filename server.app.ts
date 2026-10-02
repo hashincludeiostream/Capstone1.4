@@ -1508,6 +1508,77 @@ async function startServer() {
     }
   });
 
+  // Distinct Service Categories with Salon Association
+  app.get('/api/services/categories', async (req, res) => {
+    try {
+      const [rows] = await db.execute('SELECT * FROM services');
+      const services = (rows as any[]) || [];
+
+      const iconMap: Record<string, string> = {
+        'Manicure': '💅',
+        'Pedicure': '🦶',
+        'Nail Art': '✨',
+        'Nail Extensions': '💎',
+        'Gel Polish': '🌈',
+        'Nail Care': '🌿',
+        'Nail Design': '🎨',
+        'Nail Services': '💅',
+      };
+
+      const categoryMap = new Map<string, { category_name: string; icon: string; count: number; salon_ids: Set<number> }>();
+
+      for (const service of services) {
+        const catName = (service.category_name || service.category || '').trim();
+        if (!catName) continue;
+
+        if (!categoryMap.has(catName)) {
+          categoryMap.set(catName, {
+            category_name: catName,
+            icon: iconMap[catName] || '💅',
+            count: 0,
+            salon_ids: new Set<number>(),
+          });
+        }
+
+        const entry = categoryMap.get(catName)!;
+        entry.count += 1;
+        if (service.salon_id) {
+          entry.salon_ids.add(Number(service.salon_id));
+        }
+      }
+
+      // Also incorporate business_categories for unified icons and complete listing
+      const [catRows] = await db.execute('SELECT * FROM business_categories');
+      for (const cat of (catRows as any[]) || []) {
+        if (!categoryMap.has(cat.category_name)) {
+          categoryMap.set(cat.category_name, {
+            category_name: cat.category_name,
+            icon: cat.icon || iconMap[cat.category_name] || '💅',
+            count: 0,
+            salon_ids: new Set<number>(),
+          });
+        } else if (cat.icon) {
+          categoryMap.get(cat.category_name)!.icon = cat.icon;
+        }
+      }
+
+      const result = Array.from(categoryMap.values()).map((c) => ({
+        category_name: c.category_name,
+        icon: c.icon,
+        count: c.count,
+        salon_ids: Array.from(c.salon_ids),
+      }));
+
+      // Sort with highest service counts first, then alphabetically
+      result.sort((a, b) => b.count - a.count || a.category_name.localeCompare(b.category_name));
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching service categories:', error);
+      res.status(500).json({ error: 'Failed to fetch distinct service categories' });
+    }
+  });
+
   // Services List
   app.get('/api/services', async (req, res) => {
     const { salon_id } = req.query;

@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { db as firestoreDb } from '../lib/firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import {
   seedCategories,
   seedUsers,
@@ -17,6 +19,21 @@ import {
 } from '../data/seedData';
 
 const DB_FILE = path.join(process.cwd(), 'src', 'data', 'persisted_db.json');
+
+function cleanForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(cleanForFirestore);
+  if (typeof obj === 'object') {
+    const res: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== undefined) {
+        res[k] = cleanForFirestore(v);
+      }
+    }
+    return res;
+  }
+  return obj;
+}
 
 class InMemoryDatabase {
   private tables: Record<string, any[]> = {
@@ -73,6 +90,75 @@ class InMemoryDatabase {
       fs.writeFileSync(DB_FILE, JSON.stringify(this.tables, null, 2), 'utf-8');
     } catch (err) {
       console.warn('[Database] Failed to save database to disk:', err);
+    }
+  }
+
+  /**
+   * Pulls all live records from Cloud Firestore to ensure real-time parity with Firebase.
+   */
+  public async syncFromFirestore(): Promise<number> {
+    const collectionsToSync: { table: string; col: string }[] = [
+      { table: 'business_categories', col: 'categories' },
+      { table: 'users', col: 'users' },
+      { table: 'salons', col: 'salons' },
+      { table: 'services', col: 'services' },
+      { table: 'technicians', col: 'technicians' },
+      { table: 'working_hours', col: 'working_hours' },
+      { table: 'appointments', col: 'appointments' },
+      { table: 'reviews', col: 'reviews' },
+      { table: 'reels', col: 'reels' },
+      { table: 'promotions', col: 'promotions' },
+      { table: 'announcements', col: 'announcements' },
+      { table: 'products', col: 'products' },
+      { table: 'product_orders', col: 'product_orders' },
+      { table: 'transactions', col: 'transactions' },
+      { table: 'email_logs', col: 'email_logs' },
+    ];
+
+    let totalLoaded = 0;
+    for (const { table, col } of collectionsToSync) {
+      try {
+        const snap = await getDocs(collection(firestoreDb, col));
+        if (!snap.empty) {
+          const docs: any[] = [];
+          snap.forEach((d) => {
+            const data = d.data();
+            const idVal = data.id !== undefined ? (isNaN(Number(data.id)) ? data.id : Number(data.id)) : (isNaN(Number(d.id)) ? d.id : Number(d.id));
+            docs.push({ ...data, id: idVal });
+          });
+          if (docs.length > 0) {
+            this.tables[table] = docs;
+            totalLoaded += docs.length;
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Firestore Sync] Could not pull collection "${col}":`, err?.message || err);
+      }
+    }
+    console.log(`🔥 [Firestore] Successfully synchronized ${totalLoaded} live documents into database layer.`);
+    this.saveToDisk();
+    return totalLoaded;
+  }
+
+  /**
+   * Asynchronously persists mutations to Cloud Firestore.
+   */
+  private syncToFirestore(tableName: string, action: 'set' | 'delete', id: number | string, data?: any) {
+    try {
+      const colName = tableName === 'business_categories' ? 'categories' : tableName;
+      const docRef = doc(firestoreDb, colName, String(id));
+      if (action === 'delete') {
+        deleteDoc(docRef).catch((err) => {
+          console.warn(`[Firestore] Failed to delete doc in "${colName}/${id}":`, err?.message || err);
+        });
+      } else if (data) {
+        const clean = cleanForFirestore(data);
+        setDoc(docRef, clean, { merge: true }).catch((err) => {
+          console.warn(`[Firestore] Failed to write doc in "${colName}/${id}":`, err?.message || err);
+        });
+      }
+    } catch (err: any) {
+      console.warn(`[Firestore] Sync invocation error for ${tableName}:`, err?.message || err);
     }
   }
 
@@ -430,6 +516,7 @@ class InMemoryDatabase {
 
     table.push(record);
     this.saveToDisk();
+    this.syncToFirestore(tableName, 'set', record.id, record);
     return [{ insertId: record.id, affectedRows: 1 }, null];
   }
 
@@ -480,6 +567,7 @@ class InMemoryDatabase {
         }
         record.updated_at = new Date().toISOString();
         this.saveToDisk();
+        this.syncToFirestore(tableName, 'set', record.id, record);
         return [{ affectedRows: 1, changedRows: 1 }, null];
       }
     }
@@ -494,8 +582,12 @@ class InMemoryDatabase {
     if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
       const salonId = Number(params[0]);
       const prevLen = table.length;
+      const toRemove = table.filter((item) => item.salon_id === salonId);
       this.tables[tableName] = table.filter((item) => item.salon_id !== salonId);
       this.saveToDisk();
+      for (const item of toRemove) {
+        this.syncToFirestore(tableName, 'delete', item.id);
+      }
       return [{ affectedRows: prevLen - this.tables[tableName].length }, null];
     }
 
@@ -505,6 +597,7 @@ class InMemoryDatabase {
       if (index !== -1) {
         table.splice(index, 1);
         this.saveToDisk();
+        this.syncToFirestore(tableName, 'delete', id);
         return [{ affectedRows: 1 }, null];
       }
     }

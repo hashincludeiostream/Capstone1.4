@@ -32,54 +32,30 @@ A modern mobile-web responsive nail salon portal built with React, TypeScript, N
 
 - **Frontend**: React 18, TypeScript, Tailwind CSS 4.0, Vite
 - **Backend**: Node.js, Express.js
-- **Database**: MySQL/MariaDB (via mysql2)
+- **Database**: Google Cloud Firestore (ai-studio-capstone14-f7575340-b666-4d9b-b5f4-cffdf3c32bbc)
 - **Maps**: Leaflet, React-Leaflet
 - **Icons**: Lucide React
 - **Animations**: Motion
 - **Development**: tsx, esbuild
 
-## Installation
+## Installation & Architecture
 
 ### Prerequisites
 - Node.js 18+ and npm
-- MySQL 5.7+ or MariaDB
-- XAMPP/WAMP/MAMP (for local MySQL) or standalone MySQL
+- Fully provisioned Google Cloud Firestore database in AI Studio
 
 ### Setup Instructions
 
-1. **Clone or download the project**
-   ```bash
-   cd nail-glam-hub
-   ```
-
-2. **Install dependencies**
+1. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. **Create the database**
-   - Open phpMyAdmin (http://localhost/phpmyadmin)
-   - Create a new database named `nailglamhub_db`
-   - Import `php-backend/database.sql`
+2. **Database Verification & Sync**
+   - The system connects directly to Google Cloud Firestore.
+   - Run `npx tsx scripts/verifyFirestore.ts` to inspect live cloud collections.
 
-4. **Configure environment variables**
-   - Copy `.env.example` to `.env`
-   - Update the following variables:
-   ```env
-   PORT=3001
-   NODE_ENV=development
-   DB_HOST=127.0.0.1
-   DB_USER=root
-   DB_PASSWORD=
-   DB_NAME=nailglamhub_db
-   VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
-   ADMIN_CODES=ADMIN2025,GLAM_ADMIN,ADMIN,SUPERADMIN
-   ENABLE_REGISTRATION_RATE_LIMIT=true
-   ```
-
-   Set `ENABLE_REGISTRATION_RATE_LIMIT=false` during local development if repeated registration testing is needed. Keep it enabled in production.
-
-5. **Start the development server**
+3. **Start the development server**
    ```bash
    npm run dev
    ```
@@ -148,7 +124,7 @@ nail-glam-hub/
 ## Support
 
 For issues or questions, please ensure:
-- Database connection is working (MySQL running in XAMPP)
+- Google Cloud Firestore connection is active
 - Environment variables are properly configured
 - Node.js dependencies are installed
 - TypeScript compilation succeeds

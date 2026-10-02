@@ -20,6 +20,7 @@ import {
 import { Salon, BusinessCategory, User, Service, Technician, Product } from '../types';
 import { fetchServices, fetchTechnicians } from '../lib/api';
 import { HeroSection } from './HeroSection';
+import { CategoryFilter } from './CategoryFilter';
 
 interface LandingPageProps {
   salons: Salon[];
@@ -127,23 +128,42 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     loadFeaturedContent();
   }, [salons]);
 
-  // Filter salons if search query or category is applied
+  const [selectedServiceCategory, setSelectedServiceCategory] = React.useState<string | null>(null);
+  const [serviceCategorySalonIds, setServiceCategorySalonIds] = React.useState<number[]>([]);
+
+  // Filter salons if search query, service category, or business category is applied
   const filteredSalons = React.useMemo(() => {
     if (!salons) return [];
     return salons.filter((s) => {
+      // 1. Search Query filter (name, city, province, address)
       const q = searchQuery.toLowerCase().trim();
-      const matchesSearch = !q ||
+      const matchesSearch =
+        !q ||
         s.salon_name?.toLowerCase().includes(q) ||
         (s.city && s.city.toLowerCase().includes(q)) ||
         (s.province && s.province.toLowerCase().includes(q)) ||
         (s.address && s.address.toLowerCase().includes(q));
-      const matchesCategory = selectedCategory === null || !selectedCategory || s.category_id === selectedCategory;
+
+      // 2. Service Category filter
+      let matchesCategory = true;
+      if (selectedServiceCategory) {
+        if (serviceCategorySalonIds.length > 0) {
+          matchesCategory = serviceCategorySalonIds.includes(Number(s.id));
+        } else {
+          matchesCategory =
+            Boolean(s.category_name?.toLowerCase() === selectedServiceCategory.toLowerCase()) ||
+            Boolean(s.description?.toLowerCase().includes(selectedServiceCategory.toLowerCase()));
+        }
+      } else if (selectedCategory !== null && selectedCategory !== undefined) {
+        matchesCategory = s.category_id === selectedCategory;
+      }
+
       return matchesSearch && matchesCategory;
     });
-  }, [salons, searchQuery, selectedCategory]);
+  }, [salons, searchQuery, selectedServiceCategory, serviceCategorySalonIds, selectedCategory]);
 
-  const isFiltering = searchQuery.trim().length > 0 || selectedCategory !== null;
-  const featureSalons = isFiltering ? filteredSalons : (salons ? salons.slice(0, 4) : []);
+  const isFiltering = searchQuery.trim().length > 0 || selectedServiceCategory !== null || selectedCategory !== null;
+  const featureSalons = isFiltering ? filteredSalons : (salons ? salons.slice(0, 8) : []);
   const topCategories = categories ? categories.slice(0, 4) : [];
 
   // Show loading state only during initial data fetch
@@ -192,7 +212,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
 
-        {/* Search Bar & Category Filters */}
+        {/* Search Bar Container */}
         <HeroSection
           categories={categories}
           selectedCategory={selectedCategory}
@@ -200,6 +220,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
           onOpenBooking={onOpenBooking}
+          hideCategories={true}
+        />
+
+        {/* Dynamic Service Category Filter Component */}
+        <CategoryFilter
+          selectedCategory={selectedServiceCategory}
+          onSelectCategory={(catName, matchingIds) => {
+            setSelectedServiceCategory(catName);
+            setServiceCategorySalonIds(matchingIds);
+            if (catName === null) {
+              onSelectCategory(null);
+            }
+          }}
+          totalSalonsCount={salons.length}
+          filteredSalonsCount={filteredSalons.length}
+          onExploreAll={onExplore}
         />
       </div>
 
@@ -257,28 +293,76 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-4 gap-3 xl:gap-5">
           {topCategories.map((category) => (
-            <div key={category.id} className="rounded-2xl border border-pink-100 bg-gradient-to-br from-white to-pink-50 p-4 xl:p-5 hover:shadow-sm transition-all">
-              <Sparkles className="w-5 h-5 text-pink-600" />
-              <div className="mt-4 text-sm xl:text-base font-black text-gray-900">{category.category_name}</div>
-            </div>
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => {
+                setSelectedServiceCategory(category.category_name);
+                const el = document.getElementById('service-category-filter');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-left rounded-2xl border border-pink-100 bg-gradient-to-br from-white to-pink-50 p-4 xl:p-5 hover:shadow-md hover:border-pink-300 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">{category.icon || '💅'}</span>
+                <ArrowRight className="w-3.5 h-3.5 text-pink-400 group-hover:translate-x-1 transition-transform" />
+              </div>
+              <div className="mt-4 text-sm xl:text-base font-black text-gray-900 group-hover:text-pink-700 transition-colors">
+                {category.category_name}
+              </div>
+              <div className="text-[11px] text-gray-500 mt-0.5">Filter studios</div>
+            </button>
           ))}
         </div>
       </section>
 
       {/* Featured salons */}
       <section className="rounded-[2rem] border border-pink-100 bg-white p-6 xl:p-8 shadow-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <span className="text-[11px] xl:text-xs font-black uppercase tracking-[0.16em] text-pink-700">Featured Studios</span>
-            <h2 className="mt-2 font-serif text-2xl xl:text-3xl font-black text-gray-900">Today’s Top Salons</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] xl:text-xs font-black uppercase tracking-[0.16em] text-pink-700">
+                Featured Studios
+              </span>
+              {selectedServiceCategory && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-pink-100 text-pink-800 border border-pink-200">
+                  <Sparkles className="w-3 h-3 text-pink-600" />
+                  {selectedServiceCategory}
+                </span>
+              )}
+            </div>
+            <h2 className="mt-1.5 font-serif text-2xl xl:text-3xl font-black text-gray-900">
+              {selectedServiceCategory ? `Studios Offering ${selectedServiceCategory}` : 'Today’s Top Salons'}
+            </h2>
+            {isFiltering && (
+              <p className="text-xs text-gray-500 mt-1">
+                Showing {featureSalons.length} {featureSalons.length === 1 ? 'studio' : 'studios'} matching your filter criteria
+              </p>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={onExplore}
-            className="rounded-2xl bg-pink-700 px-4 py-2 text-[11px] xl:text-xs font-black text-white hover:bg-pink-800 transition cursor-pointer"
-          >
-            See the map
-          </button>
+          <div className="flex items-center gap-2">
+            {isFiltering && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedServiceCategory(null);
+                  setServiceCategorySalonIds([]);
+                  onSearchChange('');
+                  onSelectCategory(null);
+                }}
+                className="rounded-2xl border border-pink-200 bg-pink-50 px-3.5 py-2 text-xs font-bold text-pink-700 hover:bg-pink-100 transition cursor-pointer"
+              >
+                Clear all filters
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onExplore}
+              className="rounded-2xl bg-pink-700 px-4 py-2 text-[11px] xl:text-xs font-black text-white hover:bg-pink-800 transition cursor-pointer"
+            >
+              See the map
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 xl:gap-6 mt-5">
@@ -303,6 +387,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                 <div className="mt-4 text-[11px] text-gray-500 line-clamp-2">{salon.address}</div>
 
+                {selectedServiceCategory && (
+                  <div className="mt-2.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Offers {selectedServiceCategory}</span>
+                  </div>
+                )}
+
                 <div className="mt-4 flex items-center justify-between">
                   <button
                     type="button"
@@ -324,17 +415,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           ) : (
             <div className="col-span-full py-12 px-6 text-center rounded-2xl border border-dashed border-pink-200 bg-pink-50/40">
               <Store className="w-10 h-10 text-pink-400 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-gray-800">No studios listed yet</h3>
+              <h3 className="text-base font-bold text-gray-800">
+                {isFiltering ? 'No studios match this filter' : 'No studios listed yet'}
+              </h3>
               <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                No salons are currently listed. Register your studio to get accredited and listed on Nail Glam Hub.
+                {isFiltering
+                  ? `No salons currently match "${selectedServiceCategory || searchQuery}". Try clearing your filters or exploring another category.`
+                  : 'No salons are currently listed. Register your studio to get accredited and listed on Nail Glam Hub.'}
               </p>
-              <button
-                type="button"
-                onClick={onOpenRegisterSalon}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-pink-700 px-4 py-2 text-xs font-bold text-white hover:bg-pink-800 transition shadow-sm cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Register Your Studio
-              </button>
+              {isFiltering ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedServiceCategory(null);
+                    setServiceCategorySalonIds([]);
+                    onSearchChange('');
+                    onSelectCategory(null);
+                  }}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-pink-700 px-4 py-2 text-xs font-bold text-white hover:bg-pink-800 transition shadow-sm cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Reset All Filters
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onOpenRegisterSalon}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-pink-700 px-4 py-2 text-xs font-bold text-white hover:bg-pink-800 transition shadow-sm cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Register Your Studio
+                </button>
+              )}
             </div>
           )}
         </div>

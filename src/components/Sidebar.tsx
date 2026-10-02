@@ -67,6 +67,7 @@ interface SidebarProps {
   adminContentCount?: number;
   adminActiveAnnouncementsCount?: number;
   adminTotalAppointmentsCount?: number;
+  onAdminSecretTrigger?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -79,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isAdminMode,
   onNavigate,
   onLogout,
+  onAdminSecretTrigger,
   bookingsCount = 0,
   activeBookingsCount = 0,
   totalBookingsCount = 0,
@@ -111,6 +113,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setActiveTab(tab);
     }
   };
+
+  const tapCountRef = React.useRef(0);
+  const lastTapTimeRef = React.useRef(0);
+
+  const handleSecretTap = () => {
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 1500) {
+      tapCountRef.current += 1;
+      if (tapCountRef.current >= 5) {
+        tapCountRef.current = 0;
+        if (onAdminSecretTrigger) {
+          onAdminSecretTrigger();
+        }
+      }
+    } else {
+      tapCountRef.current = 1;
+    }
+    lastTapTimeRef.current = now;
+  };
+
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
 
@@ -1238,7 +1260,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <PhoneCall className="w-3 h-3" /> Support
           </button>
         </div>
-        <p className="text-[11px] text-gray-400">© 2025 Nail Glam Hub. All rights reserved.</p>
+        <div
+          onClick={handleSecretTap}
+          className="cursor-default select-none group inline-flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-500 transition-colors"
+          title="Nail Glam Hub Platform"
+        >
+          <span>© 2026 Nail Glam Hub. All rights reserved.</span>
+          <span className="opacity-0 group-hover:opacity-40 transition-opacity text-[10px]">🔒</span>
+        </div>
       </div>
     </aside>
   );
