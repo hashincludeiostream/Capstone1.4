@@ -314,7 +314,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
       {isOpen && (
         <div
           id="navbar-notifications-dropdown"
-          className="fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-[440px] max-w-[440px] bg-white rounded-2xl shadow-2xl border border-pink-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150 flex flex-col max-h-[85vh] sm:max-h-[580px]"
+          className="fixed sm:absolute right-2 left-2 sm:left-auto sm:right-0 top-16 sm:top-full sm:mt-2 w-auto sm:w-[440px] max-w-[440px] bg-white rounded-2xl shadow-2xl border border-pink-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150 flex flex-col max-h-[85vh] sm:max-h-[580px]"
         >
           {/* Header */}
           <div className="p-3.5 bg-gradient-to-r from-pink-50/80 via-white to-pink-50/40 border-b border-pink-100 flex items-center justify-between">

@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { User as UserType, Salon, Appointment, ProductOrder } from '../types';
 import { fetchAppointments, updateUser } from '../lib/api';
+import { getInitials } from '../lib/imageUpload';
+import { ProfileImageUploadModal } from './common/ProfileImageUploadModal';
 
 interface UserProfileProps {
   currentUser: UserType;
@@ -60,6 +62,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'appointments' | 'favorites' | 'orders'>('profile');
   const [formData, setFormData] = useState({
@@ -132,6 +135,34 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       avatar: currentUser.avatar || '',
     });
     setIsEditing(false);
+  };
+
+  const handleAvatarSelected = async (newAvatarUrl: string) => {
+    setFormData((prev) => ({ ...prev, avatar: newAvatarUrl }));
+    
+    // Automatically persist to backend if not currently in editing mode
+    if (!isEditing) {
+      setLoading(true);
+      try {
+        const updatedUser = await updateUser(currentUser.id, {
+          fullname: formData.fullname,
+          email: formData.email,
+          phone: formData.phone,
+          avatar: newAvatarUrl,
+        });
+        onUpdateUser(updatedUser);
+        setFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
+        setTimeout(() => setFeedback(null), 4000);
+      } catch (err: any) {
+        console.error('Error updating avatar:', err);
+        setFeedback({ type: 'error', message: err?.message || 'Failed to update profile picture' });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setFeedback({ type: 'success', message: 'New photo selected! Click "Save Changes" to apply updates.' });
+      setTimeout(() => setFeedback(null), 4000);
+    }
   };
 
   const getUserRoleBadge = () => {
@@ -258,8 +289,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         <div className="px-6 pb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-16">
             {/* Avatar */}
-            <div className="relative">
-              <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+            <div className="relative group">
+              <div
+                onClick={() => setShowImageModal(true)}
+                className="w-32 h-32 rounded-2xl bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xl"
+                title="Click to change profile picture"
+              >
                 {formData.avatar ? (
                   <img
                     src={formData.avatar}
@@ -267,16 +302,19 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white text-3xl font-serif font-bold">
-                    {currentUser.fullname.charAt(0).toUpperCase()}
+                  <div className="w-full h-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white text-3xl font-serif font-bold select-none">
+                    {getInitials(formData.fullname || currentUser.fullname)}
                   </div>
                 )}
               </div>
-              {isEditing && (
-                <div className="absolute bottom-2 right-2 w-8 h-8 bg-pink-600 text-white rounded-full flex items-center justify-center shadow-lg pointer-events-none">
-                  <Camera className="w-4 h-4" />
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowImageModal(true)}
+                className="absolute bottom-2 right-2 w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-full flex items-center justify-center shadow-lg hover:from-pink-600 hover:to-rose-700 hover:scale-110 active:scale-95 transition-all cursor-pointer z-10"
+                title="Upload or change profile picture"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
             </div>
 
             {/* User Info */}
@@ -886,6 +924,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           </div>
         </div>
       )}
+
+      {/* Profile Photo Upload & Customization Modal */}
+      <ProfileImageUploadModal
+        isOpen={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        currentAvatar={formData.avatar}
+        userName={formData.fullname || currentUser.fullname}
+        onSelectAvatar={handleAvatarSelected}
+        title={currentUser.user_type === 'admin' ? 'Update Administrator Photo' : 'Update Client Photo'}
+      />
     </div>
   );
 };

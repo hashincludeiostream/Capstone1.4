@@ -1199,8 +1199,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="w-full text-left text-xs min-w-[650px]">
               <thead className="bg-pink-50/50 text-gray-700 font-bold border-b border-pink-100">
                 <tr>
                   <th className="p-3.5">User Identity</th>

@@ -140,25 +140,25 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAdmin = currentUser?.user_type === 'admin';
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-pink-100/80 shadow-xs">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-pink-100/80 shadow-xs max-w-full overflow-hidden">
       <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12">
-        <div className="flex items-center justify-between h-18">
+        <div className="flex items-center justify-between h-18 gap-2">
           {/* Brand Logo */}
           <div
             id="brand-logo-btn"
             onClick={handleBrandLogoClick}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer group min-w-0 shrink"
             title="Nail Glam Hub (Tap 5x for Admin Gate)"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-600 via-rose-500 to-amber-300 flex items-center justify-center text-white shadow-md shadow-pink-500/20 group-hover:scale-105 transition-transform duration-200">
-              <Sparkles className="w-5 h-5 animate-pulse" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-pink-600 via-rose-500 to-amber-300 flex items-center justify-center text-white shadow-md shadow-pink-500/20 group-hover:scale-105 transition-transform duration-200 shrink-0">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif font-bold text-xl tracking-tight bg-gradient-to-r from-pink-700 via-rose-600 to-purple-800 bg-clip-text text-transparent">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-serif font-bold text-base sm:text-xl tracking-tight bg-gradient-to-r from-pink-700 via-rose-600 to-purple-800 bg-clip-text text-transparent truncate">
                   Nail Glam Hub
                 </span>
-                <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full ${
+                <span className={`hidden xs:inline-block text-[9px] sm:text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                   currentUser?.user_type === 'salon_owner'
                     ? 'bg-purple-100 text-purple-800'
                     : currentUser?.user_type === 'admin'
@@ -172,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     : 'Luxe'}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-500 font-medium tracking-wide">
+              <p className="text-[10px] sm:text-[11px] text-gray-500 font-medium tracking-wide truncate hidden sm:block">
                 {currentUser?.user_type === 'salon_owner'
                   ? 'Salon Business Management'
                   : currentUser?.user_type === 'admin'
@@ -285,7 +285,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {userDropdownOpen && (
                   <div
                     id="user-menu-dropdown"
-                    className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-pink-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                    className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-xl border border-pink-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
                   >
                     <div className="px-4 py-2 border-b border-gray-100">
                       <p className="text-xs font-medium text-gray-500">Signed in as</p>

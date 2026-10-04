@@ -878,7 +878,7 @@ const AppContent: React.FC = () => {
     (adminReviews.length > 0 ? adminReviews.length : 4);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCF8FA] text-[#2D1A28]">
+    <div className="min-h-screen flex flex-col bg-[#FCF8FA] text-[#2D1A28] w-full max-w-full overflow-x-hidden">
       {/* Toast Banner */}
       {toastMessage && (
         <div className="fixed top-20 right-6 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-pink-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200">
@@ -950,7 +950,7 @@ const AppContent: React.FC = () => {
                   : 'bg-stone-900 text-white border-stone-800'
               }`}
             >
-              <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 flex items-center justify-between gap-3">
+              <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 flex items-center justify-between gap-3 overflow-hidden">
                 <div className="flex items-center gap-2 overflow-hidden">
                   {isAlert ? (
                     <AlertTriangle className="w-4 h-4 shrink-0 text-white animate-bounce" />
@@ -996,7 +996,7 @@ const AppContent: React.FC = () => {
         })}
 
       {/* Main Workspace Layout */}
-      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex gap-6 xl:gap-8 flex-1">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex gap-6 xl:gap-8 flex-1 min-w-0 max-w-full overflow-x-hidden">
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}
@@ -1043,7 +1043,7 @@ const AppContent: React.FC = () => {
         />
 
         {/* Dynamic Center Stage Views */}
-        <main className="flex-1 min-w-0 pb-24 lg:pb-12">
+        <main className="flex-1 min-w-0 max-w-full overflow-x-hidden pb-24 lg:pb-12">
           {/* 0. LANDING PAGE VIEW */}
           {activeTab === 'landing' && (
             <LandingPage

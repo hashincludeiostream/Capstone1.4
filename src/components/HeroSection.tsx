@@ -24,7 +24,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   hideCategories = false,
 }) => {
   return (
-    <div className={`bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-pink-100/90 shadow-xs p-3.5 sm:p-4 mb-4 transition-all ${className}`}>
+    <div className={`bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-pink-100/90 shadow-xs p-3.5 sm:p-4 mb-4 transition-all max-w-full overflow-hidden ${className}`}>
       {/* Search Bar & Book Now Action */}
       <div className="flex flex-col sm:flex-row items-center gap-2.5">
         <div className="relative flex items-center gap-2.5 px-3.5 py-1.5 flex-1 w-full bg-pink-50/50 hover:bg-pink-50/80 focus-within:bg-white rounded-xl sm:rounded-2xl border border-pink-200/80 focus-within:border-pink-500 focus-within:ring-2 focus-within:ring-pink-200/60 transition-all text-gray-800">
@@ -63,8 +63,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
       {/* Category Filters Bar (Optional) */}
       {!hideCategories && (
-        <div className="mt-3 pt-3 border-t border-pink-100/70">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1">
+        <div className="mt-3 pt-3 border-t border-pink-100/70 max-w-full overflow-hidden">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             <button
               type="button"
               onClick={() => onSelectCategory(null)}

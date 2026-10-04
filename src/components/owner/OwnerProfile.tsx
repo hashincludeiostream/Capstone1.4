@@ -31,6 +31,8 @@ import {
 import { User as UserType, Salon, Appointment, Technician, Service, Review } from '../../types';
 import { fetchAppointments, fetchTechnicians, fetchServices, fetchReviews, fetchSalons, updateUser } from '../../lib/api';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { getInitials } from '../../lib/imageUpload';
+import { ProfileImageUploadModal } from '../common/ProfileImageUploadModal';
 
 interface OwnerProfileProps {
   currentUser: UserType;
@@ -49,6 +51,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [formData, setFormData] = useState({
     fullname: currentUser?.fullname || '',
@@ -143,6 +146,34 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
     setIsEditing(false);
   };
 
+  const handleAvatarSelected = async (newAvatarUrl: string) => {
+    setFormData((prev) => ({ ...prev, avatar: newAvatarUrl }));
+    
+    // Automatically persist to backend if not currently in editing mode
+    if (!isEditing) {
+      setLoading(true);
+      try {
+        const updatedUser = await updateUser(currentUser.id, {
+          fullname: formData.fullname,
+          email: formData.email,
+          phone: formData.phone,
+          avatar: newAvatarUrl,
+        });
+        onUpdateUser(updatedUser);
+        setFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
+        setTimeout(() => setFeedback(null), 4000);
+      } catch (err: any) {
+        console.error('Error updating avatar:', err);
+        setFeedback({ type: 'error', message: err?.message || 'Failed to update profile picture' });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setFeedback({ type: 'success', message: 'New photo selected! Click "Save Changes" to apply all profile updates.' });
+      setTimeout(() => setFeedback(null), 4000);
+    }
+  };
+
   const getUserSalon = () => {
     if (!currentUser?.id || !salons || salons.length === 0) return null;
     return ownerSalons.find(s => Number(s.owner_id) === Number(currentUser.id))
@@ -197,11 +228,15 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
       {/* Profile Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-purple-100 overflow-hidden">
         <div className="bg-gradient-to-r from-purple-900 via-pink-900 to-rose-950 h-32"></div>
-        <div className="px-6 pb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-16">
+        <div className="px-4 sm:px-6 pb-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 -mt-16 text-center sm:text-left">
             {/* Avatar */}
-            <div className="relative">
-              <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+            <div className="relative group shrink-0">
+              <div
+                onClick={() => setShowImageModal(true)}
+                className="w-32 h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xl"
+                title="Click to change profile picture"
+              >
                 {formData.avatar ? (
                   <img
                     src={formData.avatar}
@@ -209,14 +244,19 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <User className="w-16 h-16 text-purple-400" />
+                  <div className="w-full h-full bg-gradient-to-br from-pink-600 via-rose-600 to-purple-700 flex items-center justify-center text-white text-3xl font-bold tracking-wider select-none">
+                    {getInitials(formData.fullname || currentUser?.fullname)}
+                  </div>
                 )}
               </div>
-              {isEditing && (
-                <button className="absolute bottom-2 right-2 w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-full flex items-center justify-center shadow-lg hover:from-purple-600 hover:to-pink-700 transition-all">
-                  <Camera className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowImageModal(true)}
+                className="absolute bottom-2 right-2 w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-full flex items-center justify-center shadow-lg hover:from-purple-600 hover:to-pink-700 hover:scale-110 active:scale-95 transition-all cursor-pointer z-10"
+                title="Upload or change profile picture"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
             </div>
 
             {/* User Info */}
@@ -251,7 +291,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 self-stretch sm:self-end">
               {!isEditing ? (
                 <>
                   <button
@@ -535,13 +575,23 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
           {/* Sign Out */}
           <button
             onClick={onLogout}
-            className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-semibold shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2"
+            className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-semibold shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
           </button>
         </div>
       </div>
+
+      {/* Profile Photo Upload & Customization Modal */}
+      <ProfileImageUploadModal
+        isOpen={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        currentAvatar={formData.avatar}
+        userName={formData.fullname || currentUser?.fullname}
+        onSelectAvatar={handleAvatarSelected}
+        title="Update Salon Partner Photo"
+      />
     </div>
   );
 };

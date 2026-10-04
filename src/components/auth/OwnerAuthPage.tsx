@@ -177,14 +177,14 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-8 px-4 sm:px-6">
+    <div className="min-h-[85vh] flex items-center justify-center py-4 sm:py-8 px-3 sm:px-6">
       <div className="w-full max-w-5xl bg-white rounded-3xl shadow-xl border border-purple-100 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
         {/* Left Visual Banner (Owner Theme: Royal Purple / Velvet) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 p-8 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="lg:col-span-5 bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 p-5 sm:p-8 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-pink-500/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
 
-          <div className="relative z-10 space-y-6">
+          <div className="relative z-10 space-y-4 sm:space-y-6">
             <button
               onClick={() => onNavigate('explore')}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-200 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
@@ -198,7 +198,7 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
                 <Store className="w-3.5 h-3.5 text-purple-300" />
                 <span>Salon Owner & Partner Portal</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold leading-tight">
+              <h2 className="text-xl sm:text-3xl font-serif font-bold leading-tight">
                 {mode === 'signin'
                   ? 'Grow your beauty business on Nail Glam Hub.'
                   : 'Register your salon & get instant bookings.'}
@@ -208,8 +208,8 @@ export const OwnerAuthPage: React.FC<OwnerAuthPageProps> = ({
               </p>
             </div>
 
-            {/* Business Features */}
-            <div className="space-y-3 pt-2">
+            {/* Business Features - tablet & desktop */}
+            <div className="hidden sm:block space-y-3 pt-2">
               <div className="flex items-start gap-3 bg-white/10 backdrop-blur-xs p-3 rounded-2xl border border-white/15">
                 <CalendarCheck className="w-5 h-5 text-purple-300 shrink-0 mt-0.5" />
                 <div>

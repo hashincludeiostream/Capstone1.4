@@ -594,8 +594,8 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
 
           {/* Products Stock Table */}
           <div className="bg-white rounded-3xl border border-stone-200 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="w-full text-left text-xs min-w-[680px]">
                 <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="py-3.5 px-5">Product Details</th>

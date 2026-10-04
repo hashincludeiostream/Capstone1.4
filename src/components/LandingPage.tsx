@@ -16,6 +16,7 @@ import {
   Eye,
   Package,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 import { Salon, BusinessCategory, User, Service, Technician, Product } from '../types';
 import { fetchServices, fetchTechnicians } from '../lib/api';
@@ -66,6 +67,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [technicianCount, setTechnicianCount] = React.useState<number>(0);
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [addedProductId, setAddedProductId] = React.useState<number | null>(null);
+  const [guestBannerDismissed, setGuestBannerDismissed] = React.useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nailglamhub_dismissed_guest_banner') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const handleQuickAdd = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -239,20 +247,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         />
       </div>
 
-      {!currentUser && (
-        <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900 shadow-sm">
+      {!currentUser && !guestBannerDismissed && (
+        <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-3.5 text-sm font-bold text-amber-900 shadow-sm animate-in fade-in duration-200">
           <div className="flex items-center justify-between gap-4">
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              To continue, please login to your customer account.
+            <span className="flex items-center gap-2.5 text-xs sm:text-sm">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <span>To continue, explore verified studios or sign in to reserve treatments and boutique items.</span>
             </span>
-            <button
-              type="button"
-              onClick={onOpenLogin}
-              className="rounded-2xl bg-amber-700 px-4 py-2 text-[11px] font-black text-white hover:bg-amber-800 transition cursor-pointer"
-            >
-              Login
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={onOpenLogin}
+                className="rounded-xl bg-amber-700 hover:bg-amber-800 px-3.5 py-1.5 text-xs font-bold text-white transition shadow-xs cursor-pointer"
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setGuestBannerDismissed(true);
+                  try {
+                    localStorage.setItem('nailglamhub_dismissed_guest_banner', 'true');
+                  } catch {}
+                }}
+                className="p-1 hover:bg-amber-100 text-amber-700 rounded-lg transition cursor-pointer"
+                title="Dismiss notice"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </section>
       )}

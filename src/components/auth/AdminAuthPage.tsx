@@ -190,20 +190,20 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-8 px-4 sm:px-6">
+    <div className="min-h-[85vh] flex items-center justify-center py-4 sm:py-8 px-3 sm:px-6">
       <div className="w-full max-w-5xl bg-white rounded-3xl shadow-xl border border-rose-100 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
         {/* Left Visual Banner (Admin Theme: Dark Slate / Rose / Gold) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-gray-900 to-rose-950 p-8 text-white flex flex-col justify-center relative overflow-hidden">
+        <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-gray-900 to-rose-950 p-5 sm:p-8 text-white flex flex-col justify-center relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-rose-600/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-600/10 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
 
-          <div className="relative z-10 space-y-6">
+          <div className="relative z-10 space-y-4 sm:space-y-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 bg-rose-900/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold tracking-wide text-rose-200 border border-rose-500/30">
                 <Shield className="w-3.5 h-3.5 text-rose-400" />
                 <span>Super Admin Console</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold leading-tight">
+              <h2 className="text-xl sm:text-3xl font-serif font-bold leading-tight">
                 {mode === 'signin'
                   ? 'Master platform operations & oversight.'
                   : 'Authorize staff & platform administrators.'}
@@ -213,8 +213,8 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
               </p>
             </div>
 
-            {/* Admin Capabilities */}
-            <div className="space-y-3 pt-2">
+            {/* Admin Capabilities - tablet & desktop */}
+            <div className="hidden sm:block space-y-3 pt-2">
               <div className="flex items-start gap-3 bg-white/10 backdrop-blur-xs p-3 rounded-2xl border border-white/15">
                 <BarChart3 className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                 <div>

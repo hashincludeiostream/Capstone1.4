@@ -179,15 +179,15 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-8 px-4 sm:px-6">
+    <div className="min-h-[85vh] flex items-center justify-center py-4 sm:py-8 px-3 sm:px-6">
       <div className="w-full max-w-5xl bg-white rounded-3xl shadow-xl border border-pink-100 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
         {/* Left Visual Banner (Customer theme) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-pink-600 via-rose-500 to-purple-700 p-8 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="lg:col-span-5 bg-gradient-to-br from-pink-600 via-rose-500 to-purple-700 p-5 sm:p-8 text-white flex flex-col justify-between relative overflow-hidden">
           {/* Subtle decorative glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-pink-400/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-900/30 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
 
-          <div className="relative z-10 space-y-6">
+          <div className="relative z-10 space-y-4 sm:space-y-6">
             <button
               onClick={() => onNavigate('explore')}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-pink-100 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
@@ -201,7 +201,7 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
                 <Heart className="w-3.5 h-3.5 fill-pink-300 text-pink-300" />
                 <span>Client & Customer Portal</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold leading-tight">
+              <h2 className="text-xl sm:text-3xl font-serif font-bold leading-tight">
                 {mode === 'signin'
                   ? 'Your personal beauty escape awaits.'
                   : 'Join Manila’s curated beauty community.'}
@@ -211,8 +211,8 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
               </p>
             </div>
 
-            {/* Perks checklist */}
-            <div className="space-y-3 pt-2">
+            {/* Perks checklist - displayed on tablet & desktop */}
+            <div className="hidden sm:block space-y-3 pt-2">
               <div className="flex items-start gap-3 bg-white/10 backdrop-blur-xs p-3 rounded-2xl border border-white/15">
                 <Calendar className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
                 <div>
