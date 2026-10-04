@@ -395,8 +395,8 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
       {/* Branch Table View */}
       {viewMode === 'table' && sortedBranches.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-purple-100 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full min-w-[650px]">
+          <div className="overflow-x-auto">
+            <table className="w-full">
               <thead className="bg-purple-50 border-b border-purple-100">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-bold text-purple-700">Branch</th>

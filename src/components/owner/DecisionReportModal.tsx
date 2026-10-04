@@ -1280,8 +1280,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
               </div>
 
               {/* Itemized P&L Ledger Table */}
-              <div className="overflow-x-auto no-scrollbar border border-gray-200 rounded-2xl shadow-2xs">
-                <table className="w-full text-left text-xs min-w-[700px]">
+              <div className="overflow-x-auto border border-gray-200 rounded-2xl shadow-2xs">
+                <table className="w-full text-left text-xs">
                   <thead className="bg-gray-50 text-gray-600 uppercase font-semibold text-[10px] border-b border-gray-200">
                     <tr>
                       <th className="py-3 px-3">Period</th>
@@ -1386,8 +1386,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
                   <h5 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
                     Top Grossing Services
                   </h5>
-                  <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left text-xs min-w-[480px]">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
                       <thead className="bg-gray-50 text-gray-500 uppercase font-semibold text-[10px]">
                         <tr>
                           <th className="py-2 px-3">Service Name</th>
@@ -1447,8 +1447,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
                 </span>
               </div>
 
-              <div className="overflow-x-auto no-scrollbar border border-gray-200 rounded-2xl shadow-2xs">
-                <table className="w-full text-left text-xs min-w-[650px]">
+              <div className="overflow-x-auto border border-gray-200 rounded-2xl shadow-2xs">
+                <table className="w-full text-left text-xs">
                   <thead className="bg-gray-50 text-gray-600 uppercase font-semibold text-[10px] border-b border-gray-200">
                     <tr>
                       <th className="py-3 px-4">Technician</th>
@@ -1567,8 +1567,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
 
               {/* Product Stock Table */}
               {reportData.inventoryItems && reportData.inventoryItems.length > 0 && (
-                <div className="overflow-x-auto no-scrollbar border border-gray-200 rounded-2xl shadow-2xs">
-                  <table className="w-full text-left text-xs min-w-[650px]">
+                <div className="overflow-x-auto border border-gray-200 rounded-2xl shadow-2xs">
+                  <table className="w-full text-left text-xs">
                     <thead className="bg-gray-50 text-gray-600 uppercase font-semibold text-[10px] border-b border-gray-200">
                       <tr>
                         <th className="py-2.5 px-3">Product Name &amp; SKU</th>

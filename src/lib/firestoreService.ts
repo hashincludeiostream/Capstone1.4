@@ -389,3 +389,27 @@ export async function createFirestoreReview(data: Partial<Review>): Promise<Revi
   await setDoc(doc(db, 'reviews', String(newId)), reviewRecord);
   return reviewRecord;
 }
+
+export async function updateFirestoreUser(
+  userId: number,
+  userData: Record<string, any>
+): Promise<boolean> {
+  try {
+    const ref = doc(db, 'users', String(userId));
+    await updateDoc(ref, {
+      ...userData,
+      updated_at: new Date().toISOString(),
+    });
+    return true;
+  } catch (err) {
+    // If doc doesn't exist yet, create it with setDoc merge
+    try {
+      const ref = doc(db, 'users', String(userId));
+      await setDoc(ref, { ...userData, id: userId, updated_at: new Date().toISOString() }, { merge: true });
+      return true;
+    } catch (setErr) {
+      console.warn('[Firestore] Failed to update user in firestore:', setErr);
+      return false;
+    }
+  }
+}

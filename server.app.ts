@@ -1135,6 +1135,49 @@ async function startServer() {
     }
   });
 
+  // Change User Password Endpoint
+  app.post('/api/users/:id/change-password', async (req, res) => {
+    const userId = Number(req.params.id);
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Both current password and new password are required' });
+    }
+
+    try {
+      const [rows] = await db.execute('SELECT id, password FROM users WHERE id = ?', [userId]);
+      const user = (rows as any[])[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      // Verify current password
+      let isMatch = false;
+      if (user.password) {
+        if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
+          isMatch = await bcrypt.compare(currentPassword, user.password);
+        } else {
+          isMatch = user.password === currentPassword;
+        }
+      }
+
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Current password does not match our records' });
+      }
+
+      // Validate new password strength
+      const validation = validatePasswordStrength(newPassword);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.message });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+      res.json({ success: true, message: 'Password has been updated securely.' });
+    } catch (error) {
+      console.error('Change password error:', error);
+      res.status(500).json({ error: 'Server error updating password' });
+    }
+  });
+
   // Get Single User Profile
   app.get('/api/users/:id', async (req, res) => {
     const userId = Number(req.params.id);

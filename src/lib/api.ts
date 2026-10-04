@@ -798,6 +798,26 @@ export async function fetchUser(id: number): Promise<User> {
   return await res.json();
 }
 
+export async function changePassword(
+  userId: number,
+  data: { currentPassword?: string; newPassword?: string }
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/users/${userId}/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      throw new Error(result.error || 'Failed to update password');
+    }
+    return result;
+  } catch (err: any) {
+    throw new Error(err.message || 'Failed to change password');
+  }
+}
+
 export interface AdminVerificationResult {
   authorized: boolean;
   error?: string;

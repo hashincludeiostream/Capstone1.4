@@ -138,17 +138,17 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 rounded-3xl p-5 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5 sm:gap-4">
+      <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
           {currentUser.avatar ? (
             <img
               src={currentUser.avatar}
               alt={currentUser.fullname}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-pink-300 shadow-md shrink-0"
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-pink-300 shadow-md"
             />
           ) : (
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center border-2 border-pink-300 shadow-md shrink-0">
-              <span className="text-white text-lg sm:text-xl font-bold">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center border-2 border-pink-300 shadow-md">
+              <span className="text-white text-xl font-bold">
                 {currentUser.fullname.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -157,7 +157,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-pink-200 text-[11px] font-semibold mb-1">
               <Sparkles className="w-3 h-3 text-amber-300" /> Client Portal
             </div>
-            <h2 className="text-xl sm:text-3xl font-serif font-bold">
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold">
               Welcome, {currentUser.fullname}
             </h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -177,7 +177,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
         <button
           onClick={onOpenBooking}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 flex items-center gap-2 cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Appointment</span>

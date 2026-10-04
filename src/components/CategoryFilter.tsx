@@ -58,7 +58,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
 
   return (
     <div
-      className={`bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-pink-100 shadow-xs p-4 sm:p-5 transition-all max-w-full overflow-hidden ${className}`}
+      className={`bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-pink-100 shadow-xs p-4 sm:p-5 transition-all ${className}`}
       id="service-category-filter"
     >
       {/* Header bar */}
@@ -121,7 +121,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             <div className="h-9 w-28 rounded-xl bg-pink-100/40 shrink-0" />
           </div>
         ) : (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
             {/* "All" button */}
             <button
               type="button"

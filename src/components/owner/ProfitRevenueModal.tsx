@@ -230,8 +230,8 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
               </div>
 
               <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs bg-white">
-                <div className="overflow-x-auto no-scrollbar">
-                  <table className="w-full text-xs text-left min-w-[700px]">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
                     <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px]">
                       <tr>
                         <th className="py-3 px-3.5">Period</th>
