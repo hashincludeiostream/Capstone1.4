@@ -36,6 +36,8 @@ import {
   Review,
 } from '../types';
 import { NotificationMenu } from './NotificationMenu';
+import { NotificationBadge } from './common/NotificationBadge';
+import { useNotifications } from '../context/NotificationContext';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -67,6 +69,9 @@ interface NavbarProps {
   adminTotalAppointments?: number;
   favoritesCount?: number;
   onOpenEmailHistory?: () => void;
+  dismissedAnnouncements?: number[];
+  onDismissAnnouncement?: (id: number) => void;
+  onDismissAllAnnouncements?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -98,7 +103,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   adminTotalAppointments = 0,
   favoritesCount = 0,
   onOpenEmailHistory,
+  dismissedAnnouncements = [],
+  onDismissAnnouncement,
+  onDismissAllAnnouncements,
 }) => {
+  const { categoryUnread } = useNotifications();
   const handleNavigation = (tab: string, targetDomId?: string) => {
     if (onNavigate) {
       onNavigate(tab, targetDomId);
@@ -234,6 +243,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               adminTotalAppointments={adminTotalAppointments}
               favoritesCount={favoritesCount}
               onNavigate={handleNavigation}
+              dismissedAnnouncements={dismissedAnnouncements}
+              onDismissAnnouncement={onDismissAnnouncement}
+              onDismissAllAnnouncements={onDismissAllAnnouncements}
             />
 
             {/* Email Notifications & PDF Reports Inbox Button */}
@@ -885,9 +897,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>In-Store Reservation Cart</span>
                     </span>
                     {cartItemCount > 0 && (
-                      <span className="text-xs bg-pink-600 text-white font-bold px-2 py-0.5 rounded-full">
-                        {cartItemCount}
-                      </span>
+                      <NotificationBadge
+                        count={cartItemCount}
+                        variant="pink"
+                        size="sm"
+                        isUnread={categoryUnread.cart}
+                        showPing={false}
+                      />
                     )}
                   </button>
                 )}
