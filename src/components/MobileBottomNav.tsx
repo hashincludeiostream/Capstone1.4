@@ -13,8 +13,6 @@ import {
   Layers,
 } from 'lucide-react';
 import { User } from '../types';
-import { NotificationBadge } from './common/NotificationBadge';
-import { useNotifications } from '../context/NotificationContext';
 
 interface MobileBottomNavProps {
   currentUser: User | null;
@@ -45,7 +43,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const isCustomer = currentUser?.user_type === 'customer';
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
-  const { categoryUnread, unreadBookingsCount, unreadOrdersCount } = useNotifications();
 
   // 1. ADMIN BOTTOM NAVIGATION
   if (isAdmin) {
@@ -77,15 +74,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           >
             <Store className="w-5 h-5" />
             {adminPendingSalonsCount > 0 && (
-              <NotificationBadge
-                count={adminPendingSalonsCount}
-                variant="amber"
-                priority={adminPendingSalonsCount > 0 ? 'urgent' : 'normal'}
-                isUnread={adminPendingSalonsCount > 0 && categoryUnread.alerts}
-                showPing={false}
-                size="badge-overlay"
-                className="absolute top-1 right-2.5"
-              />
+              <span className="absolute top-1 right-2.5 w-4 h-4 bg-amber-500 text-stone-950 text-[9px] font-black rounded-full flex items-center justify-center shadow-xs">
+                {adminPendingSalonsCount}
+              </span>
             )}
             <span className="text-[10px] mt-0.5 truncate">Salons</span>
           </button>
@@ -160,15 +151,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           >
             <Calendar className="w-5 h-5" />
             {ownerPendingAppointmentsCount > 0 && (
-              <NotificationBadge
-                count={ownerPendingAppointmentsCount}
-                variant="amber"
-                priority={ownerPendingAppointmentsCount > 0 ? 'urgent' : 'normal'}
-                isUnread={ownerPendingAppointmentsCount > 0 && categoryUnread.bookings}
-                showPing={false}
-                size="badge-overlay"
-                className="absolute top-1 right-2.5"
-              />
+              <span className="absolute top-1 right-2.5 w-4 h-4 bg-amber-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                {ownerPendingAppointmentsCount}
+              </span>
             )}
             <span className="text-[10px] mt-0.5 truncate">Bookings</span>
           </button>
@@ -280,15 +265,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         >
           <ShoppingBag className="w-5 h-5" />
           {cartItemCount > 0 && (
-            <NotificationBadge
-              count={cartItemCount}
-              variant="pink"
-              priority="normal"
-              isUnread={categoryUnread.cart}
-              showPing={false}
-              size="badge-overlay"
-              className="absolute top-1 right-2.5"
-            />
+            <span className="absolute top-1 right-2.5 w-4 h-4 bg-pink-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
+              {cartItemCount}
+            </span>
           )}
           <span className="text-[10px] mt-0.5 truncate font-medium">
             {cartItemCount > 0 ? 'Cart' : 'Shop'}
@@ -308,15 +287,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           >
             <Calendar className="w-5 h-5" />
             {bookingsCount + ordersCount > 0 && (
-              <NotificationBadge
-                count={bookingsCount + ordersCount}
-                variant="pink"
-                priority="normal"
-                isUnread={unreadBookingsCount + unreadOrdersCount > 0}
-                showPing={false}
-                size="badge-overlay"
-                className="absolute top-1 right-2.5"
-              />
+              <span className="absolute top-1 right-2.5 w-4 h-4 bg-pink-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                {bookingsCount + ordersCount}
+              </span>
             )}
             <span className="text-[10px] mt-0.5 truncate font-medium">Bookings</span>
           </button>

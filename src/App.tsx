@@ -64,9 +64,6 @@ import { EmailLogsModal } from './components/email/EmailLogsModal';
 import { ChatWidget } from './components/chat/ChatWidget';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { scrollToElement } from './utils/scrollHelper';
-import { NotificationProvider } from './context/NotificationContext';
-import { NotificationBadge } from './components/common/NotificationBadge';
-import { SiteAnnouncementBar } from './components/common/SiteAnnouncementBar';
 
 export const App: React.FC = () => {
   return (
@@ -91,46 +88,8 @@ const AppContent: React.FC = () => {
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  // Persistent dismissed / viewed announcements so banners only persist UNLESS viewed
-  const [dismissedAnnouncements, setDismissedAnnouncements] = useState<number[]>(() => {
-    return safeLocalStorage.getJSON<number[]>('nailglamhub_viewed_announcements') || [];
-  });
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Sync viewed announcements across browser sessions/storage
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'nailglamhub_viewed_announcements' && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) {
-            setDismissedAnnouncements(parsed);
-          }
-        } catch {
-          // ignore
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  const handleDismissAnnouncement = (id: number) => {
-    setDismissedAnnouncements((prev) => {
-      const next = Array.from(new Set([...prev, id]));
-      safeLocalStorage.setJSON('nailglamhub_viewed_announcements', next);
-      return next;
-    });
-  };
-
-  const handleDismissAllAnnouncements = () => {
-    setDismissedAnnouncements((prev) => {
-      const allIds = announcements.map((a) => a.id);
-      const next = Array.from(new Set([...prev, ...allIds]));
-      safeLocalStorage.setJSON('nailglamhub_viewed_announcements', next);
-      return next;
-    });
-  };
 
   // Search & Filtering
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -919,18 +878,7 @@ const AppContent: React.FC = () => {
     (adminReviews.length > 0 ? adminReviews.length : 4);
 
   return (
-    <NotificationProvider
-      currentUser={currentUser}
-      announcements={announcements}
-      customerAppointments={customerAppointments}
-      customerOrders={customerOrders}
-      ownerAppointments={ownerAppointments}
-      ownerProductOrders={ownerProductOrders}
-      ownerSalons={effectiveOwnerSalons}
-      adminPendingSalons={adminPendingSalons}
-      cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-    >
-      <div className="min-h-screen flex flex-col bg-[#FCF8FA] text-[#2D1A28]">
+    <div className="min-h-screen flex flex-col bg-[#FCF8FA] text-[#2D1A28]">
       {/* Toast Banner */}
       {toastMessage && (
         <div className="fixed top-20 right-6 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-pink-500/30 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200">
@@ -978,22 +926,74 @@ const AppContent: React.FC = () => {
         adminTotalAppointments={adminTotalAppointments}
         favoritesCount={favorites.length}
         onOpenEmailHistory={() => setShowEmailLogsModal(true)}
-        dismissedAnnouncements={dismissedAnnouncements}
-        onDismissAnnouncement={handleDismissAnnouncement}
-        onDismissAllAnnouncements={handleDismissAllAnnouncements}
       />
 
-      {/* Live Site-Wide Announcements Broadcasted by Super Admin - Only Persistent UNLESS Viewed */}
-      <SiteAnnouncementBar
-        announcements={announcements}
-        dismissedAnnouncements={dismissedAnnouncements}
-        onDismissAnnouncement={handleDismissAnnouncement}
-        onNavigateTab={(tab) => setActiveTab(tab)}
-        onOpenBookingModal={() => {
-          setBookingSalon(salons[0] || null);
-          setBookingModalOpen(true);
-        }}
-      />
+      {/* Live Site-Wide Announcements Broadcasted by Super Admin */}
+      {announcements
+        .filter((a) => a.is_active && !dismissedAnnouncements.includes(a.id))
+        .map((a) => {
+          const isAlert = a.type === 'alert';
+          const isPromo = a.type === 'promo';
+          const isMaintenance = a.type === 'maintenance';
+
+          return (
+            <div
+              key={a.id}
+              id={`site-announcement-${a.id}`}
+              className={`border-b text-xs py-2 px-4 flex items-center justify-between transition-all ${
+                isAlert
+                  ? 'bg-red-500 text-white border-red-600'
+                  : isPromo
+                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white border-pink-700'
+                  : isMaintenance
+                  ? 'bg-amber-500 text-stone-900 border-amber-600 font-semibold'
+                  : 'bg-stone-900 text-white border-stone-800'
+              }`}
+            >
+              <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  {isAlert ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white animate-bounce" />
+                  ) : isPromo ? (
+                    <Sparkles className="w-4 h-4 shrink-0 text-amber-300" />
+                  ) : (
+                    <Megaphone className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="font-bold tracking-wide uppercase text-[10px] px-1.5 py-0.5 rounded bg-black/20">
+                    {a.type}
+                  </span>
+                  <span className="font-bold truncate">{a.title}:</span>
+                  <span className="truncate opacity-95">{a.message}</span>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {a.link_url && a.link_text && (
+                    <button
+                      onClick={() => {
+                        if (a.link_url?.startsWith('tab:')) {
+                          setActiveTab(a.link_url.replace('tab:', ''));
+                        } else if (a.link_url === 'booking') {
+                          setBookingSalon(salons[0] || null);
+                          setBookingModalOpen(true);
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white text-gray-900 hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer"
+                    >
+                      {a.link_text}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setDismissedAnnouncements((prev) => [...prev, a.id])}
+                    className="p-1 hover:bg-black/20 rounded-full transition-colors cursor-pointer"
+                    title="Dismiss Announcement"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
       {/* Main Workspace Layout */}
       <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex gap-6 xl:gap-8 flex-1">
@@ -1913,6 +1913,5 @@ const AppContent: React.FC = () => {
         onAuthorized={handleAdminGateAuthorized}
       />
     </div>
-    </NotificationProvider>
   );
 };

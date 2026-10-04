@@ -29,8 +29,6 @@ import {
   LogOut,
 } from 'lucide-react';
 import { User } from '../types';
-import { NotificationBadge } from './common/NotificationBadge';
-import { useNotifications } from '../context/NotificationContext';
 
 interface SidebarProps {
   currentUser: User | null;
@@ -137,7 +135,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
-  const { categoryUnread, unreadBookingsCount, unreadOrdersCount, unreadAlertsCount } = useNotifications();
 
   // ----------------------------------------------------
   // SUPER ADMIN SIDEBAR VIEW (Exclusive Admin Tools Only)
@@ -194,12 +191,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Overview & KPIs</span>
               </div>
               {adminTotalAppointmentsCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-admin-overview-badge"
-                  count={adminTotalAppointmentsCount}
-                  variant={activeTab === 'admin-dashboard' ? 'white' : 'rose'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'admin-dashboard'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  <span>{adminTotalAppointmentsCount}</span>
+                </span>
               )}
             </button>
 
@@ -225,19 +226,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
                       <Store className="w-4 h-4 text-rose-700 shrink-0" />
+                      {hasPending && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
                     </div>
                     <span className="truncate">Salon Approvals</span>
                   </div>
                   {countToShow > 0 && (
-                    <NotificationBadge
+                    <span
                       id="sidebar-admin-salons-badge"
-                      count={hasPending ? `${countToShow} pending` : countToShow}
-                      variant={activeTab === 'admin-salons' ? 'white' : 'rose'}
-                      priority={hasPending ? 'urgent' : 'normal'}
-                      isUnread={hasPending && unreadAlertsCount > 0}
-                      showPing={true}
-                      size="sm"
-                    />
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'admin-salons'
+                          ? 'bg-white/20 text-white'
+                          : hasPending
+                          ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-rose-500/25 ring-1 ring-rose-400/30'
+                          : 'bg-rose-100 text-rose-900'
+                      }`}
+                    >
+                      {hasPending && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                      )}
+                      <span>{hasPending ? `${countToShow} pending` : countToShow}</span>
+                    </span>
                   )}
                 </button>
               );
@@ -261,12 +274,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">User Accounts</span>
               </div>
               {adminTotalUsersCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-admin-users-badge"
-                  count={adminTotalUsersCount}
-                  variant={activeTab === 'admin-users' ? 'white' : 'rose'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'admin-users'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  <span>{adminTotalUsersCount}</span>
+                </span>
               )}
             </button>
 
@@ -288,12 +305,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Content Moderation</span>
               </div>
               {adminContentCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-admin-content-badge"
-                  count={adminContentCount}
-                  variant={activeTab === 'admin-content' ? 'white' : 'rose'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'admin-content'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  <span>{adminContentCount}</span>
+                </span>
               )}
             </button>
 
@@ -314,19 +335,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
                       <Radio className="w-4 h-4 text-rose-700 shrink-0" />
+                      {hasActiveBroadcasts && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
                     </div>
                     <span className="truncate">Site Broadcasts</span>
                   </div>
                   {adminActiveAnnouncementsCount > 0 && (
-                    <NotificationBadge
+                    <span
                       id="sidebar-admin-announcements-badge"
-                      count={adminActiveAnnouncementsCount}
-                      variant={activeTab === 'admin-announcements' ? 'white' : 'rose'}
-                      priority="normal"
-                      isUnread={hasActiveBroadcasts && unreadAlertsCount > 0}
-                      showPing={true}
-                      size="sm"
-                    />
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'admin-announcements'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-rose-100 text-rose-900 ring-1 ring-rose-200'
+                      }`}
+                    >
+                      {hasActiveBroadcasts && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse shrink-0"></span>
+                      )}
+                      <span>{adminActiveAnnouncementsCount}</span>
+                    </span>
                   )}
                 </button>
               );
@@ -348,12 +379,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">My Account Profile</span>
               </div>
-              <NotificationBadge
+              <span
                 id="sidebar-admin-profile-badge"
-                label="ADMIN"
-                variant={activeTab === 'profile' ? 'white' : 'rose'}
-                size="sm"
-              />
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  activeTab === 'profile'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
+                }`}
+              >
+                ADMIN
+              </span>
             </button>
           </div>
         </div>
@@ -495,19 +530,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
                   <Store className="w-4 h-4 text-purple-600 shrink-0" />
+                  {ownerPendingSalonsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 ring-1 ring-white"></span>
+                    </span>
+                  )}
                 </div>
                 <span className="truncate">Branch Overview</span>
               </div>
               {ownerSalonsCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-owner-branches-badge"
-                  count={ownerSalonsCount}
-                  variant={activeTab === 'owner-branches' ? 'white' : 'amber'}
-                  priority={ownerPendingSalonsCount > 0 ? 'urgent' : 'normal'}
-                  isUnread={ownerPendingSalonsCount > 0 && categoryUnread.alerts}
-                  showPing={true}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-branches'
+                      ? 'bg-white/20 text-white'
+                      : ownerPendingSalonsCount > 0
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerSalonsCount}</span>
+                </span>
               )}
             </button>
 
@@ -529,12 +573,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Store Reports & CRM</span>
               </div>
               {ownerReviewsCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-owner-crm-badge"
-                  count={ownerReviewsCount}
-                  variant={activeTab === 'owner-dashboard' ? 'white' : 'purple'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-dashboard'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerReviewsCount}</span>
+                </span>
               )}
             </button>
 
@@ -562,19 +610,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
                       <Calendar className="w-4 h-4 text-purple-600 shrink-0" />
+                      {hasPendingAppts && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
                     </div>
                     <span className="truncate">Bookings & Schedule</span>
                   </div>
                   {countToShow > 0 && (
-                    <NotificationBadge
+                    <span
                       id="sidebar-owner-appointments-badge"
-                      count={hasPendingAppts ? `${countToShow} new` : countToShow}
-                      variant={activeTab === 'owner-appointments' ? 'white' : 'purple'}
-                      priority={hasPendingAppts ? 'urgent' : 'normal'}
-                      isUnread={hasPendingAppts && categoryUnread.bookings}
-                      showPing={true}
-                      size="sm"
-                    />
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'owner-appointments'
+                          ? 'bg-white/20 text-white'
+                          : hasPendingAppts
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-purple-500/25 ring-1 ring-purple-400/30'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {hasPendingAppts && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                      )}
+                      <span>{hasPendingAppts ? `${countToShow} new` : countToShow}</span>
+                    </span>
                   )}
                 </button>
               );
@@ -598,12 +658,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Services &amp; Treatments</span>
               </div>
               {ownerServicesCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-owner-services-badge"
-                  count={ownerServicesCount}
-                  variant={activeTab === 'owner-services' ? 'white' : 'purple'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-services'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerServicesCount}</span>
+                </span>
               )}
             </button>
 
@@ -625,12 +689,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Staff & Artists Roster</span>
               </div>
               {ownerStaffCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-owner-staff-badge"
-                  count={ownerStaffCount}
-                  variant={activeTab === 'owner-staff' ? 'white' : 'purple'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                    activeTab === 'owner-staff'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 text-purple-800'
+                  }`}
+                >
+                  <span>{ownerStaffCount}</span>
+                </span>
               )}
             </button>
 
@@ -658,19 +726,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
                       <Package className="w-4 h-4 text-purple-600 shrink-0" />
+                      {hasPendingOrders && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-1 ring-white"></span>
+                        </span>
+                      )}
                     </div>
                     <span className="truncate">Products & Stock</span>
                   </div>
                   {countToShow > 0 && (
-                    <NotificationBadge
+                    <span
                       id="sidebar-owner-inventory-badge"
-                      count={hasPendingOrders ? `${countToShow} orders` : countToShow}
-                      variant={activeTab === 'owner-inventory' ? 'white' : 'emerald'}
-                      priority={hasPendingOrders ? 'urgent' : 'normal'}
-                      isUnread={hasPendingOrders && categoryUnread.cart}
-                      showPing={true}
-                      size="sm"
-                    />
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                        activeTab === 'owner-inventory'
+                          ? 'bg-white/20 text-white'
+                          : hasPendingOrders
+                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-600/25 ring-1 ring-emerald-400/30'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {hasPendingOrders && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                      )}
+                      <span>{hasPendingOrders ? `${countToShow} orders` : countToShow}</span>
+                    </span>
                   )}
                 </button>
               );
@@ -694,12 +774,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Store Location & Map</span>
               </div>
               {ownerSalonsCount > 0 && (
-                <NotificationBadge
+                <span
                   id="sidebar-owner-location-badge"
-                  label="GPS"
-                  variant={activeTab === 'owner-location' ? 'white' : 'purple'}
-                  size="sm"
-                />
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    activeTab === 'owner-location'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-50 text-purple-700 border border-purple-200'
+                  }`}
+                >
+                  <span>GPS</span>
+                </span>
               )}
             </button>
 
@@ -720,12 +804,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Salon Profile & Hours</span>
               </div>
-              <NotificationBadge
+              <span
                 id="sidebar-owner-hours-badge"
-                label="7D"
-                variant={activeTab === 'owner-settings' ? 'white' : 'emerald'}
-                size="sm"
-              />
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  activeTab === 'owner-settings'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}
+              >
+                <span>7D</span>
+              </span>
             </button>
 
             {/* My Account Profile */}
@@ -744,12 +832,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">My Account Profile</span>
               </div>
-              <NotificationBadge
+              <span
                 id="sidebar-owner-profile-badge"
-                label="OWNER"
-                variant={activeTab === 'profile' ? 'white' : 'purple'}
-                size="sm"
-              />
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  activeTab === 'profile'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-purple-50 text-purple-800 border border-purple-200'
+                }`}
+              >
+                OWNER
+              </span>
             </button>
           </div>
         </div>
@@ -929,20 +1021,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative flex items-center justify-center shrink-0">
                         <CalendarCheck className="w-4 h-4 text-pink-600 shrink-0" />
+                        {hasActiveBookings && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-1 ring-white"></span>
+                          </span>
+                        )}
                       </div>
                       <span className="truncate">My Bookings</span>
                     </div>
 
                     {bookingsCount > 0 && (
-                      <NotificationBadge
+                      <span
                         id="sidebar-bookings-badge"
-                        count={bookingsCount}
-                        variant={activeTab === 'customer-dashboard' ? 'white' : 'pink'}
-                        priority="normal"
-                        isUnread={unreadBookingsCount > 0}
-                        showPing={true}
-                        size="sm"
-                      />
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                          hasActiveBookings
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-pink-500/25 ring-1 ring-pink-400/30'
+                            : 'bg-pink-100 text-pink-800'
+                        }`}
+                      >
+                        {hasActiveBookings && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                        )}
+                        <span>{bookingsCount}</span>
+                      </span>
                     )}
                   </button>
                 );
@@ -969,20 +1071,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative flex items-center justify-center shrink-0">
                         <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
+                        {hasActiveOrders && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-1 ring-white"></span>
+                          </span>
+                        )}
                       </div>
                       <span className="truncate">Reserved Orders</span>
                     </div>
 
                     {ordersCount > 0 && (
-                      <NotificationBadge
+                      <span
                         id="sidebar-orders-badge"
-                        count={ordersCount}
-                        variant={activeTab === 'customer-orders' ? 'white' : 'emerald'}
-                        priority="normal"
-                        isUnread={unreadOrdersCount > 0}
-                        showPing={true}
-                        size="sm"
-                      />
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                          hasActiveOrders
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-600/25 ring-1 ring-emerald-400/30'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {hasActiveOrders && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span>
+                        )}
+                        <span>{ordersCount}</span>
+                      </span>
                     )}
                   </button>
                 );
@@ -1005,12 +1117,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="truncate">Favorite Salons</span>
                 </div>
                 {favoritesCount > 0 && (
-                  <NotificationBadge
+                  <span
                     id="sidebar-favorites-badge"
-                    count={favoritesCount}
-                    variant={activeTab === 'favorites' ? 'white' : 'pink'}
-                    size="sm"
-                  />
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold transition-all shadow-2xs ${
+                      activeTab === 'favorites'
+                        ? 'bg-pink-600 text-white'
+                        : 'bg-pink-100 text-pink-700'
+                    }`}
+                  >
+                    <span>{favoritesCount}</span>
+                  </span>
                 )}
               </button>
 
