@@ -483,11 +483,11 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
 
       {/* Broadcast Promo Modal */}
       {showBroadcastModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-rose-100">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-rose-600" />
-              Broadcast Promo to Registered Customers
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-rose-100 my-auto max-h-[92vh] overflow-y-auto">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-rose-600 shrink-0" />
+              <span className="truncate">Broadcast Promo to Registered Customers</span>
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               Dispatch live promotional news and discount updates directly to client email accounts.

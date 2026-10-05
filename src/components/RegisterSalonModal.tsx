@@ -71,28 +71,28 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-pink-100">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-4 sm:p-6 max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-pink-100 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
               <Store className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-lg text-gray-900">List Your Salon</h3>
-              <p className="text-xs text-gray-500">Join our verified beauty network</p>
+            <div className="min-w-0">
+              <h3 className="font-serif font-bold text-base sm:text-lg text-gray-900 truncate">List Your Salon</h3>
+              <p className="text-[11px] sm:text-xs text-gray-500 truncate">Join our verified beauty network</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer"
+            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {done ? (
-          <div className="py-10 text-center space-y-3">
+          <div className="py-8 sm:py-10 text-center space-y-3 overflow-y-auto flex-1 min-h-0">
             <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8" />
             </div>
@@ -100,7 +100,7 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
             <p className="text-xs text-gray-500">Your studio is now live on the marketplace.</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
+          <form onSubmit={handleSubmit} className="mt-3 sm:mt-4 space-y-3 sm:space-y-3.5 overflow-y-auto flex-1 min-h-0 pr-0.5">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
                 Salon Business Name
@@ -115,7 +115,7 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
                   Category

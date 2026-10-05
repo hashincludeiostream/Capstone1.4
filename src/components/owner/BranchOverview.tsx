@@ -483,14 +483,14 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
       )}
 
       {editingSalon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={handleSaveSettings} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between border-b border-purple-100 pb-4">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Branch Settings</h3>
-                <p className="text-xs text-gray-500">Update {editingSalon.salon_name}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-y-auto">
+          <form onSubmit={handleSaveSettings} className="w-full max-w-lg rounded-2xl bg-white p-4 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto my-auto">
+            <div className="mb-4 sm:mb-5 flex items-center justify-between border-b border-purple-100 pb-3 sm:pb-4">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">Branch Settings</h3>
+                <p className="text-xs text-gray-500 truncate">Update {editingSalon.salon_name}</p>
               </div>
-              <button type="button" onClick={() => setEditingSalon(null)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Close branch settings">
+              <button type="button" onClick={() => setEditingSalon(null)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100 shrink-0 ml-2" aria-label="Close branch settings">
                 <span className="text-lg leading-none">&times;</span>
               </button>
             </div>

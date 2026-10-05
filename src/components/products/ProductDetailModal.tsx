@@ -124,7 +124,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative text-left"
+        className="bg-white rounded-2xl sm:rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative text-left max-h-[92vh] overflow-y-auto"
       >
         {/* Prominent High-Contrast Close Button */}
         <button
@@ -132,14 +132,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           onClick={onClose}
           aria-label="Close product details (Escape)"
           title="Close (Esc)"
-          className="absolute top-3.5 right-3.5 z-30 w-10 h-10 rounded-full bg-white/95 hover:bg-white text-stone-700 hover:text-stone-950 border border-stone-200/90 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-105 active:scale-95"
+          className="absolute top-3.5 right-3.5 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-stone-700 hover:text-stone-950 border border-stone-200/90 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-105 active:scale-95"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Left Column: Product Image & Badges */}
-          <div className="relative bg-stone-100 flex items-center justify-center min-h-[300px] md:min-h-[420px]">
+          <div className="relative bg-stone-100 flex items-center justify-center h-48 sm:h-64 md:h-auto md:min-h-[420px]">
             <img
               src={product.image_url || 'https://images.unsplash.com/photo-1608248597359-0a62377c08fe?w=600&auto=format&fit=crop&q=80'}
               alt={product.name}
@@ -147,84 +147,84 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               className="w-full h-full object-cover"
             />
             
-            <div className="absolute top-4 left-4 flex flex-col gap-2">
-              <span className="px-3 py-1 rounded-full bg-stone-900/90 text-white text-xs font-semibold backdrop-blur-xs">
+            <div className="absolute top-3 sm:top-4 left-3 sm:left-4 flex flex-col gap-1.5 sm:gap-2">
+              <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-stone-900/90 text-white text-[11px] sm:text-xs font-semibold backdrop-blur-xs">
                 {product.category}
               </span>
               {isOutOfStock ? (
-                <span className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold uppercase tracking-wider">
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-red-600 text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
                   Out of Stock
                 </span>
               ) : isLowStock ? (
-                <span className="px-2.5 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-amber-500 text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs">
                   <AlertTriangle className="w-3 h-3" />
                   Only {product.stock_quantity} left
                 </span>
               ) : (
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold uppercase tracking-wider">
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-emerald-600 text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
                   In Stock ({product.stock_quantity})
                 </span>
               )}
             </div>
 
             {product.sku && (
-              <div className="absolute bottom-4 left-4 px-2.5 py-1 rounded-md bg-white/90 text-stone-600 font-mono text-[10px] backdrop-blur-xs">
+              <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md bg-white/90 text-stone-600 font-mono text-[9px] sm:text-[10px] backdrop-blur-xs">
                 SKU: {product.sku}
               </div>
             )}
           </div>
 
           {/* Right Column: Details & Actions */}
-          <div className="p-6 md:p-7 flex flex-col justify-between space-y-5">
+          <div className="p-4 sm:p-6 md:p-7 flex flex-col justify-between space-y-4 sm:space-y-5 min-w-0">
             <div className="space-y-3">
               {/* Salon Provider Info */}
-              <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-pink-700">
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>{product.salon_name || 'Verified Salon'}</span>
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-pink-700 truncate">
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{product.salon_name || 'Verified Salon'}</span>
                 </div>
                 {product.salon_city && (
-                  <div className="flex items-center gap-1 text-[11px] text-stone-500">
-                    <MapPin className="w-3 h-3" />
-                    <span>Available at {product.salon_city} Studio</span>
+                  <div className="flex items-center gap-1 text-[11px] text-stone-500 truncate">
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    <span className="truncate">Available at {product.salon_city} Studio</span>
                   </div>
                 )}
               </div>
 
               {/* Product Title */}
-              <h2 id="product-modal-title" className="text-xl font-bold text-stone-900 font-serif leading-snug">
+              <h2 id="product-modal-title" className="text-lg sm:text-xl font-bold text-stone-900 font-serif leading-snug break-words">
                 {product.name}
               </h2>
 
               {/* Volume & Ratings */}
-              <div className="flex items-center gap-3 text-xs text-stone-600">
+              <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-stone-600 flex-wrap">
                 {product.volume_or_size && (
                   <div className="flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5 text-stone-400" />
+                    <Package className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                     <span className="font-medium">{product.volume_or_size}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md font-semibold">
-                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md font-semibold text-[11px] sm:text-xs">
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                   <span>{product.rating || '4.9'} ({product.review_count || 24} reviews)</span>
                 </div>
               </div>
 
               {/* Price & Available Stock Card */}
-              <div className="pt-2 space-y-3">
+              <div className="pt-1 sm:pt-2 space-y-2.5 sm:space-y-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <span className="text-xs text-stone-400 block font-sans">Physical Store Settlement Price</span>
-                    <div className="text-2xl font-black text-stone-900">
+                    <span className="text-[11px] sm:text-xs text-stone-400 block font-sans">Physical Store Settlement Price</span>
+                    <div className="text-xl sm:text-2xl font-black text-stone-900">
                       ₱{product.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 block">
+                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-stone-400 block">
                       Salon Inventory
                     </span>
-                    <span className={`text-sm font-black inline-flex items-center gap-1 ${
+                    <span className={`text-xs sm:text-sm font-black inline-flex items-center gap-1 ${
                       isOutOfStock
                         ? 'text-red-600'
                         : isLowStock
@@ -233,17 +233,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     }`}>
                       {isOutOfStock ? (
                         <>
-                          <XCircle className="w-3.5 h-3.5" />
+                          <XCircle className="w-3.5 h-3.5 shrink-0" />
                           <span>0 units</span>
                         </>
                       ) : isLowStock ? (
                         <>
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                           <span>{product.stock_quantity} left</span>
                         </>
                       ) : (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           <span>{product.stock_quantity} available</span>
                         </>
                       )}
@@ -252,17 +252,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
 
                 {/* Available Stock Box */}
-                <div className={`p-3 rounded-2xl border flex flex-col gap-2 ${
+                <div className={`p-2.5 sm:p-3 rounded-2xl border flex flex-col gap-2 ${
                   isOutOfStock
                     ? 'bg-red-50/60 border-red-200 text-red-900'
                     : isLowStock
                     ? 'bg-amber-50/80 border-amber-200 text-amber-900'
                     : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
                 }`}>
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between text-xs flex-wrap gap-1">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                       <Package className="w-4 h-4 shrink-0" />
-                      <span className="font-bold">
+                      <span className="font-bold truncate">
                         {isOutOfStock
                           ? 'Sold Out at this Location'
                           : isLowStock
@@ -270,7 +270,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           : `Available Stock: ${product.stock_quantity} unit${product.stock_quantity !== 1 ? 's' : ''} in store`}
                       </span>
                     </div>
-                    <span className="text-[11px] font-semibold opacity-80">
+                    <span className="text-[10px] sm:text-[11px] font-semibold opacity-80 shrink-0">
                       {isOutOfStock ? '0 in stock' : `${product.stock_quantity} in salon stock`}
                     </span>
                   </div>
@@ -296,16 +296,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
 
               {/* Description */}
-              <div className="text-xs text-stone-600 leading-relaxed max-h-32 overflow-y-auto pr-1">
+              <div className="text-xs text-stone-600 leading-relaxed max-h-24 sm:max-h-32 overflow-y-auto pr-1">
                 {product.description || 'Authentic salon-grade formulation recommended by certified nail artists.'}
               </div>
 
               {/* In-Store Settlement Clarity Notice */}
-              <div className="p-3 rounded-xl bg-pink-50/60 border border-pink-100 flex items-start gap-2.5 text-xs text-stone-700">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-pink-50/60 border border-pink-100 flex items-start gap-2 text-xs text-stone-700">
                 <ShieldCheck className="w-4 h-4 text-pink-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold text-stone-900 block">No Online Payment Required</span>
-                  <p className="text-[11px] text-stone-600 mt-0.5">
+                <div className="min-w-0">
+                  <span className="font-bold text-stone-900 block truncate">No Online Payment Required</span>
+                  <p className="text-[10px] sm:text-[11px] text-stone-600 mt-0.5 leading-relaxed">
                     Your reservation guarantees item availability. Inspect the product and pay directly in cash or card when collecting at the salon front desk.
                   </p>
                 </div>
@@ -313,33 +313,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
 
             {/* Quantity Selector & Action Buttons */}
-            <div className="space-y-3 pt-3 border-t border-stone-100">
+            <div className="space-y-3 pt-2 sm:pt-3 border-t border-stone-100">
               {!isOutOfStock && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-stone-700">Quantity to Reserve:</span>
-                    <span className="text-[11px] text-stone-500 font-medium">
+                    <span className="text-[10px] sm:text-[11px] text-stone-500 font-medium">
                       (Max {product.stock_quantity} available)
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden bg-stone-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden bg-stone-50 shrink-0">
                       <button
                         onClick={handleDecrement}
                         disabled={quantity <= 1}
-                        className="p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
+                        className="p-1.5 sm:p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
                         title="Decrease quantity"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-4 py-1 text-xs font-bold text-stone-900 min-w-[2.5rem] text-center">
+                      <span className="px-3 sm:px-4 py-1 text-xs font-bold text-stone-900 min-w-[2rem] sm:min-w-[2.5rem] text-center">
                         {quantity}
                       </span>
                       <button
                         onClick={handleIncrement}
                         disabled={quantity >= product.stock_quantity}
-                        className="p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
+                        className="p-1.5 sm:p-2 hover:bg-stone-200 text-stone-600 disabled:opacity-30 cursor-pointer"
                         title={quantity >= product.stock_quantity ? `Reached all ${product.stock_quantity} units available` : 'Increase quantity'}
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -347,32 +347,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </div>
 
                     {quantity >= product.stock_quantity && (
-                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1">
+                      <span className="text-[10px] sm:text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 sm:py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 truncate">
                         <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                        <span>All {product.stock_quantity} available units selected</span>
+                        <span className="truncate">All {product.stock_quantity} selected</span>
                       </span>
                     )}
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="py-3 px-3.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
+                  className="py-2.5 sm:py-3 px-3 sm:px-3.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1"
                   title="Close product details"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Back</span>
-                  <span className="sm:hidden">Close</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleAdd}
                   disabled={isOutOfStock}
-                  className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  className={`flex-1 min-w-0 py-2.5 sm:py-3 px-2.5 sm:px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer truncate ${
                     isOutOfStock
                       ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
                       : addedSuccess
@@ -384,18 +383,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 >
                   {addedSuccess ? (
                     <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Added to Cart!</span>
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span className="truncate">Added to Cart!</span>
                     </>
                   ) : !isCustomer ? (
                     <>
-                      <Lock className="w-4 h-4 text-pink-600" />
-                      <span>Sign In to Add</span>
+                      <Lock className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+                      <span className="truncate">Sign In</span>
                     </>
                   ) : (
                     <>
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>{isOutOfStock ? 'Sold Out' : 'Add to Cart'}</span>
+                      <ShoppingBag className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{isOutOfStock ? 'Sold Out' : 'Add to Cart'}</span>
                     </>
                   )}
                 </button>
@@ -403,10 +402,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {!isOutOfStock && (
                   <button
                     onClick={handleReserveNow}
-                    className="flex-1 py-3 px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
+                    className="flex-1 min-w-0 py-2.5 sm:py-3 px-2.5 sm:px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 truncate"
                   >
-                    {!isCustomer && <Lock className="w-3.5 h-3.5" />}
-                    <span>{isCustomer ? 'Reserve for Pickup' : 'Sign In to Reserve'}</span>
+                    {!isCustomer && <Lock className="w-3.5 h-3.5 shrink-0" />}
+                    <span className="truncate">{isCustomer ? 'Reserve' : 'Sign In'}</span>
                   </button>
                 )}
               </div>

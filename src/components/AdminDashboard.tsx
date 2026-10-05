@@ -1565,16 +1565,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* MODAL: CREATE / EDIT ANNOUNCEMENT                    */}
       {/* ---------------------------------------------------- */}
       {announcementModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-pink-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-lg w-full shadow-2xl border border-pink-100 space-y-4 my-auto max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-lg font-serif font-bold text-gray-900 flex items-center gap-2">
-                <Megaphone className="w-5 h-5 text-rose-700" />
-                <span>{editingAnnouncement ? 'Edit Announcement Broadcast' : 'Publish New Site Broadcast'}</span>
+              <h3 className="text-base sm:text-lg font-serif font-bold text-gray-900 flex items-center gap-2 min-w-0">
+                <Megaphone className="w-5 h-5 text-rose-700 shrink-0" />
+                <span className="truncate">{editingAnnouncement ? 'Edit Announcement Broadcast' : 'Publish New Site Broadcast'}</span>
               </h3>
               <button
                 onClick={() => setAnnouncementModalOpen(false)}
-                className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 shrink-0 ml-2"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1682,16 +1682,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* MODAL: PROVISION NEW USER                           */}
       {/* ---------------------------------------------------- */}
       {newUserModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-pink-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl border border-pink-100 space-y-4 my-auto max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-lg font-serif font-bold text-gray-900 flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-rose-700" />
-                <span>Provision User Account</span>
+              <h3 className="text-base sm:text-lg font-serif font-bold text-gray-900 flex items-center gap-2 min-w-0">
+                <UserCheck className="w-5 h-5 text-rose-700 shrink-0" />
+                <span className="truncate">Provision User Account</span>
               </h3>
               <button
                 onClick={() => setNewUserModalOpen(false)}
-                className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 shrink-0 ml-2"
               >
                 <X className="w-5 h-5" />
               </button>

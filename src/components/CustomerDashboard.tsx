@@ -445,11 +445,11 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         {previewImage && (
           <div
             id="customer-inspo-lightbox-modal"
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
             onClick={() => setPreviewImage(null)}
           >
             <div
-              className="relative max-w-lg w-full bg-white rounded-2xl p-4 shadow-2xl border border-pink-200 animate-in fade-in zoom-in-95 duration-150"
+              className="relative max-w-lg w-full bg-white rounded-2xl p-3 sm:p-4 shadow-2xl border border-pink-200 animate-in fade-in zoom-in-95 duration-150 my-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between pb-3 border-b border-pink-100">

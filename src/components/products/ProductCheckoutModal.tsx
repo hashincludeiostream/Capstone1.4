@@ -151,19 +151,19 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative text-left"
+        className="bg-white rounded-2xl sm:rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative text-left max-h-[92vh] flex flex-col"
       >
         {/* Modal Header */}
-        <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/50">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
+        <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/50 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
               <Store className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-stone-900">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-stone-900 truncate">
                 {confirmedOrder ? 'Reservation Confirmed' : 'Reserve In-Store Pickup'}
               </h2>
-              <p className="text-xs text-stone-500">
+              <p className="text-[11px] sm:text-xs text-stone-500 truncate">
                 {confirmedOrder
                   ? `Order #${confirmedOrder.order_number}`
                   : 'Physical store settlement with zero upfront fees'}
@@ -173,7 +173,7 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer shrink-0 ml-2"
           >
             <X className="w-5 h-5" />
           </button>
@@ -182,7 +182,7 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
         {/* Content Body */}
         {confirmedOrder ? (
           /* Confirmation / Receipt View */
-          <div className="p-6 md:p-8 space-y-6">
+          <div className="p-5 sm:p-6 md:p-8 space-y-5 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
             <div className="text-center space-y-3">
               <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm animate-bounce duration-1000">
                 <CheckCircle2 className="w-8 h-8" />
@@ -272,7 +272,7 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
           </div>
         ) : (
           /* Checkout Reservation Form */
-          <form onSubmit={handleSubmit} className="p-6 md:p-7 space-y-5">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-7 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0">
             {errorMsg && (
               <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 text-xs text-red-700">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -492,11 +492,11 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
             </label>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-semibold cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-semibold cursor-pointer text-center"
               >
                 Cancel
               </button>
@@ -504,7 +504,7 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {submitting ? (
                   <>

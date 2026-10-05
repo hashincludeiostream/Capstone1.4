@@ -304,18 +304,18 @@ export const ReelsView: React.FC<ReelsViewProps> = ({
       {/* Comments Drawer / Modal */}
       {activeReelComments && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-pink-100">
+          <div className="bg-white w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh] border border-pink-100 my-auto">
             {/* Header */}
-            <div className="p-4 border-b border-pink-100 flex items-center justify-between bg-pink-50/50">
-              <div>
-                <h4 className="font-serif font-bold text-base text-gray-900">
-                  Reel Discussion & Inspo
+            <div className="p-3.5 sm:p-4 border-b border-pink-100 flex items-center justify-between bg-pink-50/50 shrink-0">
+              <div className="min-w-0 pr-2">
+                <h4 className="font-serif font-bold text-sm sm:text-base text-gray-900 truncate">
+                  Reel Discussion &amp; Inspo
                 </h4>
-                <p className="text-xs text-gray-500">{activeReelComments.title}</p>
+                <p className="text-xs text-gray-500 truncate">{activeReelComments.title}</p>
               </div>
               <button
                 onClick={() => setActiveReelComments(null)}
-                className="text-gray-400 hover:text-gray-700 text-sm font-semibold p-1"
+                className="text-gray-400 hover:text-gray-700 text-sm font-semibold p-1 shrink-0 cursor-pointer"
               >
                 ✕
               </button>

@@ -891,16 +891,16 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
 
       {/* Waive Late Fee Modal Dialog */}
       {waiveTargetAppt && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-stone-100 space-y-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-stone-100 space-y-4 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div className="flex items-center gap-2 text-purple-900 font-bold text-base">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-                <span>Waive Late Cancellation Fee</span>
+              <div className="flex items-center gap-2 text-purple-900 font-bold text-base min-w-0">
+                <Sparkles className="w-5 h-5 text-purple-600 shrink-0" />
+                <span className="truncate">Waive Late Cancellation Fee</span>
               </div>
               <button
                 onClick={() => setWaiveTargetAppt(null)}
-                className="p-1 rounded-full text-stone-400 hover:text-stone-700"
+                className="p-1 rounded-full text-stone-400 hover:text-stone-700 shrink-0 ml-2"
               >
                 <X className="w-5 h-5" />
               </button>

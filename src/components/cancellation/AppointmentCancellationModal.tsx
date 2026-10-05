@@ -117,31 +117,31 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-pink-700 p-6 text-white relative">
+        <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-pink-700 p-4 sm:p-6 text-white relative shrink-0">
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors"
+            className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center space-x-2 text-rose-100 text-xs font-semibold tracking-wider uppercase mb-1">
-            <ShieldAlert className="w-4 h-4" />
-            <span>Store Schedule Protection & Cancellation</span>
+          <div className="flex items-center space-x-2 text-rose-100 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-1">
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span className="truncate">Store Schedule Protection & Cancellation</span>
           </div>
 
-          <h3 className="text-xl font-bold">Cancel Salon Appointment</h3>
-          <p className="text-rose-100 text-sm mt-1">
+          <h3 className="text-lg sm:text-xl font-bold truncate">Cancel Salon Appointment</h3>
+          <p className="text-rose-100 text-xs sm:text-sm mt-0.5 truncate">
             Step {step} of 3: {step === 1 ? 'Schedule Impact & Policy' : step === 2 ? 'Reason for Cancellation' : 'Final Review & Sanctions'}
           </p>
 
           {/* Stepper Dots */}
-          <div className="flex items-center space-x-2 mt-4">
+          <div className="flex items-center space-x-2 mt-3 sm:mt-4">
             <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? 'bg-white' : 'bg-white/30'}`} />
             <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? 'bg-white' : 'bg-white/30'}`} />
             <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? 'bg-white' : 'bg-white/30'}`} />
@@ -149,7 +149,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 pr-1">
           {errorMsg && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-2.5 text-rose-800 text-sm">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -410,13 +410,13 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+        <div className="p-3 sm:p-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
           {step > 1 ? (
             <button
               type="button"
               disabled={isSubmitting}
               onClick={handleBack}
-              className="py-2 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+              className="py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
@@ -426,7 +426,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
               type="button"
               disabled={isSubmitting}
               onClick={onClose}
-              className="py-2 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold transition-colors"
+              className="py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold transition-colors cursor-pointer text-center"
             >
               Keep My Booking
             </button>
@@ -436,7 +436,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
             <button
               type="button"
               onClick={handleNext}
-              className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors"
+              className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
               <span>Continue to Next Step</span>
               <ArrowRight className="w-4 h-4" />
@@ -446,7 +446,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
               type="button"
               disabled={!acknowledgedPolicy || isSubmitting}
               onClick={handleCancelSubmit}
-              className={`py-2.5 px-5 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center space-x-1.5 transition-all ${
+              className={`py-2.5 px-5 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 !acknowledgedPolicy || isSubmitting
                   ? 'bg-rose-300 cursor-not-allowed'
                   : 'bg-rose-700 hover:bg-rose-800'
@@ -460,7 +460,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
               ) : (
                 <>
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Confirm Cancellation & Impose Sanctions</span>
+                  <span className="truncate">Confirm Cancellation &amp; Impose Sanctions</span>
                 </>
               )}
             </button>

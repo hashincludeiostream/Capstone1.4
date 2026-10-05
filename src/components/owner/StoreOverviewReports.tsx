@@ -2194,16 +2194,16 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
       {/* Offer Promo Modal */}
       {promoModalClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-pink-100 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl border border-pink-100 space-y-4 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-purple-900">
-                <Sparkles className="w-5 h-5 text-pink-600" />
-                <h4 className="font-serif font-bold text-lg">Send Exclusive VIP Promo</h4>
+              <div className="flex items-center gap-2 text-purple-900 min-w-0">
+                <Sparkles className="w-5 h-5 text-pink-600 shrink-0" />
+                <h4 className="font-serif font-bold text-base sm:text-lg truncate">Send Exclusive VIP Promo</h4>
               </div>
               <button
                 onClick={() => setPromoModalClient(null)}
-                className="text-gray-400 hover:text-gray-600 text-sm font-bold cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 text-sm font-bold cursor-pointer shrink-0 ml-2"
               >
                 ✕
               </button>

@@ -54,23 +54,23 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-pink-100">
-          <div>
-            <h3 className="font-serif font-bold text-lg text-gray-900">Leave a Review</h3>
-            <p className="text-xs text-pink-700 font-semibold">{salon.salon_name}</p>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-4 sm:p-6 max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-pink-100 shrink-0">
+          <div className="min-w-0">
+            <h3 className="font-serif font-bold text-base sm:text-lg text-gray-900 truncate">Leave a Review</h3>
+            <p className="text-xs text-pink-700 font-semibold truncate">{salon.salon_name}</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer"
+            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {submitted ? (
-          <div className="py-10 text-center space-y-3">
+          <div className="py-8 sm:py-10 text-center space-y-3 overflow-y-auto flex-1 min-h-0">
             <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8" />
             </div>
@@ -78,7 +78,7 @@ export const LeaveReviewModal: React.FC<LeaveReviewModalProps> = ({
             <p className="text-xs text-gray-500">Your review has been successfully published.</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <form onSubmit={handleSubmit} className="mt-3 sm:mt-4 space-y-3 sm:space-y-4 overflow-y-auto flex-1 min-h-0 pr-0.5">
             {technicianName && (
               <p className="rounded-xl bg-purple-50 p-2.5 text-center text-xs font-semibold text-purple-800">
                 Reviewing technician: {technicianName}

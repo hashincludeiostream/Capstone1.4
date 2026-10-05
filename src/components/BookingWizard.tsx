@@ -335,24 +335,26 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   }, [currentService?.price, paymentType]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-pink-100 max-h-[92vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-pink-100 max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               <CalendarIcon className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-base sm:text-lg">
+            <div className="min-w-0">
+              <h3 className="font-serif font-bold text-sm sm:text-lg truncate">
                 Book Your Nail Appointment
               </h3>
-              <p className="text-[11px] text-pink-100">Step {step} of 5 — {currentSalon?.salon_name}</p>
+              <p className="text-[10px] sm:text-[11px] text-pink-100 truncate">
+                Step {step} of 5 — {currentSalon?.salon_name}
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
@@ -360,48 +362,53 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
         {/* Stepper Progress Bar */}
         {step < 6 && (
-          <div className="px-4 sm:px-6 py-3 bg-pink-50/70 border-b border-pink-100 grid grid-cols-5 gap-1.5 text-center text-[11px] font-medium shrink-0">
+          <div className="px-2.5 sm:px-6 py-2.5 sm:py-3 bg-pink-50/70 border-b border-pink-100 grid grid-cols-5 gap-1 sm:gap-1.5 text-center text-[10px] sm:text-[11px] font-medium shrink-0 overflow-x-auto no-scrollbar">
             <div
-              className={`py-1 rounded-md transition-all ${
+              className={`py-1 px-1 rounded-md transition-all truncate ${
                 step >= 1 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
               }`}
             >
-              1. Service
+              <span className="sm:hidden">1. Svc</span>
+              <span className="hidden sm:inline">1. Service</span>
             </div>
             <div
-              className={`py-1 rounded-md transition-all ${
+              className={`py-1 px-1 rounded-md transition-all truncate ${
                 step >= 2 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
               }`}
             >
-              2. Date/Time
+              <span className="sm:hidden">2. Date</span>
+              <span className="hidden sm:inline">2. Date/Time</span>
             </div>
             <div
-              className={`py-1 rounded-md transition-all ${
+              className={`py-1 px-1 rounded-md transition-all truncate ${
                 step >= 3 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
               }`}
             >
-              3. Specialist
+              <span className="sm:hidden">3. Staff</span>
+              <span className="hidden sm:inline">3. Specialist</span>
             </div>
             <div
-              className={`py-1 rounded-md transition-all ${
+              className={`py-1 px-1 rounded-md transition-all truncate ${
                 step >= 4 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
               }`}
             >
-              4. Contact
+              <span className="sm:hidden">4. Info</span>
+              <span className="hidden sm:inline">4. Contact</span>
             </div>
             <div
-              className={`py-1 rounded-md transition-all ${
+              className={`py-1 px-1 rounded-md transition-all truncate ${
                 step >= 5 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
               }`}
             >
-              5. Payment
+              <span className="sm:hidden">5. Pay</span>
+              <span className="hidden sm:inline">5. Payment</span>
             </div>
           </div>
         )}
 
         {/* Inline Validation Alert */}
         {validationError && (
-          <div className="mx-6 mt-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 animate-in fade-in duration-150">
+          <div className="mx-4 sm:mx-6 mt-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 animate-in fade-in duration-150">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
             <span className="flex-1 font-medium">{validationError}</span>
             <button
@@ -415,10 +422,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         )}
 
         {/* Step Content */}
-        <div className="p-6 overflow-y-auto flex-1 bg-white">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 bg-white max-w-full">
           {/* STEP 1: SELECT SALON & SERVICE */}
           {step === 1 && (
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               {/* Salon Selection */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
@@ -427,7 +434,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <select
                   value={selectedSalonId}
                   onChange={(e) => setSelectedSalonId(Number(e.target.value))}
-                  className="w-full p-3 rounded-xl border border-pink-200 bg-pink-50/30 text-sm font-medium text-gray-900 focus:outline-pink-500"
+                  className="w-full p-2.5 sm:p-3 rounded-xl border border-pink-200 bg-pink-50/30 text-xs sm:text-sm font-medium text-gray-900 focus:outline-pink-500"
                 >
                   {salons.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -457,15 +464,15 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       <div
                         key={service.id}
                         onClick={() => setSelectedServiceId(service.id)}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                           selectedServiceId === service.id
                             ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20'
                             : 'border-pink-100 hover:border-pink-300 bg-white'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                           <div
-                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                               selectedServiceId === service.id
                                 ? 'border-pink-600 bg-pink-600 text-white'
                                 : 'border-gray-300'
@@ -475,26 +482,26 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                               <div className="w-2 h-2 bg-white rounded-full" />
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-gray-900">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                              <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                                 {service.service_name}
                               </p>
-                              <span className="text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.2 rounded-md">
+                              <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.2 rounded-md shrink-0">
                                 {service.category}
                               </span>
                             </div>
-                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
+                            <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5">
                               {service.description}
                             </p>
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="inline-block px-2.5 py-1 rounded-full bg-pink-100/80 text-pink-800 text-[11px] font-semibold">
+                          <span className="inline-block px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-pink-100/80 text-pink-800 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap">
                             Pay In-Store
                           </span>
-                          <p className="text-[11px] text-gray-400 mt-1">{service.duration} mins</p>
+                          <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">{service.duration} mins</p>
                         </div>
                       </div>
                     ))}
@@ -506,7 +513,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
           {/* STEP 2: DATE & TIME */}
           {step === 2 && (
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
                   Select Appointment Date
@@ -516,7 +523,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   min={new Date().toISOString().split('T')[0]}
                   value={appointmentDate}
                   onChange={(e) => setAppointmentDate(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-pink-200 bg-pink-50/30 text-sm font-medium text-gray-900 focus:outline-pink-500"
+                  className="w-full p-2.5 sm:p-3 rounded-xl border border-pink-200 bg-pink-50/30 text-xs sm:text-sm font-medium text-gray-900 focus:outline-pink-500"
                 />
               </div>
 
@@ -529,19 +536,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                     No available slots for this date. Choose another date.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                     {availableTimeSlots.map((time) => (
                     <button
                       key={time}
                       type="button"
                       onClick={() => setAppointmentTime(time)}
-                      className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         appointmentTime === time
                           ? 'bg-pink-600 text-white border-pink-600 shadow-xs'
                           : 'bg-white text-gray-700 border-pink-100 hover:border-pink-300 hover:bg-pink-50/50'
                       }`}
                     >
-                      <Clock className="w-3.5 h-3.5" />
+                      <Clock className="w-3.5 h-3.5 shrink-0" />
                       <span>{time}</span>
                     </button>
                     ))}
@@ -549,9 +556,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 )}
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-pink-50 border border-pink-100 text-xs text-pink-900 flex items-center gap-2">
+              <div className="p-3 sm:p-3.5 rounded-2xl bg-pink-50 border border-pink-100 text-xs text-pink-900 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-pink-600 shrink-0" />
-                <span>
+                <span className="min-w-0">
                   Estimated duration for {currentService?.service_name}:{' '}
                   <strong>{currentService?.duration} minutes</strong>
                 </span>
@@ -575,23 +582,23 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 {/* Any Available Option */}
                 <div
                   onClick={() => setSelectedStaffId(null)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                  className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                     selectedStaffId === null
                       ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20'
                       : 'border-pink-100 hover:border-pink-300 bg-white'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-700 font-bold flex items-center justify-center">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-700 font-bold flex items-center justify-center shrink-0">
                       <Sparkles className="w-5 h-5" />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-900">Any Available Specialist</p>
-                      <p className="text-xs text-gray-500">First available certified technician</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">Any Available Specialist</p>
+                      <p className="text-[11px] sm:text-xs text-gray-500 truncate">First available certified technician</p>
                     </div>
                   </div>
                   <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                       selectedStaffId === null
                         ? 'border-pink-600 bg-pink-600 text-white'
                         : 'border-gray-300'
@@ -606,33 +613,33 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   <div
                     key={tech.id}
                     onClick={() => setSelectedStaffId(tech.id)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                    className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                       selectedStaffId === tech.id
                         ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20'
                         : 'border-pink-100 hover:border-pink-300 bg-white'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       {tech.avatar ? (
                         <img
                           src={tech.avatar}
                           alt={tech.name}
-                          className="w-10 h-10 rounded-full object-cover border border-pink-200"
+                          className="w-10 h-10 rounded-full object-cover border border-pink-200 shrink-0"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center border border-pink-200">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center border border-pink-200 shrink-0">
                           <span className="text-white text-xs font-bold">
                             {tech.name?.charAt(0).toUpperCase() || '?'}
                           </span>
                         </div>
                       )}
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{tech.name}</p>
-                        <p className="text-xs text-pink-700 font-medium">{tech.specialties}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{tech.name}</p>
+                        <p className="text-[11px] sm:text-xs text-pink-700 font-medium truncate">{tech.specialties}</p>
                       </div>
                     </div>
                     <div
-                      className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                         selectedStaffId === tech.id
                           ? 'border-pink-600 bg-pink-600 text-white'
                           : 'border-gray-300'
@@ -1214,7 +1221,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
         {/* Footer Navigation Buttons */}
         {step < 6 && (
-          <div className="p-4 bg-gray-50 border-t border-pink-100 flex items-center justify-between shrink-0">
+          <div className="p-3 sm:p-4 bg-gray-50 border-t border-pink-100 flex items-center justify-between gap-2 shrink-0">
             {step > 1 ? (
               <button
                 type="button"
@@ -1222,9 +1229,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   setValidationError(null);
                   setStep(step - 1);
                 }}
-                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors flex items-center gap-1 cursor-pointer"
+                className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Back</span>
               </button>
             ) : (
@@ -1256,23 +1263,23 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   }
                   setStep(step + 1);
                 }}
-                className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+                className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-sm cursor-pointer shrink-0"
               >
                 <span>Continue</span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             ) : (
               <button
                 type="button"
                 disabled={submitting}
                 onClick={handleSubmitBooking}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition-all shadow-md shadow-pink-500/20 flex items-center gap-2 cursor-pointer"
+                className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition-all shadow-md shadow-pink-500/20 flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
               >
                 {submitting ? (
-                  <span>Processing Payment & Booking...</span>
+                  <span>Processing...</span>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-4 h-4" />
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                     <span>
                       {paymentType === 'pay_at_salon'
                         ? 'Confirm Booking (Pay In-Salon)'

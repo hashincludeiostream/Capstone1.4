@@ -79,8 +79,8 @@ export default function ProfileCustomizationModal({
       : PRESET_AVATARS.customer;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-pink-100 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-2.5 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-pink-100 flex flex-col max-h-[92vh] my-auto">
         {/* Hidden file input */}
         <input
           type="file"
@@ -91,20 +91,20 @@ export default function ProfileCustomizationModal({
         />
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-700 p-5 text-white shrink-0">
+        <div className="bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-700 p-4 sm:p-5 text-white shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+                <User className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <h2 className="text-lg font-bold">Customize Your Profile</h2>
-                <p className="text-pink-100 text-xs">Set your photo & contact details</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-bold truncate">Customize Your Profile</h2>
+                <p className="text-pink-100 text-[11px] sm:text-xs truncate">Set your photo & contact details</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-2"
             >
               <X className="w-4 h-4" />
             </button>
@@ -112,7 +112,7 @@ export default function ProfileCustomizationModal({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 overflow-y-auto min-h-0 flex-1">
+        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto min-h-0 flex-1">
           {errorMsg && (
             <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
               {errorMsg}

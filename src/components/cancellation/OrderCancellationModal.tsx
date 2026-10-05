@@ -92,14 +92,14 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col my-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 p-6 text-white relative">
+        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 p-4 sm:p-6 text-white relative shrink-0">
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors"
+            className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -110,14 +110,14 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
             <span>Salon Retail Inventory</span>
           </div>
 
-          <h3 className="text-xl font-bold">Cancel Product Pickup Reservation</h3>
-          <p className="text-amber-100 text-sm mt-1">
+          <h3 className="text-lg sm:text-xl font-bold truncate pr-8">Cancel Product Reservation</h3>
+          <p className="text-amber-100 text-xs sm:text-sm mt-1">
             Step {step} of 2: {step === 1 ? 'Reason for Cancellation' : 'Release Reserved Inventory'}
           </p>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           {errorMsg && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-2 text-rose-800 text-xs">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
@@ -127,17 +127,17 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
 
           {/* Reserved Order Summary */}
           <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3.5 space-y-2 text-xs">
-            <div className="flex justify-between items-center text-amber-950 font-bold">
-              <span>Order #{order.id} • {order.salon_name}</span>
-              <span className="text-sm font-extrabold">₱{Number(order.total_amount || 0).toLocaleString()}</span>
+            <div className="flex justify-between items-center text-amber-950 font-bold gap-2">
+              <span className="truncate">Order #{order.id} • {order.salon_name}</span>
+              <span className="text-sm font-extrabold shrink-0">₱{Number(order.total_amount || 0).toLocaleString()}</span>
             </div>
             <div className="text-gray-600 space-y-1 pt-1 border-t border-amber-200/80">
               {items.map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center">
-                  <span>
+                <div key={idx} className="flex justify-between items-center gap-2">
+                  <span className="truncate">
                     {item.product_name} <span className="text-gray-400">×{item.quantity}</span>
                   </span>
-                  <span className="font-medium text-gray-800">
+                  <span className="font-medium text-gray-800 shrink-0">
                     ₱{(Number(item.price) * Number(item.quantity)).toLocaleString()}
                   </span>
                 </div>
@@ -233,13 +233,13 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+        <div className="p-3 sm:p-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
           {step === 2 ? (
             <button
               type="button"
               disabled={isSubmitting}
               onClick={handleBack}
-              className="py-2 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+              className="py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
@@ -249,7 +249,7 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
               type="button"
               disabled={isSubmitting}
               onClick={onClose}
-              className="py-2 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold transition-colors"
+              className="py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold transition-colors cursor-pointer text-center"
             >
               Keep My Reservation
             </button>
@@ -259,7 +259,7 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
             <button
               type="button"
               onClick={handleNext}
-              className="py-2.5 px-5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors"
+              className="py-2.5 px-5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
               <span>Continue</span>
               <ArrowRight className="w-4 h-4" />
@@ -269,7 +269,7 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
               type="button"
               disabled={!agreed || isSubmitting}
               onClick={handleSubmit}
-              className={`py-2.5 px-5 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center space-x-1.5 transition-all ${
+              className={`py-2.5 px-5 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 !agreed || isSubmitting
                   ? 'bg-amber-300 cursor-not-allowed'
                   : 'bg-amber-600 hover:bg-amber-700'
@@ -283,7 +283,7 @@ export const OrderCancellationModal: React.FC<OrderCancellationModalProps> = ({
               ) : (
                 <>
                   <PackageX className="w-4 h-4" />
-                  <span>Release Stock & Cancel</span>
+                  <span className="truncate">Release Stock &amp; Cancel</span>
                 </>
               )}
             </button>

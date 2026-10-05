@@ -93,11 +93,11 @@ export const AdminGateModal: React.FC<AdminGateModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md bg-stone-950 border border-rose-900/60 rounded-3xl p-6 sm:p-8 shadow-2xl text-white overflow-hidden"
+        className="relative w-full max-w-md bg-stone-950 border border-rose-900/60 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl text-white overflow-y-auto max-h-[92vh] my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Ambient background glow */}

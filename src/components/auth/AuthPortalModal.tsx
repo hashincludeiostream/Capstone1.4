@@ -22,20 +22,20 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
   onSelectPortal,
 }) => {
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8 relative">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-pink-100 p-4 sm:p-8 relative max-h-[92vh] overflow-y-auto my-auto">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+          className="absolute top-3.5 sm:top-5 right-3.5 sm:right-5 w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-colors cursor-pointer shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="text-center max-w-md mx-auto space-y-2">
+        <div className="text-center max-w-md mx-auto space-y-2 pt-2 sm:pt-0">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-600 via-rose-500 to-amber-300 text-white flex items-center justify-center mx-auto shadow-md shadow-pink-500/20">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h3 className="font-serif font-bold text-2xl text-gray-900">
+          <h3 className="font-serif font-bold text-xl sm:text-2xl text-gray-900">
             Choose Your Access Portal
           </h3>
           <p className="text-xs text-gray-500">
@@ -43,9 +43,9 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 mt-5 sm:mt-6">
           {/* 1. Customer Card */}
-          <div className="bg-gradient-to-b from-pink-50/80 to-rose-50/40 rounded-2xl p-5 border border-pink-200/80 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="bg-gradient-to-b from-pink-50/80 to-rose-50/40 rounded-2xl p-4 sm:p-5 border border-pink-200/80 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div>
               <div className="w-10 h-10 rounded-xl bg-pink-600 text-white flex items-center justify-center mb-3 shadow-xs">
                 <Heart className="w-5 h-5" />
@@ -58,7 +58,7 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
               </p>
             </div>
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-4 sm:mt-5 space-y-2">
               <button
                 id="portal-modal-customer-login-btn"
                 onClick={() => {
@@ -85,7 +85,7 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
           </div>
 
           {/* 2. Salon Owner Card */}
-          <div className="bg-gradient-to-b from-purple-50/80 to-indigo-50/40 rounded-2xl p-5 border border-purple-200/80 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="bg-gradient-to-b from-purple-50/80 to-indigo-50/40 rounded-2xl p-4 sm:p-5 border border-purple-200/80 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div>
               <div className="w-10 h-10 rounded-xl bg-purple-700 text-white flex items-center justify-center mb-3 shadow-xs">
                 <Store className="w-5 h-5" />
@@ -98,7 +98,7 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
               </p>
             </div>
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-4 sm:mt-5 space-y-2">
               <button
                 id="portal-modal-owner-login-btn"
                 onClick={() => {
@@ -125,7 +125,7 @@ export const AuthPortalModal: React.FC<AuthPortalModalProps> = ({
           </div>
         </div>
 
-        <div className="mt-6 pt-4 border-t border-pink-100 flex items-center justify-between text-xs text-gray-500">
+        <div className="mt-5 sm:mt-6 pt-3 sm:pt-4 border-t border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 text-center sm:text-left">
           <span>Need help choosing? Contact customer support</span>
           <button
             onClick={onClose}

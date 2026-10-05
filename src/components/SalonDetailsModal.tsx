@@ -317,58 +317,58 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                       No services listed yet for this salon.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      {salonData.services.map((service) => (
-                        <div
-                          key={service.id}
-                          className="p-3.5 rounded-2xl border border-pink-100 hover:border-pink-300 hover:bg-pink-50/30 transition-all flex gap-3 group justify-between"
-                        >
-                          <div className="flex gap-3">
-                            {service.image_url && (
-                              <img
-                                src={service.image_url}
-                                alt={service.service_name}
-                                className="w-16 h-16 rounded-xl object-cover shrink-0 border border-pink-100"
-                              />
-                            )}
-                            <div>
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <span className="text-xs font-bold text-pink-700 bg-pink-100 px-2 py-0.2 rounded-md">
-                                  {service.category}
-                                </span>
-                                {service.difficulty_level && (
-                                  <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-md">
-                                    {service.difficulty_level}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+                        {salonData.services.map((service) => (
+                          <div
+                            key={service.id}
+                            className="p-3 sm:p-3.5 rounded-2xl border border-pink-100 hover:border-pink-300 hover:bg-pink-50/30 transition-all flex gap-3 group justify-between items-center"
+                          >
+                            <div className="flex gap-2.5 sm:gap-3 min-w-0 flex-1 items-center">
+                              {service.image_url && (
+                                <img
+                                  src={service.image_url}
+                                  alt={service.service_name}
+                                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover shrink-0 border border-pink-100"
+                                />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                  <span className="text-[10px] sm:text-xs font-bold text-pink-700 bg-pink-100 px-1.5 sm:px-2 py-0.2 rounded-md shrink-0">
+                                    {service.category}
                                   </span>
-                                )}
-                              </div>
-                              <h5 className="text-sm font-semibold text-gray-900 group-hover:text-pink-700 transition-colors">
-                                {service.service_name}
-                              </h5>
-                              <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
-                                {service.description}
-                              </p>
-                              <div className="flex items-center gap-2 mt-2 text-xs font-medium text-gray-600">
-                                <span className="text-pink-700 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
-                                  Pay In-Store
-                                </span>
-                                <span>•</span>
-                                <span>{service.duration} mins</span>
+                                  {service.difficulty_level && (
+                                    <span className="text-[9px] sm:text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-md shrink-0">
+                                      {service.difficulty_level}
+                                    </span>
+                                  )}
+                                </div>
+                                <h5 className="text-xs sm:text-sm font-semibold text-gray-900 group-hover:text-pink-700 transition-colors truncate">
+                                  {service.service_name}
+                                </h5>
+                                <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5">
+                                  {service.description}
+                                </p>
+                                <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-[11px] sm:text-xs font-medium text-gray-600">
+                                  <span className="text-pink-700 font-semibold bg-pink-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-pink-100 shrink-0">
+                                    Pay In-Store
+                                  </span>
+                                  <span>•</span>
+                                  <span>{service.duration} mins</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex flex-col justify-end">
-                            <button
-                              onClick={() => onBookService(salon, service)}
-                              className="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
-                            >
-                              Book
-                            </button>
+                            <div className="flex flex-col justify-end shrink-0 pl-2">
+                              <button
+                                onClick={() => onBookService(salon, service)}
+                                className="px-3 sm:px-3.5 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+                              >
+                                Book
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
                   )}
                 </div>
               )}
@@ -390,41 +390,41 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                       No technicians listed currently.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {salonData.technicians.map((tech) => (
-                        <div
-                          key={tech.id}
-                          className="p-4 rounded-2xl border border-pink-100 bg-pink-50/20 flex gap-3.5 items-start"
-                        >
-                          {tech.avatar ? (
-                            <img
-                              src={tech.avatar}
-                              alt={tech.name}
-                              className="w-14 h-14 rounded-full object-cover border-2 border-pink-200 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center border-2 border-pink-200 shrink-0">
-                              <span className="text-sm font-bold">{tech.name?.charAt(0).toUpperCase()}</span>
-                            </div>
-                          )}
-                          <div>
-                            <h5 className="text-sm font-bold text-gray-900">{tech.name}</h5>
-                            <p className="text-xs text-pink-700 font-medium">
-                              {tech.experience_years} Years Experience
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1 font-medium">
-                              <span className="font-semibold text-gray-700">Specialties:</span>{' '}
-                              {tech.specialties}
-                            </p>
-                            {tech.bio && (
-                              <p className="text-xs text-gray-500 mt-1 italic leading-relaxed">
-                                "{tech.bio}"
-                              </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                        {salonData.technicians.map((tech) => (
+                          <div
+                            key={tech.id}
+                            className="p-3.5 sm:p-4 rounded-2xl border border-pink-100 bg-pink-50/20 flex gap-3 sm:gap-3.5 items-start min-w-0"
+                          >
+                            {tech.avatar ? (
+                              <img
+                                src={tech.avatar}
+                                alt={tech.name}
+                                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-pink-200 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center border-2 border-pink-200 shrink-0">
+                                <span className="text-sm font-bold">{tech.name?.charAt(0).toUpperCase()}</span>
+                              </div>
                             )}
+                            <div className="min-w-0 flex-1">
+                              <h5 className="text-sm font-bold text-gray-900 truncate">{tech.name}</h5>
+                              <p className="text-xs text-pink-700 font-medium">
+                                {tech.experience_years} Years Experience
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1 font-medium break-words">
+                                <span className="font-semibold text-gray-700">Specialties:</span>{' '}
+                                {tech.specialties}
+                              </p>
+                              {tech.bio && (
+                                <p className="text-xs text-gray-500 mt-1 italic leading-relaxed break-words line-clamp-3">
+                                  "{tech.bio}"
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
                   )}
                 </div>
               )}
@@ -432,8 +432,8 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
               {/* Reviews Tab */}
               {activeTab === 'reviews' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <h4 className="text-base font-serif font-bold text-gray-900">
                         Customer Feedback & Experiences
                       </h4>
@@ -443,7 +443,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                     </div>
                     <button
                       onClick={() => onOpenLeaveReview(salon)}
-                      className="px-3.5 py-1.5 rounded-xl border border-pink-300 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-colors cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-xl border border-pink-300 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
                     >
                       Write a Review
                     </button>
@@ -650,17 +650,17 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
       </div>
 
         {/* Modal Bottom CTA */}
-        <div className="p-4 bg-pink-50 border-t border-pink-100 flex items-center justify-between gap-3 shrink-0">
-          <div>
+        <div className="p-3.5 sm:p-4 bg-pink-50 border-t border-pink-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+          <div className="min-w-0">
             <p className="text-xs font-semibold text-gray-800">Ready to pamper your nails?</p>
             <p className="text-[11px] text-gray-500">Fast confirmation with instant calendar booking</p>
           </div>
           <button
             onClick={() => onBookService(salon)}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-semibold text-sm shadow-md shadow-pink-500/20 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-pink-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
-            <Calendar className="w-4 h-4" />
-            <span>Book with {salon.salon_name.split(' ')[0]}</span>
+            <Calendar className="w-4 h-4 shrink-0" />
+            <span className="truncate">Book with {salon.salon_name.split(' ')[0]}</span>
           </button>
         </div>
       </div>

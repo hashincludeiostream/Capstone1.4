@@ -59,49 +59,49 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
   const maxRevenue = Math.max(...reportData.periods.map((p) => p.totalRevenue), 1);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl border border-emerald-100 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2.5 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[92vh] shadow-2xl border border-emerald-100 flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="p-5 bg-gradient-to-r from-emerald-900 via-teal-950 to-slate-950 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-              <DollarSign className="w-5 h-5 text-emerald-300" />
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-900 via-teal-950 to-slate-950 text-white flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shrink-0">
+              <DollarSign className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-emerald-300" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-lg font-serif font-bold">
-                  Profit &amp; Revenue Financial Performance Report
+                <h3 className="text-base sm:text-lg font-serif font-bold truncate">
+                  Profit &amp; Revenue Report
                 </h3>
-                <span className="text-[10px] font-bold bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="text-[10px] font-bold bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                   {reportData.timeGrain} Report
                 </span>
               </div>
-              <p className="text-xs text-emerald-200/80 mt-0.5">
-                {reportData.salonName} • Official P&amp;L audit, cost breakdown, and net profit ledger
+              <p className="text-xs text-emerald-200/80 mt-0.5 truncate">
+                {reportData.salonName} • Official P&amp;L audit and net profit ledger
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-emerald-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-emerald-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-2"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Sub-header Controls: Time Grain Selector & Quick Actions */}
-        <div className="p-3.5 bg-gray-50 border-b border-gray-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+        <div className="p-3 sm:p-3.5 bg-gray-50 border-b border-gray-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
           {/* Grain Switcher */}
-          <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs">
-            <span className="text-[10px] font-bold text-gray-400 uppercase px-2">Grain:</span>
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs overflow-x-auto">
+            <span className="text-[10px] font-bold text-gray-400 uppercase px-1.5 sm:px-2 shrink-0">Grain:</span>
             {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((grain) => (
               <button
                 key={grain}
                 onClick={() => {
                   if (onTimeGrainChange) onTimeGrainChange(grain);
                 }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                className={`px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer shrink-0 ${
                   reportData.timeGrain === grain
                     ? 'bg-emerald-700 text-white shadow-2xs'
                     : 'text-gray-600 hover:bg-gray-100'
@@ -113,65 +113,56 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
           </div>
 
           {/* Tab buttons */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setActiveTab('statement')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'statement'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              P&amp;L Statement
-            </button>
-            <button
-              onClick={() => setActiveTab('visuals')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'visuals'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              Visual Trends
-            </button>
-            <button
-              onClick={() => setActiveTab('export')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'export'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              Export Options
-            </button>
-          </div>
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setActiveTab('statement')}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'statement'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                P&amp;L Statement
+              </button>
+              <button
+                onClick={() => setActiveTab('visuals')}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'visuals'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                Visual Trends
+              </button>
+            </div>
 
-          {/* Quick Print and Download buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-            >
-              <Printer className="w-3.5 h-3.5 text-gray-600" />
-              <span>Print / PDF</span>
-            </button>
-            <button
-              onClick={handleDownloadCsv}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Export CSV</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handlePrint}
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              >
+                <Printer className="w-3.5 h-3.5 text-gray-600" />
+                <span className="hidden sm:inline">Print / PDF</span>
+              </button>
+              <button
+                onClick={handleDownloadCsv}
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Export CSV</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-gray-800">
+        <div className="p-3.5 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 flex-1 min-h-0 text-gray-800">
           {/* Executive KPI Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             <div className="p-3.5 bg-purple-50/50 border border-purple-100 rounded-2xl text-center shadow-2xs">
               <span className="text-[11px] font-bold text-purple-700 uppercase">Gross Revenue</span>
-              <p className="text-2xl font-serif font-bold text-purple-950 mt-1">
+              <p className="text-xl sm:text-2xl font-serif font-bold text-purple-950 mt-1">
                 ₱{reportData.summary.totalGrossRevenue.toLocaleString()}
               </p>
               <span className="text-[10px] text-purple-700 font-semibold block mt-0.5">
@@ -181,7 +172,7 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
 
             <div className="p-3.5 bg-rose-50/50 border border-rose-100 rounded-2xl text-center shadow-2xs">
               <span className="text-[11px] font-bold text-rose-700 uppercase">Operating Costs</span>
-              <p className="text-2xl font-serif font-bold text-rose-950 mt-1">
+              <p className="text-xl sm:text-2xl font-serif font-bold text-rose-950 mt-1">
                 ₱{reportData.summary.totalExpenses.toLocaleString()}
               </p>
               <span className="text-[10px] text-rose-700 font-semibold block mt-0.5">
@@ -191,7 +182,7 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
 
             <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl text-center shadow-2xs">
               <span className="text-[11px] font-bold text-emerald-800 uppercase">Net Operating Profit</span>
-              <p className="text-2xl font-serif font-bold text-emerald-950 mt-1">
+              <p className="text-xl sm:text-2xl font-serif font-bold text-emerald-950 mt-1">
                 ₱{reportData.summary.netProfit.toLocaleString()}
               </p>
               <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">

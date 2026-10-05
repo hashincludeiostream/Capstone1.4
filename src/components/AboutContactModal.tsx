@@ -26,13 +26,13 @@ export const AboutContactModal: React.FC<AboutContactModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-6">
-        <div className="flex items-center justify-between pb-3 border-b border-pink-100">
-          <div className="flex border-b-2 border-transparent gap-3">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-4 sm:p-6 max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 border-b border-pink-100 shrink-0">
+          <div className="flex border-b-2 border-transparent gap-2 sm:gap-3 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setTab('about')}
-              className={`pb-1 text-sm font-bold transition-all cursor-pointer ${
+              className={`pb-1 text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                 tab === 'about'
                   ? 'border-b-2 border-pink-600 text-pink-700'
                   : 'text-gray-400 hover:text-gray-700'
@@ -42,7 +42,7 @@ export const AboutContactModal: React.FC<AboutContactModalProps> = ({
             </button>
             <button
               onClick={() => setTab('contact')}
-              className={`pb-1 text-sm font-bold transition-all cursor-pointer ${
+              className={`pb-1 text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                 tab === 'contact'
                   ? 'border-b-2 border-pink-600 text-pink-700'
                   : 'text-gray-400 hover:text-gray-700'
@@ -53,23 +53,23 @@ export const AboutContactModal: React.FC<AboutContactModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer"
+            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {tab === 'about' ? (
-          <div className="mt-4 space-y-4 text-xs text-gray-600 leading-relaxed">
-            <div className="p-4 rounded-2xl bg-pink-50/50 border border-pink-100 flex items-center gap-3">
+          <div className="mt-3 sm:mt-4 space-y-3.5 sm:space-y-4 text-xs text-gray-600 leading-relaxed overflow-y-auto flex-1 min-h-0 pr-0.5">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-pink-50/50 border border-pink-100 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-600 to-rose-600 text-white flex items-center justify-center shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
-              <div>
-                <h4 className="font-serif font-bold text-sm text-gray-900">
+              <div className="min-w-0">
+                <h4 className="font-serif font-bold text-xs sm:text-sm text-gray-900 truncate">
                   Elevating the Nail & Beauty Industry
                 </h4>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-gray-500 line-clamp-1">
                   A modern platform connecting beauty seekers with premier salons.
                 </p>
               </div>
@@ -79,10 +79,10 @@ export const AboutContactModal: React.FC<AboutContactModalProps> = ({
               <strong>Nail Glam Hub</strong> was designed to bridge the gap between creative nail artists and clients seeking bespoke, high-quality beauty experiences. We combine Pinterest-style visual discovery with a frictionless, real-time booking ecosystem.
             </p>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div className="p-3 rounded-xl border border-pink-100 bg-white space-y-1">
                 <div className="flex items-center gap-1.5 text-pink-700 font-bold">
-                  <ShieldCheck className="w-4 h-4" /> Verified Quality
+                  <ShieldCheck className="w-4 h-4 shrink-0" /> Verified Quality
                 </div>
                 <p className="text-[11px] text-gray-500">
                   Every salon is vetted for sanitation, skill certification, and client satisfaction.
@@ -90,7 +90,7 @@ export const AboutContactModal: React.FC<AboutContactModalProps> = ({
               </div>
               <div className="p-3 rounded-xl border border-pink-100 bg-white space-y-1">
                 <div className="flex items-center gap-1.5 text-rose-700 font-bold">
-                  <Heart className="w-4 h-4" /> Artist Empowerment
+                  <Heart className="w-4 h-4 shrink-0" /> Artist Empowerment
                 </div>
                 <p className="text-[11px] text-gray-500">
                   Independent technicians showcase their portfolio and manage appointment queues seamlessly.
@@ -99,7 +99,7 @@ export const AboutContactModal: React.FC<AboutContactModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div className="mt-3 sm:mt-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-0.5">
             {sent ? (
               <div className="py-8 text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">

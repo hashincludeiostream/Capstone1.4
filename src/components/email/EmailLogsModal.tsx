@@ -133,48 +133,48 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden border border-pink-100 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-pink-100 my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Modal Top Header */}
-        <div className="px-6 py-4 border-b border-pink-100 bg-gradient-to-r from-pink-50 via-white to-pink-50 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center text-pink-600 shadow-sm">
-              <Mail className="w-5 h-5" />
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-pink-100 bg-gradient-to-r from-pink-50 via-white to-pink-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-pink-100 flex items-center justify-center text-pink-600 shadow-sm shrink-0">
+              <Mail className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-lg font-bold text-gray-900">Email Notifications & Reports History</h2>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">Email History</h2>
+                <span className="inline-flex items-center px-2 py-0.2 rounded-full text-[10px] sm:text-xs font-semibold bg-emerald-100 text-emerald-800 shrink-0">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   Live Sync
                 </span>
               </div>
-              <p className="text-xs text-gray-500">
-                Delivered notifications, receipts, and monthly PDF reports for <span className="font-semibold text-gray-700">{currentUser.email}</span>
+              <p className="text-[11px] sm:text-xs text-gray-500 truncate">
+                Delivered notifications for <span className="font-semibold text-gray-700">{currentUser.email}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0">
             <button
               onClick={handleSendTestEmail}
               disabled={isSendingTest}
-              className="inline-flex items-center px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50"
+              className="inline-flex items-center px-2.5 sm:px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50 cursor-pointer"
             >
               <Send className={`w-3.5 h-3.5 mr-1.5 ${isSendingTest ? 'animate-spin' : ''}`} />
-              {isSendingTest ? 'Sending...' : 'Send Test Notification'}
+              <span className="truncate">{isSendingTest ? 'Sending...' : 'Send Test'}</span>
             </button>
             <button
               onClick={fetchLogs}
               title="Refresh"
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              className="p-1.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -192,13 +192,13 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
         )}
 
         {/* Filter bar */}
-        <div className="px-6 py-2.5 border-b border-gray-100 bg-gray-50/70 flex items-center space-x-2 overflow-x-auto text-xs">
-          <span className="text-gray-500 font-medium mr-1">Filter:</span>
+        <div className="px-4 sm:px-6 py-2 border-b border-gray-100 bg-gray-50/70 flex items-center space-x-2 overflow-x-auto text-xs shrink-0 no-scrollbar">
+          <span className="text-gray-500 font-medium mr-1 shrink-0">Filter:</span>
           {['all', 'booking', 'order', 'report', 'promo', 'alert', 'verification'].map((cat) => (
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
-              className={`px-3 py-1 rounded-full font-medium transition capitalize ${
+              className={`px-2.5 sm:px-3 py-1 rounded-full font-medium transition capitalize shrink-0 cursor-pointer ${
                 filterCategory === cat
                   ? 'bg-pink-600 text-white shadow-xs'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
@@ -207,16 +207,16 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
               {cat}
             </button>
           ))}
-          <span className="ml-auto text-gray-400 font-normal">
+          <span className="ml-auto text-gray-400 font-normal shrink-0 hidden sm:inline text-[11px]">
             Showing {filteredLogs.length} delivered email(s)
           </span>
         </div>
 
         {/* Two-Column Split Pane */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           
           {/* Left: Email List */}
-          <div className="w-2/5 border-r border-gray-200 overflow-y-auto bg-gray-50/50">
+          <div className="w-full md:w-2/5 max-h-48 md:max-h-none border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto bg-gray-50/50 shrink-0 md:shrink min-h-0">
             {loading && logs.length === 0 ? (
               <div className="p-8 text-center text-gray-400">
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-pink-500" />
@@ -244,38 +244,38 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                     <button
                       key={log.id}
                       onClick={() => setSelectedLog(log)}
-                      className={`w-full text-left p-3.5 transition flex flex-col space-y-1.5 ${
+                      className={`w-full text-left p-3 sm:p-3.5 transition flex flex-col space-y-1.5 cursor-pointer ${
                         isSelected
                           ? 'bg-white shadow-xs border-l-4 border-l-pink-600'
                           : 'hover:bg-gray-100/70 border-l-4 border-l-transparent'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1.5 min-w-0 pr-2">
                           {getCategoryIcon(log.category)}
-                          <span className="text-xs font-semibold text-gray-800 capitalize">
+                          <span className="text-xs font-semibold text-gray-800 capitalize truncate">
                             {log.category}
                           </span>
                           {log.has_pdf_attachment && (
-                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-pink-100 text-pink-700">
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-pink-100 text-pink-700 shrink-0">
                               PDF
                             </span>
                           )}
                         </div>
-                        <span className="text-[11px] text-gray-400">{dateStr}</span>
+                        <span className="text-[10px] text-gray-400 shrink-0 whitespace-nowrap">{dateStr}</span>
                       </div>
 
                       <div className="text-xs font-semibold text-gray-900 truncate">
                         {log.subject}
                       </div>
 
-                      <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">
+                      <p className="text-[11px] text-gray-500 line-clamp-1 leading-relaxed">
                         {log.content_preview || 'Click to view email body'}
                       </p>
 
-                      <div className="text-[10px] text-gray-400 flex items-center justify-between pt-1">
-                        <span>To: {log.recipient_email}</span>
-                        <span className="text-emerald-600 font-medium">Delivered</span>
+                      <div className="text-[10px] text-gray-400 flex items-center justify-between pt-0.5">
+                        <span className="truncate pr-1">To: {log.recipient_email}</span>
+                        <span className="text-emerald-600 font-medium shrink-0">Delivered</span>
                       </div>
                     </button>
                   );
@@ -285,18 +285,18 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
           </div>
 
           {/* Right: Rendered Email Preview */}
-          <div className="w-3/5 overflow-y-auto bg-white p-6 flex flex-col">
+          <div className="w-full md:w-3/5 overflow-y-auto bg-white p-4 sm:p-6 flex flex-col flex-1 min-h-0">
             {selectedLog ? (
               <div className="space-y-4">
                 
                 {/* Email Metadata Card */}
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900">{selectedLog.subject}</h3>
+                <div className="bg-gray-50 rounded-xl p-3.5 sm:p-4 border border-gray-200">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-gray-900 break-words">{selectedLog.subject}</h3>
                       <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-                        <p><strong>From:</strong> {selectedLog.sender_email || 'notifications@nailglamhub.com'}</p>
-                        <p><strong>To:</strong> {selectedLog.recipient_email} ({selectedLog.recipient_name || selectedLog.recipient_role})</p>
+                        <p className="truncate"><strong>From:</strong> {selectedLog.sender_email || 'notifications@nailglamhub.com'}</p>
+                        <p className="truncate"><strong>To:</strong> {selectedLog.recipient_email} ({selectedLog.recipient_name || selectedLog.recipient_role})</p>
                         <p><strong>Date Sent:</strong> {new Date(selectedLog.sent_at).toLocaleString()}</p>
                       </div>
                     </div>
@@ -304,7 +304,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                     {selectedLog.has_pdf_attachment && (
                       <button
                         onClick={() => handlePrintOrDownloadPdf(selectedLog)}
-                        className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                        className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0 cursor-pointer self-start"
                       >
                         <Printer className="w-3.5 h-3.5 mr-1.5" />
                         Print / PDF Report
@@ -314,23 +314,23 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
 
                   {selectedLog.has_pdf_attachment && (
                     <div className="mt-3 pt-3 border-t border-gray-200 flex items-center space-x-2 text-xs text-emerald-800">
-                      <FileText className="w-4 h-4 text-emerald-600" />
-                      <span className="font-semibold">Attached PDF:</span>
-                      <span className="font-mono text-gray-600">{selectedLog.attachment_name || 'Monthly_Report.pdf'}</span>
+                      <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-semibold shrink-0">Attached PDF:</span>
+                      <span className="font-mono text-gray-600 truncate">{selectedLog.attachment_name || 'Monthly_Report.pdf'}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Email Body Rendering */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden bg-[#FDF7FA] p-4">
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-[#FDF7FA] p-3.5 sm:p-4">
                   <div
-                    className="prose prose-sm max-w-none text-gray-800"
+                    className="prose prose-sm max-w-none text-gray-800 text-xs sm:text-sm overflow-x-auto"
                     dangerouslySetInnerHTML={{ __html: selectedLog.html_body }}
                   />
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400 py-8">
                 <Mail className="w-12 h-12 mb-2 opacity-20" />
                 <p className="text-sm font-medium">Select an email to view full content</p>
               </div>
@@ -339,14 +339,14 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center space-x-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>Gmail API & Server Relay connected. Emails automatically dispatched upon booking, checkout, and monthly schedule.</span>
+        <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 shrink-0">
+          <div className="flex items-center space-x-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+            <span className="truncate">Gmail API &amp; Server Relay connected. Emails automatically dispatched.</span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+            className="w-full sm:w-auto px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition cursor-pointer text-center"
           >
             Close
           </button>

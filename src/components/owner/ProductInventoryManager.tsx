@@ -1103,18 +1103,18 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
 
       {/* ADD / EDIT PRODUCT MODAL */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-200 my-8 relative">
-            <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-200 my-auto relative flex flex-col max-h-[92vh]">
+            <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/50 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
                   <Package className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-stone-900">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-stone-900 truncate">
                     {editingProduct ? 'Edit Product & Stock' : 'Add New Salon Product'}
                   </h3>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-[11px] sm:text-xs text-stone-500 truncate">
                     Configure pricing, initial inventory, and low stock threshold alerts.
                   </p>
                 </div>
@@ -1122,13 +1122,13 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
 
               <button
                 onClick={() => setIsFormModalOpen(false)}
-                className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer shrink-0 ml-2"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleFormSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {formError && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
                   {formError}
@@ -1266,18 +1266,18 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
               </div>
 
               {/* Form Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsFormModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-semibold cursor-pointer text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formSubmitting}
-                  className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 text-center"
                 >
                   {formSubmitting ? 'Saving...' : editingProduct ? 'Save Changes' : 'Create Product'}
                 </button>

@@ -112,61 +112,63 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-pink-100 p-4 sm:p-6 max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-pink-100">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-pink-600 text-white flex items-center justify-center">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-pink-100 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-pink-600 text-white flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-lg text-gray-900">
+            <div className="min-w-0">
+              <h3 className="font-serif font-bold text-base sm:text-lg text-gray-900 truncate">
                 {mode === 'signin' ? 'Welcome Back' : 'Create an Account'}
               </h3>
-              <p className="text-[11px] text-gray-500">Nail Glam Hub Access Portal</p>
+              <p className="text-[10px] sm:text-[11px] text-gray-500 truncate">Nail Glam Hub Access Portal</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer"
+            className="w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-gray-600 cursor-pointer shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Demo Fast Login Personas */}
-        <div className="mt-4 p-3 bg-pink-50/70 rounded-2xl border border-pink-200">
-          <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2 text-center">
-            ⚡ Quick 1-Click Demo Login
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleDemoLogin('customer')}
-              className="p-2 rounded-xl bg-white border border-pink-200 hover:border-pink-500 text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
-            >
-              <UserIcon className="w-4 h-4 text-pink-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-              <p className="text-xs font-bold text-gray-900">Customer</p>
-              <p className="text-[9px] text-gray-400">Sophia</p>
-            </button>
-            <button
-              onClick={() => handleDemoLogin('salon_owner')}
-              className="p-2 rounded-xl bg-white border border-pink-200 hover:border-purple-500 text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
-            >
-              <Store className="w-4 h-4 text-purple-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-              <p className="text-xs font-bold text-gray-900">Salon Owner</p>
-              <p className="text-[9px] text-gray-400">Camille</p>
-            </button>
-            <button
-              onClick={() => handleDemoLogin('admin')}
-              className="p-2 rounded-xl bg-white border border-pink-200 hover:border-rose-500 text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
-            >
-              <Shield className="w-4 h-4 text-rose-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-              <p className="text-xs font-bold text-gray-900">Super Admin</p>
-              <p className="text-[9px] text-gray-400">Admin</p>
-            </button>
+        {/* Scrollable Content Body */}
+        <div className="overflow-y-auto flex-1 min-h-0 pr-0.5 pt-1">
+          {/* Demo Fast Login Personas */}
+          <div className="p-3 bg-pink-50/70 rounded-2xl border border-pink-200">
+            <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2 text-center">
+              ⚡ Quick 1-Click Demo Login
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => handleDemoLogin('customer')}
+                className="p-2 rounded-xl bg-white border border-pink-200 hover:border-pink-500 text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
+              >
+                <UserIcon className="w-4 h-4 text-pink-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                <p className="text-xs font-bold text-gray-900">Customer</p>
+                <p className="text-[9px] text-gray-400">Sophia</p>
+              </button>
+              <button
+                onClick={() => handleDemoLogin('salon_owner')}
+                className="p-2 rounded-xl bg-white border border-pink-200 hover:border-purple-500 text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
+              >
+                <Store className="w-4 h-4 text-purple-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                <p className="text-xs font-bold text-gray-900">Salon Owner</p>
+                <p className="text-[9px] text-gray-400">Camille</p>
+              </button>
+              <button
+                onClick={() => handleDemoLogin('admin')}
+                className="p-2 rounded-xl bg-white border border-pink-200 hover:border-rose-500 text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
+              >
+                <Shield className="w-4 h-4 text-rose-600 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                <p className="text-xs font-bold text-gray-900">Super Admin</p>
+                <p className="text-[9px] text-gray-400">Admin</p>
+              </button>
+            </div>
           </div>
-        </div>
 
         {error && (
           <div className="mt-3 p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-medium border border-red-200">
@@ -362,6 +364,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </form>
         )}
+        </div>
 
         {/* Interactive Google / Gmail Account Chooser */}
         <GoogleAccountChooserModal

@@ -617,8 +617,8 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
   const maxPeriodRev = Math.max(...pnlData.periods.map((p) => p.totalRevenue), 1);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[92vh] shadow-2xl border border-pink-100 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2.5 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-5xl max-h-[92vh] shadow-2xl border border-pink-100 flex flex-col overflow-hidden my-auto">
         {/* Modal Master Header */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 relative">
           <div className="flex items-center gap-3 pr-10 sm:pr-0">
@@ -790,7 +790,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-gray-800">
+        <div className="p-3.5 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 flex-1 min-h-0 text-gray-800">
           {/* In-page Jump Navigation for All-in-One Mode */}
           {activeViewTab === 'all_in_one' && (
             <div className="sticky -top-6 z-20 -mt-2 -mx-2 px-4 py-2.5 bg-white/95 backdrop-blur-md border border-purple-200 rounded-2xl shadow-sm flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
