@@ -70,7 +70,7 @@ const DEFAULT_WORKING_HOURS: WorkingHour[] = [
 
 interface SalonOwnerDashboardProps {
   currentUser: User;
-  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees';
+  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails';
   onOpenRegisterSalon?: () => void;
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
@@ -625,7 +625,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-branches"
             onClick={() => handleTabClick('branches')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'branches'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -639,7 +639,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-overview"
             onClick={() => handleTabClick('overview')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'overview'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -653,7 +653,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-appointments"
             onClick={() => handleTabClick('appointments')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'appointments'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -672,7 +672,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-cancellation-fees"
             onClick={() => handleTabClick('cancellation-fees')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'cancellation-fees'
                 ? 'border-rose-600 text-rose-950 font-bold bg-white/80 rounded-t-xl shadow-2xs'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -691,7 +691,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-services"
             onClick={() => handleTabClick('services')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'services'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -705,7 +705,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-staff"
             onClick={() => handleTabClick('staff')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'staff'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -719,7 +719,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-inventory"
             onClick={() => handleTabClick('inventory')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'inventory'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -739,7 +739,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-location"
             onClick={() => handleTabClick('location')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'location'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -753,7 +753,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-settings"
             onClick={() => handleTabClick('settings')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'settings'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -767,7 +767,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           <button
             id="owner-tab-emails"
             onClick={() => handleTabClick('emails')}
-            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'emails'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl shadow-2xs'
                 : 'border-transparent text-gray-500 hover:text-gray-900'

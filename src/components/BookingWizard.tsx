@@ -362,46 +362,38 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
         {/* Stepper Progress Bar */}
         {step < 6 && (
-          <div className="px-2.5 sm:px-6 py-2.5 sm:py-3 bg-pink-50/70 border-b border-pink-100 grid grid-cols-5 gap-1 sm:gap-1.5 text-center text-[10px] sm:text-[11px] font-medium shrink-0 overflow-x-auto no-scrollbar">
-            <div
-              className={`py-1 px-1 rounded-md transition-all truncate ${
-                step >= 1 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
-              }`}
-            >
-              <span className="sm:hidden">1. Svc</span>
-              <span className="hidden sm:inline">1. Service</span>
+          <div className="px-3 sm:px-6 py-2.5 sm:py-3 bg-pink-50/70 border-b border-pink-100 shrink-0">
+            {/* Mobile Stepper Header (< sm) */}
+            <div className="sm:hidden flex items-center justify-between text-xs mb-1.5">
+              <span className="font-bold text-pink-700 truncate">
+                Step {step} of 5: {step === 1 ? 'Service' : step === 2 ? 'Date & Time' : step === 3 ? 'Specialist' : step === 4 ? 'Your Info' : 'Payment'}
+              </span>
+              <span className="text-[11px] font-semibold text-gray-500 shrink-0 ml-2">{Math.round((step / 5) * 100)}%</span>
             </div>
-            <div
-              className={`py-1 px-1 rounded-md transition-all truncate ${
-                step >= 2 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
-              }`}
-            >
-              <span className="sm:hidden">2. Date</span>
-              <span className="hidden sm:inline">2. Date/Time</span>
+            <div className="sm:hidden w-full bg-pink-200/60 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-pink-600 h-full rounded-full transition-all duration-300"
+                style={{ width: `${(step / 5) * 100}%` }}
+              />
             </div>
-            <div
-              className={`py-1 px-1 rounded-md transition-all truncate ${
-                step >= 3 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
-              }`}
-            >
-              <span className="sm:hidden">3. Staff</span>
-              <span className="hidden sm:inline">3. Specialist</span>
-            </div>
-            <div
-              className={`py-1 px-1 rounded-md transition-all truncate ${
-                step >= 4 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
-              }`}
-            >
-              <span className="sm:hidden">4. Info</span>
-              <span className="hidden sm:inline">4. Contact</span>
-            </div>
-            <div
-              className={`py-1 px-1 rounded-md transition-all truncate ${
-                step >= 5 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'
-              }`}
-            >
-              <span className="sm:hidden">5. Pay</span>
-              <span className="hidden sm:inline">5. Payment</span>
+
+            {/* Desktop / Tablet Stepper (>= sm) */}
+            <div className="hidden sm:grid grid-cols-5 gap-1.5 text-center text-[11px] font-medium">
+              <div className={`py-1 px-1 rounded-md transition-all truncate ${step >= 1 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'}`}>
+                1. Service
+              </div>
+              <div className={`py-1 px-1 rounded-md transition-all truncate ${step >= 2 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'}`}>
+                2. Date/Time
+              </div>
+              <div className={`py-1 px-1 rounded-md transition-all truncate ${step >= 3 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'}`}>
+                3. Specialist
+              </div>
+              <div className={`py-1 px-1 rounded-md transition-all truncate ${step >= 4 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'}`}>
+                4. Contact
+              </div>
+              <div className={`py-1 px-1 rounded-md transition-all truncate ${step >= 5 ? 'bg-pink-600 text-white font-semibold' : 'text-gray-400 bg-white'}`}>
+                5. Payment
+              </div>
             </div>
           </div>
         )}
@@ -1273,14 +1265,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 type="button"
                 disabled={submitting}
                 onClick={handleSubmitBooking}
-                className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition-all shadow-md shadow-pink-500/20 flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
+                className="px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition-all shadow-md shadow-pink-500/20 flex items-center gap-1.5 sm:gap-2 cursor-pointer min-w-0"
               >
                 {submitting ? (
                   <span>Processing...</span>
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                    <span>
+                    <span className="sm:hidden truncate">
+                      {paymentType === 'pay_at_salon'
+                        ? 'Confirm In-Salon'
+                        : `Pay ₱${paymentBreakdown.dueNow.toLocaleString()}`}
+                    </span>
+                    <span className="hidden sm:inline">
                       {paymentType === 'pay_at_salon'
                         ? 'Confirm Booking (Pay In-Salon)'
                         : `Pay ₱${paymentBreakdown.dueNow.toLocaleString()} & Confirm`}

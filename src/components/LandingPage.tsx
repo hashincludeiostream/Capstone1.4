@@ -21,6 +21,7 @@ import { Salon, BusinessCategory, User, Service, Technician, Product } from '../
 import { fetchServices, fetchTechnicians } from '../lib/api';
 import { HeroSection } from './HeroSection';
 import { CategoryFilter } from './CategoryFilter';
+import { SalonCardSkeleton } from './SalonCard';
 
 interface LandingPageProps {
   salons: Salon[];
@@ -166,18 +167,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const featureSalons = isFiltering ? filteredSalons : (salons ? salons.slice(0, 8) : []);
   const topCategories = categories ? categories.slice(0, 4) : [];
 
-  // Show loading state only during initial data fetch
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Loading featured content...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8">
       {/* Streamlined Discovery Header with Search & Filter Bar (Hero Removed) */}
@@ -291,7 +280,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-4 gap-3 xl:gap-5">
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3 xl:gap-5">
           {topCategories.map((category) => (
             <button
               key={category.id}
@@ -366,7 +355,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 xl:gap-6 mt-5">
-          {featureSalons.length > 0 ? (
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <SalonCardSkeleton key={`landing-salon-skeleton-${idx}`} />
+            ))
+          ) : featureSalons.length > 0 ? (
             featureSalons.map((salon) => (
               <article key={salon.id} className="rounded-[1.5rem] border border-pink-100 bg-white p-4 shadow-sm hover:shadow-lg transition">
                 <div className="flex items-center justify-between">
@@ -470,7 +463,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 mt-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 xl:gap-6 mt-5">
             {products.slice(0, 4).map((product) => {
               const salon = salons.find((s) => s.id === product.salon_id);
               const isOutOfStock = product.stock_quantity <= 0;
@@ -529,7 +522,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                     {/* Available Stock Indicator */}
                     <div className="mt-2.5 pt-2 border-t border-stone-100 space-y-1">
-                      <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
                         <span className="text-stone-500 font-medium">Available Stock:</span>
                         {isOutOfStock ? (
                           <span className="font-bold text-red-600">0 units</span>

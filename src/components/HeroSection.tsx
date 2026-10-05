@@ -34,7 +34,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             id="hero-search-input"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search by salon name, nail art style, or location..."
+            placeholder="Search salons, nail art, or location..."
             className="w-full bg-transparent border-none text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:outline-hidden py-1"
           />
           {searchQuery && (

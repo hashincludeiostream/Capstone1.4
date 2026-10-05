@@ -20,6 +20,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Product, Salon, User } from '../../types';
+import { ProductCard, ProductCardSkeleton } from './ProductCard';
 
 interface ProductCatalogProps {
   products: Product[];
@@ -300,9 +301,14 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
       {/* Products Grid */}
       {loading ? (
-        <div className="py-20 text-center">
-          <div className="w-8 h-8 border-3 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-stone-500">Loading catalog items...</p>
+        <div
+          aria-label="Loading catalog products"
+          aria-busy="true"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5 xl:gap-6"
+        >
+          {Array.from({ length: 8 }).map((_, index) => (
+            <ProductCardSkeleton key={`product-loading-skeleton-${index}`} />
+          ))}
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="py-16 text-center bg-white rounded-3xl border border-stone-200 p-8">
@@ -399,7 +405,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
                   {/* Available Stock Indicator */}
                   <div className="pt-2 border-t border-stone-100 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-xs">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <Package className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                         <span className="text-stone-500 font-medium truncate">Available Stock:</span>

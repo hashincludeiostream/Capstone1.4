@@ -241,7 +241,8 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                 }`}
               >
                 <Scissors className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>Services &amp; Treatments ({salonData.services.length})</span>
+                <span className="sm:hidden">Services ({salonData.services.length})</span>
+                <span className="hidden sm:inline">Services &amp; Treatments ({salonData.services.length})</span>
               </button>
               <button
                 onClick={() => handleTabChange('technicians')}
@@ -252,7 +253,8 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                 }`}
               >
                 <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>Staff &amp; Specialists ({salonData.technicians.length})</span>
+                <span className="sm:hidden">Staff ({salonData.technicians.length})</span>
+                <span className="hidden sm:inline">Staff &amp; Specialists ({salonData.technicians.length})</span>
               </button>
               <button
                 onClick={() => handleTabChange('reviews')}
@@ -274,7 +276,8 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                 }`}
               >
                 <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-600" />
-                <span>Location &amp; Map</span>
+                <span className="sm:hidden">Location</span>
+                <span className="hidden sm:inline">Location &amp; Map</span>
               </button>
               <button
                 onClick={() => handleTabChange('about')}

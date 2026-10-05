@@ -62,7 +62,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
       id="service-category-filter"
     >
       {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center shrink-0">
             <Layers className="w-4 h-4" />

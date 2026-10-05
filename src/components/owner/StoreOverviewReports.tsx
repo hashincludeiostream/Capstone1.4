@@ -1010,18 +1010,18 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
   return (
     <div className="space-y-7 animate-in fade-in duration-200">
       {/* Notice Banner */}
-      <div className="p-4 rounded-2xl bg-purple-50/80 border border-purple-200/80 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Store className="w-5 h-5 text-purple-700 shrink-0" />
-          <div className="text-xs text-purple-950">
+      <div className="p-4 rounded-2xl bg-purple-50/80 border border-purple-200/80 flex items-center justify-between gap-3 flex-wrap min-w-0">
+        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+          <Store className="w-5 h-5 text-purple-700 shrink-0 mt-0.5 sm:mt-0" />
+          <div className="text-xs text-purple-950 min-w-0 leading-relaxed">
             <span className="font-bold">Physical Salon Directory & Reservation System:</span> Customers browse treatments and book appointments through the website. All services, consultations, and payments are settled in-person at your physical salon premises.
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
           <button
             onClick={() => setShowDecisionModal(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-purple-900 hover:bg-purple-950 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-purple-900 hover:bg-purple-950 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>All-in-One Master Report</span>
@@ -1030,13 +1030,13 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       </div>
 
       {/* Report Header Controls & Period Selector */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-pink-100 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-serif font-bold text-gray-900">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-base sm:text-lg font-serif font-bold text-gray-900">
               Store Executive Reports & CRM Analytics
             </h3>
-            <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+            <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0">
               Real-time
             </span>
           </div>
@@ -1045,14 +1045,14 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Time Filter Pills */}
-          <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto shrink-0 min-w-0">
+          {/* Time Filter Pills - Scrollable to prevent button overlap on mobile */}
+          <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto no-scrollbar max-w-full">
             {(['today', 'week', 'month', 'quarter', 'all'] as const).map((range) => (
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
-                className={`px-3 py-1.5 rounded-lg transition-all capitalize cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all capitalize cursor-pointer whitespace-nowrap shrink-0 text-[11px] sm:text-xs ${
                   timeRange === range
                     ? 'bg-white text-purple-900 shadow-xs font-bold'
                     : 'text-gray-500 hover:text-gray-900'
@@ -1066,7 +1066,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
           {/* Master All-in-One Report Action */}
           <button
             onClick={() => setShowDecisionModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-800 to-pink-700 hover:from-purple-900 hover:to-pink-800 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-800 to-pink-700 hover:from-purple-900 hover:to-pink-800 text-white text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>All-in-One Master Report</span>
@@ -1188,15 +1188,15 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       </div>
 
       {/* 2. EXECUTIVE OPERATING PROFIT & LOSS (P&L) FINANCIAL OVERVIEW */}
-      <div className="bg-white rounded-3xl border border-pink-100 shadow-xs p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
-              <h4 className="text-base font-serif font-bold text-gray-900">
+      <div className="bg-white rounded-3xl border border-pink-100 shadow-xs p-4 sm:p-6 space-y-6 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <DollarSign className="w-5 h-5 text-emerald-600 shrink-0" />
+              <h4 className="text-base font-serif font-bold text-gray-900 truncate">
                 Executive Operating Profit & Loss (P&L) Health
               </h4>
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0">
                 Audited Ledger
               </span>
             </div>
@@ -1205,15 +1205,15 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
             {/* Frequency Selector */}
-            <div className="inline-flex rounded-xl bg-gray-100 p-1 border border-gray-200">
+            <div className="inline-flex rounded-xl bg-gray-100 p-1 border border-gray-200 overflow-x-auto no-scrollbar max-w-full">
               {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((grain) => (
                 <button
                   key={grain}
                   type="button"
                   onClick={() => setFinancialTimeGrain(grain)}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer ${
+                  className={`px-3 py-1 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     financialTimeGrain === grain
                       ? 'bg-purple-800 text-white shadow-xs'
                       : 'text-gray-600 hover:text-gray-900'
@@ -1228,7 +1228,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             <button
               type="button"
               onClick={() => setShowDecisionModal(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-purple-200/60"
+              className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-purple-200/60 shrink-0"
             >
               <Sparkles className="w-3.5 h-3.5 text-purple-700" />
               <span>Full P&L in All-in-One Report →</span>
@@ -1237,60 +1237,60 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
         </div>
 
         {/* 4 Financial KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100/80">
-            <span className="text-xs font-semibold text-emerald-900 block">Gross Salon Revenue</span>
-            <p className="text-2xl font-serif font-bold text-emerald-950 mt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0">
+          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100/80 min-w-0">
+            <span className="text-xs font-semibold text-emerald-900 block truncate">Gross Salon Revenue</span>
+            <p className="text-2xl font-serif font-bold text-emerald-950 mt-1 truncate">
               ₱{profitRevenueData.summary.totalGrossRevenue.toLocaleString()}
             </p>
-            <div className="text-[11px] text-emerald-700 mt-1 flex items-center justify-between">
+            <div className="text-[11px] text-emerald-700 mt-1 flex flex-wrap items-center justify-between gap-1">
               <span>Services: ₱{profitRevenueData.summary.totalServicesRevenue.toLocaleString()}</span>
               <span>Retail: ₱{profitRevenueData.summary.totalRetailRevenue.toLocaleString()}</span>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-100/80">
-            <span className="text-xs font-semibold text-rose-900 block">Operating Costs & Expenses</span>
-            <p className="text-2xl font-serif font-bold text-rose-950 mt-1">
+          <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-100/80 min-w-0">
+            <span className="text-xs font-semibold text-rose-900 block truncate">Operating Costs & Expenses</span>
+            <p className="text-2xl font-serif font-bold text-rose-950 mt-1 truncate">
               -₱{profitRevenueData.summary.totalExpenses.toLocaleString()}
             </p>
-            <span className="text-[11px] text-rose-700 mt-1 block">
+            <span className="text-[11px] text-rose-700 mt-1 block truncate">
               Commissions (40%), Supplies (15%), Overhead (8%)
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100/80">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-purple-900">Retained Net Profit</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">
+          <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100/80 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-purple-900 truncate">Retained Net Profit</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 shrink-0">
                 {profitRevenueData.summary.profitMargin.toFixed(1)}% Margin
               </span>
             </div>
-            <p className="text-2xl font-serif font-bold text-purple-950 mt-1">
+            <p className="text-2xl font-serif font-bold text-purple-950 mt-1 truncate">
               ₱{profitRevenueData.summary.netProfit.toLocaleString()}
             </p>
-            <span className="text-[11px] text-purple-700 mt-1 block">
+            <span className="text-[11px] text-purple-700 mt-1 block truncate">
               Direct salon owner operating earnings
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100/80">
-            <span className="text-xs font-semibold text-blue-900 block">Average Ticket & Activity</span>
-            <p className="text-2xl font-serif font-bold text-blue-950 mt-1">
+          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100/80 min-w-0">
+            <span className="text-xs font-semibold text-blue-900 block truncate">Average Ticket & Activity</span>
+            <p className="text-2xl font-serif font-bold text-blue-950 mt-1 truncate">
               ₱{profitRevenueData.summary.averageTicket.toLocaleString()}
             </p>
-            <span className="text-[11px] text-blue-700 mt-1 block">
+            <span className="text-[11px] text-blue-700 mt-1 block truncate">
               Across {profitRevenueData.summary.totalAppointments} visits & {profitRevenueData.summary.totalOrders || 0} retail orders
             </span>
           </div>
         </div>
 
         {/* Financial Flow & Allocation Summary */}
-        <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5 flex-1">
-            <div className="flex items-center justify-between text-xs font-semibold text-gray-700">
+        <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 min-w-0">
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center justify-between text-xs font-semibold text-gray-700 gap-1">
               <span>Revenue Composition</span>
-              <span>
+              <span className="text-[11px]">
                 Services {profitRevenueData.summary.totalGrossRevenue > 0 ? Math.round((profitRevenueData.summary.totalServicesRevenue / profitRevenueData.summary.totalGrossRevenue) * 100) : 100}% • Retail {profitRevenueData.summary.totalGrossRevenue > 0 ? Math.round((profitRevenueData.summary.totalRetailRevenue / profitRevenueData.summary.totalGrossRevenue) * 100) : 0}%
               </span>
             </div>
@@ -1308,19 +1308,19 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs shrink-0">
+          <div className="flex flex-wrap items-center gap-3 text-xs shrink-0">
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+              <div className="w-2.5 h-2.5 rounded-full bg-purple-600 shrink-0" />
               <span className="text-gray-600">Salon Services</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-pink-500" />
+              <div className="w-2.5 h-2.5 rounded-full bg-pink-500 shrink-0" />
               <span className="text-gray-600">Retail Products</span>
             </div>
             <button
               type="button"
               onClick={() => setShowDecisionModal(true)}
-              className="text-xs font-bold text-purple-700 hover:text-purple-900 underline ml-2 cursor-pointer"
+              className="text-xs font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer"
             >
               Export Statement in Master Dossier
             </button>
@@ -1329,14 +1329,14 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       </div>
 
       {/* 3. DYNAMIC APPOINTMENT & REVENUE VOLUME TRENDS + TREATMENT POPULARITY MIX */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
         {/* Appointment & Revenue Volume Trend Visualization with Granularity & Metric Toggles */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-pink-100 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
-            <div>
+        <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl border border-pink-100 shadow-xs space-y-4 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100 min-w-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-purple-600" />
-                <h4 className="text-sm font-serif font-bold text-gray-900">
+                <BarChart3 className="w-4 h-4 text-purple-600 shrink-0" />
+                <h4 className="text-sm font-serif font-bold text-gray-900 truncate">
                   Store Appointment & Revenue Volume
                 </h4>
               </div>
@@ -1348,9 +1348,9 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             </div>
 
             {/* Controls: Metric Toggle & Time Grain Toggle */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {/* Metric Toggle: Bookings vs Income */}
-              <div className="inline-flex rounded-xl bg-gray-100 p-0.5 border border-gray-200">
+              <div className="inline-flex rounded-xl bg-gray-100 p-0.5 border border-gray-200 shrink-0">
                 <button
                   type="button"
                   onClick={() => setVolumeMetric('bookings')}
@@ -1376,13 +1376,13 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
               </div>
 
               {/* Time Grain Toggle: Daily | Weekly | Monthly | Yearly */}
-              <div className="inline-flex rounded-xl bg-purple-50 p-0.5 border border-purple-200">
+              <div className="inline-flex rounded-xl bg-purple-50 p-0.5 border border-purple-200 overflow-x-auto no-scrollbar max-w-full shrink-0">
                 {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((grain) => (
                   <button
                     key={grain}
                     type="button"
                     onClick={() => setVolumeTimeGrain(grain)}
-                    className={`px-2.5 py-1 text-[11px] font-bold rounded-lg capitalize transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 text-[11px] font-bold rounded-lg capitalize transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       volumeTimeGrain === grain
                         ? 'bg-purple-900 text-white shadow-xs'
                         : 'text-purple-800 hover:bg-purple-100/70'
@@ -1395,72 +1395,74 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             </div>
           </div>
 
-          {/* Quick Stats Strip for Current Volume Window */}
-          <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-purple-50/50 border border-purple-100 text-xs">
-            <div>
+          {/* Quick Stats Strip for Current Volume Window - Responsive single column on mobile, 3 cols on sm+ */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 rounded-xl bg-purple-50/50 border border-purple-100 text-xs min-w-0">
+            <div className="min-w-0">
               <span className="text-[10px] text-gray-500 block uppercase font-semibold">Total in View</span>
-              <span className="font-serif font-bold text-gray-900 text-sm">
+              <span className="font-serif font-bold text-gray-900 text-sm truncate block">
                 {volumeMetric === 'bookings'
                   ? `${volumeTrendData.reduce((acc, b) => acc + b.count, 0)} Bookings`
                   : `₱${volumeTrendData.reduce((acc, b) => acc + b.income, 0).toLocaleString()}`}
               </span>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-[10px] text-gray-500 block uppercase font-semibold">Peak Period</span>
               <span className="font-serif font-bold text-purple-900 text-sm truncate block">
                 {peakVolumePeriod?.shortLabel || 'N/A'} ({peakVolumePeriod?.formattedValue})
               </span>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-[10px] text-gray-500 block uppercase font-semibold">Granularity</span>
-              <span className="font-semibold text-emerald-700 text-sm capitalize">
+              <span className="font-semibold text-emerald-700 text-sm capitalize truncate block">
                 {volumeTimeGrain} View
               </span>
             </div>
           </div>
 
-          {/* Dynamic Bar Visualizer */}
-          <div className="pt-2 flex items-end justify-between gap-2 sm:gap-3 h-52 border-b border-gray-100 pb-2">
-            {volumeTrendData.map((bar, i) => {
-              const maxValue = Math.max(...volumeTrendData.map((t) => t.value), 1);
-              const heightPercent = bar.value === 0 ? 6 : Math.max(8, Math.round((bar.value / maxValue) * 100));
-              const height = `${heightPercent}%`;
+          {/* Dynamic Bar Visualizer - Wrapped in horizontally scrollable box on mobile to prevent squash/overlap */}
+          <div className="overflow-x-auto no-scrollbar pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+            <div className="pt-2 flex items-end justify-between gap-1.5 sm:gap-3 h-52 border-b border-gray-100 pb-2 min-w-[340px] sm:min-w-0">
+              {volumeTrendData.map((bar, i) => {
+                const maxValue = Math.max(...volumeTrendData.map((t) => t.value), 1);
+                const heightPercent = bar.value === 0 ? 6 : Math.max(8, Math.round((bar.value / maxValue) * 100));
+                const height = `${heightPercent}%`;
 
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group relative">
-                  {/* Floating Tooltip */}
-                  <div className="opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 absolute -top-8 bg-gray-900 text-white text-[10px] py-1 px-2 rounded-md shadow-lg whitespace-nowrap z-20">
-                    <span className="font-bold">{bar.label}:</span> {bar.formattedValue} ({bar.count} appts)
+                return (
+                  <div key={i} className="flex-1 min-w-[26px] sm:min-w-0 flex flex-col items-center gap-1.5 h-full justify-end group relative">
+                    {/* Floating Tooltip */}
+                    <div className="opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 absolute -top-8 bg-gray-900 text-white text-[10px] py-1 px-2 rounded-md shadow-lg whitespace-nowrap z-20">
+                      <span className="font-bold">{bar.label}:</span> {bar.formattedValue} ({bar.count} appts)
+                    </div>
+
+                    <span className="text-[9px] sm:text-[10px] font-bold text-gray-600 opacity-80 group-hover:opacity-100 transition-opacity truncate max-w-full text-center">
+                      {volumeMetric === 'bookings' ? bar.count : `₱${(bar.income / 1000).toFixed(bar.income >= 10000 ? 0 : 1)}k`}
+                    </span>
+
+                    <div
+                      className={`w-full rounded-t-xl transition-all duration-300 group-hover:scale-105 cursor-pointer ${
+                        bar.isActive
+                          ? 'bg-gradient-to-t from-purple-700 via-purple-600 to-pink-500 shadow-md shadow-purple-500/20'
+                          : 'bg-purple-100 hover:bg-purple-200'
+                      }`}
+                      style={{ height }}
+                    />
+
+                    <span className={`text-[9px] sm:text-[10px] font-medium truncate w-full text-center ${bar.isActive ? 'font-bold text-purple-900' : 'text-gray-500'}`}>
+                      {bar.shortLabel}
+                    </span>
                   </div>
-
-                  <span className="text-[10px] font-bold text-gray-600 opacity-80 group-hover:opacity-100 transition-opacity truncate max-w-full">
-                    {volumeMetric === 'bookings' ? bar.count : `₱${(bar.income / 1000).toFixed(bar.income >= 10000 ? 0 : 1)}k`}
-                  </span>
-
-                  <div
-                    className={`w-full rounded-t-xl transition-all duration-300 group-hover:scale-105 cursor-pointer ${
-                      bar.isActive
-                        ? 'bg-gradient-to-t from-purple-700 via-purple-600 to-pink-500 shadow-md shadow-purple-500/20'
-                        : 'bg-purple-100 hover:bg-purple-200'
-                    }`}
-                    style={{ height }}
-                  />
-
-                  <span className={`text-[10px] font-medium truncate w-full text-center ${bar.isActive ? 'font-bold text-purple-900' : 'text-gray-500'}`}>
-                    {bar.shortLabel}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-gray-500">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-700"></span> Active Period
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-700 shrink-0"></span> Active Period
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-100"></span> Prior Periods
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-100 shrink-0"></span> Prior Periods
               </span>
             </div>
             <span className="font-semibold text-purple-900">
@@ -1470,31 +1472,31 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
         </div>
 
         {/* Treatment Popularity Mix with Daily, Weekly, Monthly, Yearly, All Time Toggles */}
-        <div className="bg-white p-6 rounded-2xl border border-pink-100 shadow-xs space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-col gap-2 pb-2 border-b border-gray-100">
-              <div className="flex items-center justify-between">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-pink-100 shadow-xs space-y-4 flex flex-col justify-between min-w-0">
+          <div className="min-w-0">
+            <div className="flex flex-col gap-2 pb-2 border-b border-gray-100 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h4 className="text-sm font-serif font-bold text-gray-900 flex items-center gap-2">
-                  <PieChart className="w-4 h-4 text-pink-600" />
-                  Treatment Popularity Mix
+                  <PieChart className="w-4 h-4 text-pink-600 shrink-0" />
+                  <span>Treatment Popularity Mix</span>
                 </h4>
                 <button
                   type="button"
                   onClick={() => setTreatmentMetric((prev) => (prev === 'bookings' ? 'income' : 'bookings'))}
-                  className="text-[10px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded-md border border-purple-200 transition-colors cursor-pointer"
+                  className="text-[10px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded-md border border-purple-200 transition-colors cursor-pointer shrink-0"
                 >
                   By: {treatmentMetric === 'bookings' ? 'Bookings' : 'Income (₱)'}
                 </button>
               </div>
 
               {/* Treatment Time Grain Toggle: Daily | Weekly | Monthly | Yearly | All Time */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1">
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1 max-w-full">
                 {(['daily', 'weekly', 'monthly', 'yearly', 'all'] as const).map((grain) => (
                   <button
                     key={grain}
                     type="button"
                     onClick={() => setTreatmentTimeGrain(grain)}
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-md capitalize transition-all cursor-pointer shrink-0 ${
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-md capitalize transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                       treatmentTimeGrain === grain
                         ? 'bg-pink-600 text-white shadow-2xs'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1506,7 +1508,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
               </div>
             </div>
 
-            <div className="text-[11px] text-gray-500 pt-2 pb-1 flex justify-between">
+            <div className="text-[11px] text-gray-500 pt-2 pb-1 flex flex-wrap items-center justify-between gap-1">
               <span>{treatmentMixData.filteredCount} appointments analyzed</span>
               <span className="font-semibold text-purple-900">
                 {treatmentMetric === 'bookings'
@@ -1519,11 +1521,11 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             <div className="space-y-3 pt-1">
               {treatmentMixData.categories.map((cat, i) => (
                 <div key={cat.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-gray-700">{cat.name}</span>
-                    <span className="text-purple-900">
+                  <div className="flex items-center justify-between text-xs font-semibold gap-2">
+                    <span className="text-gray-700 truncate">{cat.name}</span>
+                    <span className="text-purple-900 shrink-0 text-right">
                       {treatmentMetric === 'bookings'
-                        ? `${cat.count} bookings (${cat.percentage}%)`
+                        ? `${cat.count} (${cat.percentage}%)`
                         : `₱${cat.income.toLocaleString()} (${cat.percentage}%)`}
                     </span>
                   </div>
@@ -1552,11 +1554,11 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
                   Top Treatments in this Scope
                 </span>
                 {treatmentMixData.topServices.slice(0, 3).map((srv, idx) => (
-                  <div key={srv.name} className="flex items-center justify-between text-[11px] py-0.5">
-                    <span className="text-gray-800 font-medium truncate max-w-[160px]">
+                  <div key={srv.name} className="flex items-center justify-between text-[11px] py-0.5 gap-2">
+                    <span className="text-gray-800 font-medium truncate flex-1 min-w-0">
                       {idx + 1}. {srv.name}
                     </span>
-                    <span className="text-purple-700 font-bold">
+                    <span className="text-purple-700 font-bold shrink-0">
                       {treatmentMetric === 'bookings' ? `${srv.count} visits` : `₱${srv.income.toLocaleString()}`}
                     </span>
                   </div>
@@ -1567,8 +1569,8 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
           <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-100 text-xs text-purple-900 space-y-1 mt-3">
             <p className="font-bold flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              Dynamic Scope Insight
+              <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <span>Dynamic Scope Insight</span>
             </p>
             <p className="text-gray-600 text-[11px] leading-relaxed">
               Viewing <span className="font-bold text-purple-900">{treatmentTimeGrain}</span> popularity by <span className="font-bold text-purple-900">{treatmentMetric}</span>.

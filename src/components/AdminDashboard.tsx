@@ -562,17 +562,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {onNavigateTab && (
             <button
               onClick={() => onNavigateTab('salons')}
-              className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm border border-white/20 transition-all cursor-pointer shadow-xs"
+              className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm border border-white/20 transition-all cursor-pointer shadow-xs"
               title="Leave Admin Console and view public salon directory"
             >
               <Store className="w-3.5 h-3.5 text-rose-300" />
-              <span>Browse Public Salons</span>
+              <span className="hidden sm:inline">Browse Public Salons</span>
+              <span className="sm:hidden">Browse</span>
             </button>
           )}
           {onLogout && (
             <button
               onClick={onLogout}
-              className="px-3.5 py-2 rounded-xl bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold flex items-center gap-1.5 border border-red-500/40 transition-all cursor-pointer shadow-xs"
+              className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold flex items-center gap-1.5 border border-red-500/40 transition-all cursor-pointer shadow-xs"
               title="Sign out of Admin account"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -581,10 +582,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
           <button
             onClick={handleDownloadAdminHtmlReport}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-pink-600/30 transition-all cursor-pointer"
+            className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-pink-600/30 transition-all cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Download Platform Report</span>
+            <span className="hidden sm:inline">Download Platform Report</span>
+            <span className="sm:hidden">Report</span>
           </button>
           <button
             onClick={handlePrintAdminReport}

@@ -30,7 +30,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { HeroSection } from './components/HeroSection';
-import { SalonCard } from './components/SalonCard';
+import { SalonCard, SalonCardSkeleton } from './components/SalonCard';
 import { SalonDetailsModal } from './components/SalonDetailsModal';
 import { ServiceCatalog } from './components/ServiceCatalog';
 import { ReelsView } from './components/ReelsView';
@@ -645,10 +645,44 @@ const AppContent: React.FC = () => {
     setActiveTab('landing');
   };
 
-  // Persist activeTab to localStorage
+  // Persist activeTab to localStorage and reflect in URL hash
   useEffect(() => {
     safeLocalStorage.setItem('nailglamhub_activeTab', activeTab);
+    if (typeof window !== 'undefined' && activeTab && activeTab !== 'landing') {
+      if (window.location.hash !== `#${activeTab}`) {
+        window.history.replaceState(null, '', `#${activeTab}`);
+      }
+    }
   }, [activeTab]);
+
+  // Synchronize on browser history popstate or hashchange
+  useEffect(() => {
+    const handleUrlHashChange = () => {
+      if (typeof window === 'undefined') return;
+      const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (!rawHash) return;
+      const validTabs = [
+        'landing', 'explore', 'salons', 'map', 'services', 'products',
+        'reels', 'reviews', 'favorites', 'customer-dashboard', 'customer-orders',
+        'profile', 'login-customer', 'register-customer', 'login-owner', 'register-owner',
+        'owner-dashboard', 'owner-branches', 'owner-appointments', 'owner-services',
+        'owner-staff', 'owner-inventory', 'owner-location', 'owner-settings',
+        'owner-cancellation-fees', 'owner-emails', 'admin-dashboard', 'admin-salons',
+        'admin-users', 'admin-content', 'admin-announcements', 'admin-appointments',
+        'admin-cancellation-fees', 'admin-emails', 'admin-reports',
+      ];
+      if (validTabs.includes(rawHash)) {
+        setActiveTab((prev) => (prev !== rawHash ? rawHash : prev));
+      }
+    };
+
+    window.addEventListener('hashchange', handleUrlHashChange);
+    window.addEventListener('popstate', handleUrlHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlHashChange);
+      window.removeEventListener('popstate', handleUrlHashChange);
+    };
+  }, []);
 
   // Persist currentUser to localStorage
   useEffect(() => {
@@ -1012,7 +1046,7 @@ const AppContent: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex gap-6 xl:gap-8 flex-1">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex items-start gap-6 xl:gap-8 flex-1 min-h-[calc(100vh-10rem)]">
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}
@@ -1059,7 +1093,7 @@ const AppContent: React.FC = () => {
         />
 
         {/* Dynamic Center Stage Views */}
-        <main className="flex-1 min-w-0 pb-24 lg:pb-12">
+        <main className="flex-1 min-w-0 pb-32 sm:pb-28 lg:pb-12">
           {/* 0. LANDING PAGE VIEW */}
           {activeTab === 'landing' && (
             <LandingPage
@@ -1177,9 +1211,14 @@ const AppContent: React.FC = () => {
 
               {/* Salons Content */}
               {loading ? (
-                <div className="py-16 text-center">
-                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Loading beauty salons...</p>
+                <div
+                  aria-label="Loading verified salons"
+                  aria-busy="true"
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 xl:gap-8"
+                >
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <SalonCardSkeleton key={`salon-loading-skeleton-${index}`} />
+                  ))}
                 </div>
               ) : exploreViewMode === 'map' ? (
                 <div className="animate-in fade-in duration-200">

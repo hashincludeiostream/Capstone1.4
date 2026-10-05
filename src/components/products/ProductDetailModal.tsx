@@ -214,7 +214,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div className="pt-1 sm:pt-2 space-y-2.5 sm:space-y-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <span className="text-[11px] sm:text-xs text-stone-400 block font-sans">Physical Store Settlement Price</span>
+                    <span className="text-[11px] sm:text-xs text-stone-400 block font-sans">Counter / Pickup Price</span>
                     <div className="text-xl sm:text-2xl font-black text-stone-900">
                       ₱{product.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </div>

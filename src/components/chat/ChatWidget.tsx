@@ -446,13 +446,13 @@ How can I help you today?
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 lg:bottom-6 right-3 sm:right-6 z-40 group flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer min-h-[44px]"
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-6 right-3 sm:right-6 z-40 group flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer min-h-[40px] sm:min-h-[44px]"
           aria-label="Open GlamBot Chatbot"
         >
           <div className="relative shrink-0">
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse text-pink-200" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white ring-1 ring-emerald-500 animate-ping" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white ring-1 ring-emerald-500 animate-ping" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
           </div>
           <div className="flex flex-col text-left">
             <span className="text-xs font-bold tracking-wide">
@@ -473,10 +473,10 @@ How can I help you today?
       {/* CHAT WINDOW */}
       {isOpen && (
         <div
-          className={`fixed z-50 transition-all duration-300 shadow-2xl flex flex-col bg-white border border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden ${
+          className={`fixed z-45 transition-all duration-300 shadow-2xl flex flex-col bg-white border border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden ${
             isExpanded
               ? 'inset-2 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[540px] xl:w-[600px] sm:h-[680px] xl:h-[740px] sm:max-h-[calc(100vh-3rem)]'
-              : 'inset-x-2 bottom-20 top-20 sm:inset-x-auto sm:top-auto sm:bottom-20 lg:bottom-6 sm:right-6 sm:w-[420px] 2xl:w-[480px] sm:h-[550px] 2xl:h-[640px] sm:max-h-[calc(100vh-6.5rem)]'
+              : 'inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] top-16 sm:inset-x-auto sm:top-auto sm:bottom-20 lg:bottom-6 sm:right-6 sm:w-[420px] 2xl:w-[480px] sm:h-[550px] 2xl:h-[640px] sm:max-h-[calc(100vh-6.5rem)]'
           }`}
         >
           {/* HEADER */}

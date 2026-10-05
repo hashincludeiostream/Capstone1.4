@@ -110,12 +110,121 @@ export const Sidebar: React.FC<SidebarProps> = ({
   adminActiveAnnouncementsCount = 0,
   adminTotalAppointmentsCount = 0,
 }) => {
+  // Reactive browser URL hash tracking for accurate path detection
+  const [currentHash, setCurrentHash] = React.useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
+    }
+    return '';
+  });
+
+  React.useEffect(() => {
+    const handleLocationChange = () => {
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase().trim();
+        setCurrentHash(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
+  }, []);
+
+  // Centralized navigation handler that keeps state and URL in lockstep
   const handleNavigation = (tab: string) => {
+    if (typeof window !== 'undefined') {
+      const currentTargetHash = `#${tab}`;
+      if (window.location.hash !== currentTargetHash) {
+        window.history.replaceState(null, '', currentTargetHash);
+        setCurrentHash(tab.toLowerCase().trim());
+      }
+    }
     if (onNavigate) {
       onNavigate(tab);
     } else {
       setActiveTab(tab);
     }
+  };
+
+  // Robust path detection that accurately matches active tab, URL context, and subviews
+  const isPathActive = (targetKey: string): boolean => {
+    const normActive = (activeTab || '').toLowerCase().trim();
+    const normTarget = (targetKey || '').toLowerCase().trim();
+    const normHash = (currentHash || '').toLowerCase().trim();
+
+    // 1. Direct match on activeTab or URL hash
+    if (normActive === normTarget || (normHash && normHash === normTarget)) {
+      return true;
+    }
+
+    // 2. Explore / Salons Directory synonyms & sub-views
+    if (normTarget === 'explore' || normTarget === 'salons') {
+      return normActive === 'explore' || normActive === 'salons' || normActive.startsWith('salon') || normHash === 'explore' || normHash === 'salons';
+    }
+
+    // 3. Products / Boutique synonyms & sub-views
+    if (normTarget === 'products') {
+      return normActive === 'products' || normActive.startsWith('product') || normHash === 'products';
+    }
+
+    // 4. Customer Bookings / Dashboard synonyms & sub-views
+    if (normTarget === 'customer-dashboard') {
+      return (
+        normActive === 'customer-dashboard' ||
+        normActive === 'bookings' ||
+        normActive.startsWith('customer-appointment') ||
+        normHash === 'customer-dashboard' ||
+        normHash === 'bookings'
+      );
+    }
+
+    // 5. Customer Orders synonyms & sub-views
+    if (normTarget === 'customer-orders') {
+      return (
+        normActive === 'customer-orders' ||
+        normActive === 'orders' ||
+        normActive.startsWith('order') ||
+        normHash === 'customer-orders' ||
+        normHash === 'orders'
+      );
+    }
+
+    // 6. Favorites
+    if (normTarget === 'favorites') {
+      return normActive === 'favorites' || normHash === 'favorites';
+    }
+
+    // 7. Profile
+    if (normTarget === 'profile') {
+      return normActive === 'profile' || normActive === 'user-profile' || normHash === 'profile';
+    }
+
+    // 8. Salon Owner Overview / Dashboard synonyms
+    if (normTarget === 'owner-dashboard') {
+      return (
+        normActive === 'owner-dashboard' ||
+        normActive === 'owner-overview' ||
+        normActive === 'owner-reports' ||
+        normHash === 'owner-dashboard' ||
+        normHash === 'owner'
+      );
+    }
+
+    // 9. Admin Overview / Dashboard synonyms
+    if (normTarget === 'admin-dashboard') {
+      return (
+        normActive === 'admin-dashboard' ||
+        normActive === 'admin-overview' ||
+        normActive === 'admin' ||
+        normHash === 'admin' ||
+        normHash === 'admin-dashboard'
+      );
+    }
+
+    return false;
   };
 
   const tapCountRef = React.useRef(0);
@@ -146,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ----------------------------------------------------
   if (isAdmin) {
     return (
-      <aside className="w-64 xl:w-72 2xl:w-80 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-5">
+      <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-20 xl:top-24 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 space-y-3.5">
         {/* Admin Identity Card */}
         <div className="bg-gradient-to-br from-stone-950 via-rose-950 to-purple-950 rounded-2xl p-4 text-white shadow-md border border-rose-900/40">
           <div className="flex items-center gap-2.5">
@@ -178,9 +287,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="sidebar-admin-overview-btn"
               onClick={() => handleNavigation('admin-dashboard')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'admin-dashboard'
-                  ? 'bg-rose-900 text-white font-bold shadow-xs'
+              aria-current={isPathActive('admin-dashboard') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+                isPathActive('admin-dashboard')
+                  ? 'bg-rose-900 text-white font-bold shadow-xs ring-1 ring-rose-800'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
               title={
@@ -191,7 +301,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <TrendingUp className="w-4 h-4 text-rose-700 shrink-0" />
+                  <TrendingUp className={`w-4 h-4 shrink-0 ${isPathActive('admin-dashboard') ? 'text-white' : 'text-rose-700'}`} />
                 </div>
                 <span className="truncate">Overview & KPIs</span>
               </div>
@@ -199,7 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-admin-overview-badge"
                   count={adminTotalAppointmentsCount}
-                  variant={activeTab === 'admin-dashboard' ? 'white' : 'rose'}
+                  variant={isPathActive('admin-dashboard') ? 'white' : 'rose'}
                   size="sm"
                 />
               )}
@@ -209,13 +319,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {(() => {
               const hasPending = adminPendingSalonsCount > 0;
               const countToShow = hasPending ? adminPendingSalonsCount : adminTotalSalonsCount;
+              const isActive = isPathActive('admin-salons');
               return (
                 <button
                   id="sidebar-admin-salons-btn"
                   onClick={() => handleNavigation('admin-salons')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                    activeTab === 'admin-salons'
-                      ? 'bg-rose-900 text-white font-bold shadow-xs'
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+                    isActive
+                      ? 'bg-rose-900 text-white font-bold shadow-xs ring-1 ring-rose-800'
                       : 'text-rose-950 hover:bg-rose-50'
                   }`}
                   title={
@@ -226,7 +338,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
-                      <Store className="w-4 h-4 text-rose-700 shrink-0" />
+                      <Store className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-rose-700'}`} />
                     </div>
                     <span className="truncate">Salon Approvals</span>
                   </div>
@@ -234,7 +346,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <NotificationBadge
                       id="sidebar-admin-salons-badge"
                       count={hasPending ? `${countToShow} pending` : countToShow}
-                      variant={activeTab === 'admin-salons' ? 'white' : 'rose'}
+                      variant={isActive ? 'white' : 'rose'}
                       priority={hasPending ? 'urgent' : 'normal'}
                       isUnread={hasPending && unreadAlertsCount > 0}
                       showPing={true}
@@ -249,16 +361,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="sidebar-admin-users-btn"
               onClick={() => handleNavigation('admin-users')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'admin-users'
-                  ? 'bg-rose-900 text-white font-bold shadow-xs'
+              aria-current={isPathActive('admin-users') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+                isPathActive('admin-users')
+                  ? 'bg-rose-900 text-white font-bold shadow-xs ring-1 ring-rose-800'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
               title={`${adminTotalUsersCount} registered user accounts across clients, owners & admins`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4 text-rose-700 shrink-0" />
+                  <Users className={`w-4 h-4 shrink-0 ${isPathActive('admin-users') ? 'text-white' : 'text-rose-700'}`} />
                 </div>
                 <span className="truncate">User Accounts</span>
               </div>
@@ -266,7 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-admin-users-badge"
                   count={adminTotalUsersCount}
-                  variant={activeTab === 'admin-users' ? 'white' : 'rose'}
+                  variant={isPathActive('admin-users') ? 'white' : 'rose'}
                   size="sm"
                 />
               )}
@@ -275,17 +388,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Content Moderation */}
             <button
               id="sidebar-admin-content-btn"
-              onClick={() => setActiveTab('admin-content')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'admin-content'
-                  ? 'bg-rose-900 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('admin-content')}
+              aria-current={isPathActive('admin-content') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+                isPathActive('admin-content')
+                  ? 'bg-rose-900 text-white font-bold shadow-xs ring-1 ring-rose-800'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
               title={`${adminContentCount} community reviews & viral reels`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <SlidersHorizontal className="w-4 h-4 text-rose-700 shrink-0" />
+                  <SlidersHorizontal className={`w-4 h-4 shrink-0 ${isPathActive('admin-content') ? 'text-white' : 'text-rose-700'}`} />
                 </div>
                 <span className="truncate">Content Moderation</span>
               </div>
@@ -293,7 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-admin-content-badge"
                   count={adminContentCount}
-                  variant={activeTab === 'admin-content' ? 'white' : 'rose'}
+                  variant={isPathActive('admin-content') ? 'white' : 'rose'}
                   size="sm"
                 />
               )}
@@ -302,20 +416,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Site Broadcasts */}
             {(() => {
               const hasActiveBroadcasts = adminActiveAnnouncementsCount > 0;
+              const isActive = isPathActive('admin-announcements');
               return (
                 <button
                   id="sidebar-admin-announcements-btn"
-                  onClick={() => setActiveTab('admin-announcements')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                    activeTab === 'admin-announcements'
-                      ? 'bg-rose-900 text-white font-bold shadow-xs'
+                  onClick={() => handleNavigation('admin-announcements')}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+                    isActive
+                      ? 'bg-rose-900 text-white font-bold shadow-xs ring-1 ring-rose-800'
                       : 'text-rose-950 hover:bg-rose-50'
                   }`}
                   title={`${adminActiveAnnouncementsCount} active broadcast banner${adminActiveAnnouncementsCount !== 1 ? 's' : ''}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
-                      <Radio className="w-4 h-4 text-rose-700 shrink-0" />
+                      <Radio className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-rose-700'}`} />
                     </div>
                     <span className="truncate">Site Broadcasts</span>
                   </div>
@@ -323,7 +439,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <NotificationBadge
                       id="sidebar-admin-announcements-badge"
                       count={adminActiveAnnouncementsCount}
-                      variant={activeTab === 'admin-announcements' ? 'white' : 'rose'}
+                      variant={isActive ? 'white' : 'rose'}
                       priority="normal"
                       isUnread={hasActiveBroadcasts && unreadAlertsCount > 0}
                       showPing={true}
@@ -337,23 +453,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* My Account Profile */}
             <button
               id="sidebar-admin-profile-btn"
-              onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'profile'
-                  ? 'bg-rose-900 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('profile')}
+              aria-current={isPathActive('profile') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+                isPathActive('profile')
+                  ? 'bg-rose-900 text-white font-bold shadow-xs ring-1 ring-rose-800'
                   : 'text-rose-950 hover:bg-rose-50'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <UserIcon className="w-4 h-4 text-rose-700 shrink-0" />
+                  <UserIcon className={`w-4 h-4 shrink-0 ${isPathActive('profile') ? 'text-white' : 'text-rose-700'}`} />
                 </div>
                 <span className="truncate">My Account Profile</span>
               </div>
               <NotificationBadge
                 id="sidebar-admin-profile-badge"
                 label="ADMIN"
-                variant={activeTab === 'profile' ? 'white' : 'rose'}
+                variant={isPathActive('profile') ? 'white' : 'rose'}
                 size="sm"
               />
             </button>
@@ -369,9 +486,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 mt-1">
             <button
               id="sidebar-admin-quick-broadcast-btn"
-              onClick={() => setActiveTab('admin-announcements')}
+              onClick={() => handleNavigation('admin-announcements')}
+              aria-current={isPathActive('admin-announcements') ? 'page' : undefined}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                activeTab === 'admin-announcements'
+                isPathActive('admin-announcements')
                   ? 'bg-rose-900 text-white'
                   : 'text-rose-900 bg-white hover:bg-rose-100/70 border border-rose-200'
               }`}
@@ -392,8 +510,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="sidebar-admin-explore-salons-btn"
               onClick={() => handleNavigation('salons')}
+              aria-current={isPathActive('salons') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'salons' || activeTab === 'explore'
+                isPathActive('salons')
                   ? 'bg-pink-100 text-pink-900 font-bold'
                   : 'text-gray-700 hover:bg-pink-50'
               }`}
@@ -404,8 +523,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="sidebar-admin-explore-products-btn"
               onClick={() => handleNavigation('products')}
+              aria-current={isPathActive('products') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'products'
+                isPathActive('products')
                   ? 'bg-pink-100 text-pink-900 font-bold'
                   : 'text-gray-700 hover:bg-pink-50'
               }`}
@@ -416,8 +536,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="sidebar-admin-explore-map-btn"
               onClick={() => handleNavigation('map')}
+              aria-current={isPathActive('map') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'map'
+                isPathActive('map')
                   ? 'bg-pink-100 text-pink-900 font-bold'
                   : 'text-gray-700 hover:bg-pink-50'
               }`}
@@ -448,14 +569,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Lock className="w-3 h-3 text-rose-600" />
             <span>Strict RBAC Security Enforcement</span>
           </div>
-          <p className="text-[11px] text-gray-400">© 2025 Nail Glam Hub Security Guard.</p>
+          <p className="text-[11px] text-gray-400">© 2026 Nail Glam Hub Security Guard.</p>
         </div>
       </aside>
     );
   }
+
+  // ----------------------------------------------------
+  // SALON OWNER SIDEBAR VIEW
+  // ----------------------------------------------------
   if (isOwner) {
     return (
-      <aside className="w-64 xl:w-72 2xl:w-80 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-5">
+      <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-20 xl:top-24 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 space-y-3.5">
         {/* Salon Partner Studio Card */}
         <div className="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl p-4 text-white shadow-md border border-purple-800">
           <div className="flex items-center gap-2">
@@ -486,17 +611,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Branch Overview */}
             <button
               id="sidebar-owner-branches-btn"
-              onClick={() => setActiveTab('owner-branches')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'owner-branches'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('owner-branches')}
+              aria-current={isPathActive('owner-branches') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-branches')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
               title={`${ownerSalonsCount} branch${ownerSalonsCount !== 1 ? 'es' : ''}${ownerPendingSalonsCount > 0 ? ` • ${ownerPendingSalonsCount} pending approval` : ''}`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <Store className="w-4 h-4 text-purple-600 shrink-0" />
+                  <Store className={`w-4 h-4 shrink-0 ${isPathActive('owner-branches') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">Branch Overview</span>
               </div>
@@ -504,7 +630,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-owner-branches-badge"
                   count={ownerSalonsCount}
-                  variant={activeTab === 'owner-branches' ? 'white' : 'amber'}
+                  variant={isPathActive('owner-branches') ? 'white' : 'amber'}
                   priority={ownerPendingSalonsCount > 0 ? 'urgent' : 'normal'}
                   isUnread={ownerPendingSalonsCount > 0 && categoryUnread.alerts}
                   showPing={true}
@@ -516,17 +642,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Store Reports & CRM */}
             <button
               id="sidebar-owner-overview-btn"
-              onClick={() => setActiveTab('owner-dashboard')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'owner-dashboard'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('owner-dashboard')}
+              aria-current={isPathActive('owner-dashboard') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-dashboard')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
               title={`${ownerReviewsCount} client review${ownerReviewsCount !== 1 ? 's' : ''} & store analytics`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <BarChart3 className="w-4 h-4 text-purple-600 shrink-0" />
+                  <BarChart3 className={`w-4 h-4 shrink-0 ${isPathActive('owner-dashboard') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">Store Reports & CRM</span>
               </div>
@@ -534,7 +661,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-owner-crm-badge"
                   count={ownerReviewsCount}
-                  variant={activeTab === 'owner-dashboard' ? 'white' : 'purple'}
+                  variant={isPathActive('owner-dashboard') ? 'white' : 'purple'}
                   size="sm"
                 />
               )}
@@ -546,13 +673,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const countToShow = hasPendingAppts
                 ? ownerPendingAppointmentsCount
                 : ownerActiveAppointmentsCount || ownerAppointmentsCount;
+              const isActive = isPathActive('owner-appointments');
               return (
                 <button
                   id="sidebar-owner-appointments-btn"
-                  onClick={() => setActiveTab('owner-appointments')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                    activeTab === 'owner-appointments'
-                      ? 'bg-purple-700 text-white font-bold shadow-xs'
+                  onClick={() => handleNavigation('owner-appointments')}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                    isActive
+                      ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                       : 'text-purple-950 hover:bg-purple-50'
                   }`}
                   title={
@@ -563,7 +692,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
-                      <Calendar className="w-4 h-4 text-purple-600 shrink-0" />
+                      <Calendar className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-purple-600'}`} />
                     </div>
                     <span className="truncate">Bookings & Schedule</span>
                   </div>
@@ -571,7 +700,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <NotificationBadge
                       id="sidebar-owner-appointments-badge"
                       count={hasPendingAppts ? `${countToShow} new` : countToShow}
-                      variant={activeTab === 'owner-appointments' ? 'white' : 'purple'}
+                      variant={isActive ? 'white' : 'purple'}
                       priority={hasPendingAppts ? 'urgent' : 'normal'}
                       isUnread={hasPendingAppts && categoryUnread.bookings}
                       showPing={true}
@@ -585,17 +714,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Services & Treatments */}
             <button
               id="sidebar-owner-services-btn"
-              onClick={() => setActiveTab('owner-services')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'owner-services'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('owner-services')}
+              aria-current={isPathActive('owner-services') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-services')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
               title={`${ownerServicesCount} specialty nail service${ownerServicesCount !== 1 ? 's' : ''}`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <Scissors className="w-4 h-4 text-purple-600 shrink-0" />
+                  <Scissors className={`w-4 h-4 shrink-0 ${isPathActive('owner-services') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">Services &amp; Treatments</span>
               </div>
@@ -603,7 +733,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-owner-services-badge"
                   count={ownerServicesCount}
-                  variant={activeTab === 'owner-services' ? 'white' : 'purple'}
+                  variant={isPathActive('owner-services') ? 'white' : 'purple'}
                   size="sm"
                 />
               )}
@@ -612,17 +742,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Staff & Artists Roster */}
             <button
               id="sidebar-owner-staff-btn"
-              onClick={() => setActiveTab('owner-staff')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'owner-staff'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('owner-staff')}
+              aria-current={isPathActive('owner-staff') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-staff')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
               title={`${ownerStaffCount} nail artist${ownerStaffCount !== 1 ? 's' : ''} & technicians`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4 text-purple-600 shrink-0" />
+                  <Users className={`w-4 h-4 shrink-0 ${isPathActive('owner-staff') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">Staff & Artists Roster</span>
               </div>
@@ -630,7 +761,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-owner-staff-badge"
                   count={ownerStaffCount}
-                  variant={activeTab === 'owner-staff' ? 'white' : 'purple'}
+                  variant={isPathActive('owner-staff') ? 'white' : 'purple'}
                   size="sm"
                 />
               )}
@@ -642,13 +773,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const countToShow = hasPendingOrders
                 ? ownerPendingOrdersCount
                 : ownerInventoryCount;
+              const isActive = isPathActive('owner-inventory');
               return (
                 <button
                   id="sidebar-owner-inventory-btn"
-                  onClick={() => setActiveTab('owner-inventory')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                    activeTab === 'owner-inventory'
-                      ? 'bg-purple-700 text-white font-bold shadow-xs'
+                  onClick={() => handleNavigation('owner-inventory')}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                    isActive
+                      ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                       : 'text-purple-950 hover:bg-purple-50'
                   }`}
                   title={
@@ -659,7 +792,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex items-center justify-center shrink-0">
-                      <Package className="w-4 h-4 text-purple-600 shrink-0" />
+                      <Package className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-purple-600'}`} />
                     </div>
                     <span className="truncate">Products & Stock</span>
                   </div>
@@ -667,7 +800,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <NotificationBadge
                       id="sidebar-owner-inventory-badge"
                       count={hasPendingOrders ? `${countToShow} orders` : countToShow}
-                      variant={activeTab === 'owner-inventory' ? 'white' : 'emerald'}
+                      variant={isActive ? 'white' : 'emerald'}
                       priority={hasPendingOrders ? 'urgent' : 'normal'}
                       isUnread={hasPendingOrders && categoryUnread.cart}
                       showPing={true}
@@ -681,17 +814,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Store Location & Map */}
             <button
               id="sidebar-owner-location-btn"
-              onClick={() => setActiveTab('owner-location')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'owner-location'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('owner-location')}
+              aria-current={isPathActive('owner-location') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-location')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
               title="Store Location & GPS Map"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <MapPin className="w-4 h-4 text-purple-600 shrink-0" />
+                  <MapPin className={`w-4 h-4 shrink-0 ${isPathActive('owner-location') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">Store Location & Map</span>
               </div>
@@ -699,7 +833,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <NotificationBadge
                   id="sidebar-owner-location-badge"
                   label="GPS"
-                  variant={activeTab === 'owner-location' ? 'white' : 'purple'}
+                  variant={isPathActive('owner-location') ? 'white' : 'purple'}
                   size="sm"
                 />
               )}
@@ -708,24 +842,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Salon Profile & Hours */}
             <button
               id="sidebar-owner-settings-btn"
-              onClick={() => setActiveTab('owner-settings')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'owner-settings'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('owner-settings')}
+              aria-current={isPathActive('owner-settings') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-settings')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
               title="Salon Profile & Operating Hours"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4 text-purple-600 shrink-0" />
+                  <Clock className={`w-4 h-4 shrink-0 ${isPathActive('owner-settings') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">Salon Profile & Hours</span>
               </div>
               <NotificationBadge
                 id="sidebar-owner-hours-badge"
                 label="7D"
-                variant={activeTab === 'owner-settings' ? 'white' : 'emerald'}
+                variant={isPathActive('owner-settings') ? 'white' : 'emerald'}
                 size="sm"
               />
             </button>
@@ -733,23 +868,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* My Account Profile */}
             <button
               id="sidebar-owner-profile-btn"
-              onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                activeTab === 'profile'
-                  ? 'bg-purple-700 text-white font-bold shadow-xs'
+              onClick={() => handleNavigation('profile')}
+              aria-current={isPathActive('profile') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('profile')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
                   : 'text-purple-950 hover:bg-purple-50'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative flex items-center justify-center shrink-0">
-                  <UserIcon className="w-4 h-4 text-purple-600 shrink-0" />
+                  <UserIcon className={`w-4 h-4 shrink-0 ${isPathActive('profile') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
                 <span className="truncate">My Account Profile</span>
               </div>
               <NotificationBadge
                 id="sidebar-owner-profile-badge"
                 label="OWNER"
-                variant={activeTab === 'profile' ? 'white' : 'purple'}
+                variant={isPathActive('profile') ? 'white' : 'purple'}
                 size="sm"
               />
             </button>
@@ -765,10 +901,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 mt-1">
             <button
               id="sidebar-register-branch-btn"
-              onClick={() => setActiveTab('owner-branches')}
+              onClick={() => handleNavigation('owner-branches')}
+              aria-current={isPathActive('owner-branches') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'owner-branches'
-                  ? 'bg-purple-700 text-white font-bold'
+                isPathActive('owner-branches')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-900 bg-white hover:bg-purple-100/70 border border-purple-200'
               }`}
             >
@@ -795,7 +932,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <PhoneCall className="w-3 h-3" /> Partner Desk
             </button>
           </div>
-          <p className="text-[11px] text-gray-400">© 2025 Nail Glam Hub Partner Network.</p>
+          <p className="text-[11px] text-gray-400">© 2026 Nail Glam Hub Partner Network.</p>
         </div>
       </aside>
     );
@@ -805,65 +942,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // CLIENT & GUEST SIDEBAR VIEW
   // ----------------------------------------------------
   return (
-    <aside className="w-64 xl:w-72 2xl:w-80 shrink-0 hidden lg:block sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto pr-3 space-y-6">
+    <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-20 xl:top-24 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 space-y-3.5">
       {/* Primary Discovery Menu */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-pink-100/80 shadow-xs">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 border border-pink-100/80 shadow-xs">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1.5">
           Discover & Book
         </p>
         <div className="space-y-1 mt-1">
           <button
             id="sidebar-explore-btn"
-            onClick={() => setActiveTab('explore')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === 'explore'
-                ? 'bg-pink-100 text-pink-900 font-semibold'
+            onClick={() => handleNavigation('explore')}
+            aria-current={isPathActive('explore') ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+              isPathActive('explore')
+                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                 : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
             }`}
           >
-            <Compass className="w-4 h-4 text-pink-600" />
+            <Compass className={`w-4 h-4 shrink-0 ${isPathActive('explore') ? 'text-pink-700' : 'text-pink-600'}`} />
             <span>Salons Directory</span>
           </button>
 
           <button
             id="sidebar-map-btn"
-            onClick={() => setActiveTab('map')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === 'map'
-                ? 'bg-pink-100 text-pink-900 font-semibold'
+            onClick={() => handleNavigation('map')}
+            aria-current={isPathActive('map') ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+              isPathActive('map')
+                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                 : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
             }`}
           >
-            <MapPin className="w-4 h-4 text-pink-600" />
+            <MapPin className={`w-4 h-4 shrink-0 ${isPathActive('map') ? 'text-pink-700' : 'text-pink-600'}`} />
             <span>Store Locator Map</span>
           </button>
 
           <button
             id="sidebar-services-btn"
-            onClick={() => setActiveTab('services')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === 'services'
-                ? 'bg-pink-100 text-pink-900 font-semibold'
+            onClick={() => handleNavigation('services')}
+            aria-current={isPathActive('services') ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+              isPathActive('services')
+                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                 : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-rose-500" />
+            <Sparkles className={`w-4 h-4 shrink-0 ${isPathActive('services') ? 'text-rose-700' : 'text-rose-500'}`} />
             <span>Service Catalog</span>
           </button>
 
           <button
             id="sidebar-products-btn"
-            onClick={() => setActiveTab('products')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === 'products'
-                ? 'bg-pink-100 text-pink-900 font-semibold'
+            onClick={() => handleNavigation('products')}
+            aria-current={isPathActive('products') ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+              isPathActive('products')
+                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                 : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
             }`}
           >
-            <ShoppingBag className="w-4 h-4 text-emerald-600" />
-            <div className="flex items-center justify-between flex-1">
-              <span>Products & Care</span>
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-1.5 py-0.2 rounded-full">
+            <ShoppingBag className={`w-4 h-4 shrink-0 ${isPathActive('products') ? 'text-emerald-700' : 'text-emerald-600'}`} />
+            <div className="flex items-center justify-between flex-1 min-w-0">
+              <span className="truncate">Products & Care</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-1.5 py-0.2 rounded-full shrink-0">
                 BOUTIQUE
               </span>
             </div>
@@ -871,17 +1012,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             id="sidebar-reels-btn"
-            onClick={() => setActiveTab('reels')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === 'reels'
-                ? 'bg-pink-100 text-pink-900 font-semibold'
+            onClick={() => handleNavigation('reels')}
+            aria-current={isPathActive('reels') ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+              isPathActive('reels')
+                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                 : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
             }`}
           >
-            <Flame className="w-4 h-4 text-amber-500" />
-            <div className="flex items-center justify-between flex-1">
-              <span>Viral Nail Reels</span>
-              <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.2 rounded-full">
+            <Flame className={`w-4 h-4 shrink-0 ${isPathActive('reels') ? 'text-amber-600' : 'text-amber-500'}`} />
+            <div className="flex items-center justify-between flex-1 min-w-0">
+              <span className="truncate">Viral Nail Reels</span>
+              <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.2 rounded-full shrink-0">
                 HOT
               </span>
             </div>
@@ -889,21 +1031,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             id="sidebar-reviews-btn"
-            onClick={() => setActiveTab('reviews')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === 'reviews'
-                ? 'bg-pink-100 text-pink-900 font-semibold'
+            onClick={() => handleNavigation('reviews')}
+            aria-current={isPathActive('reviews') ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+              isPathActive('reviews')
+                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                 : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
             }`}
           >
-            <Heart className="w-4 h-4 text-pink-600" />
+            <Heart className={`w-4 h-4 shrink-0 ${isPathActive('reviews') ? 'text-pink-700' : 'text-pink-600'}`} />
             <span>Client Reviews</span>
           </button>
         </div>
       </div>
 
       {/* Customer Workspace / Auth Links */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-pink-100/80 shadow-xs">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 border border-pink-100/80 shadow-xs">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1.5">
           {currentUser ? 'My Account' : 'Client Access'}
         </p>
@@ -912,14 +1055,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <>
               {/* My Bookings with notification signal and numbering */}
               {(() => {
-                const hasActiveBookings = activeBookingsCount > 0;
+                const isActive = isPathActive('customer-dashboard');
                 return (
                   <button
                     id="sidebar-appointments-btn"
-                    onClick={() => setActiveTab('customer-dashboard')}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                      activeTab === 'customer-dashboard'
-                        ? 'bg-pink-100 text-pink-900 font-semibold shadow-xs'
+                    onClick={() => handleNavigation('customer-dashboard')}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                      isActive
+                        ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                         : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
                     }`}
                     title={
@@ -930,7 +1074,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative flex items-center justify-center shrink-0">
-                        <CalendarCheck className="w-4 h-4 text-pink-600 shrink-0" />
+                        <CalendarCheck className={`w-4 h-4 shrink-0 ${isActive ? 'text-pink-700' : 'text-pink-600'}`} />
                       </div>
                       <span className="truncate">My Bookings</span>
                     </div>
@@ -939,7 +1083,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <NotificationBadge
                         id="sidebar-bookings-badge"
                         count={bookingsCount}
-                        variant={activeTab === 'customer-dashboard' ? 'white' : 'pink'}
+                        variant={isActive ? 'white' : 'pink'}
                         priority="normal"
                         isUnread={unreadBookingsCount > 0}
                         showPing={true}
@@ -952,14 +1096,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               {/* Reserved Orders with notification signal and numbering */}
               {(() => {
-                const hasActiveOrders = activeOrdersCount > 0;
+                const isActive = isPathActive('customer-orders');
                 return (
                   <button
                     id="sidebar-orders-btn"
-                    onClick={() => setActiveTab('customer-orders')}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                      activeTab === 'customer-orders'
-                        ? 'bg-pink-100 text-pink-900 font-semibold shadow-xs'
+                    onClick={() => handleNavigation('customer-orders')}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                      isActive
+                        ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                         : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
                     }`}
                     title={
@@ -970,7 +1115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative flex items-center justify-center shrink-0">
-                        <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <ShoppingBag className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-700' : 'text-emerald-600'}`} />
                       </div>
                       <span className="truncate">Reserved Orders</span>
                     </div>
@@ -979,7 +1124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <NotificationBadge
                         id="sidebar-orders-badge"
                         count={ordersCount}
-                        variant={activeTab === 'customer-orders' ? 'white' : 'emerald'}
+                        variant={isActive ? 'white' : 'emerald'}
                         priority="normal"
                         isUnread={unreadOrdersCount > 0}
                         showPing={true}
@@ -992,17 +1137,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <button
                 id="sidebar-favorites-btn"
-                onClick={() => setActiveTab('favorites')}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
-                  activeTab === 'favorites'
-                    ? 'bg-pink-100 text-pink-900 font-semibold shadow-xs'
+                onClick={() => handleNavigation('favorites')}
+                aria-current={isPathActive('favorites') ? 'page' : undefined}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                  isPathActive('favorites')
+                    ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                     : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
                 }`}
                 title={favoritesCount > 0 ? `${favoritesCount} saved favorite salon${favoritesCount !== 1 ? 's' : ''}` : 'Favorite Salons'}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="relative flex items-center justify-center shrink-0">
-                    <Heart className="w-4 h-4 text-pink-600 shrink-0" />
+                    <Heart className={`w-4 h-4 shrink-0 ${isPathActive('favorites') ? 'text-pink-700' : 'text-pink-600'}`} />
                   </div>
                   <span className="truncate">Favorite Salons</span>
                 </div>
@@ -1010,7 +1156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <NotificationBadge
                     id="sidebar-favorites-badge"
                     count={favoritesCount}
-                    variant={activeTab === 'favorites' ? 'white' : 'pink'}
+                    variant={isPathActive('favorites') ? 'white' : 'pink'}
                     size="sm"
                   />
                 )}
@@ -1018,14 +1164,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <button
                 id="sidebar-profile-btn"
-                onClick={() => setActiveTab('profile')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  activeTab === 'profile'
-                    ? 'bg-pink-100 text-pink-900 font-semibold'
+                onClick={() => handleNavigation('profile')}
+                aria-current={isPathActive('profile') ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                  isPathActive('profile')
+                    ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
                     : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
                 }`}
               >
-                <UserIcon className="w-4 h-4 text-pink-600" />
+                <UserIcon className={`w-4 h-4 shrink-0 ${isPathActive('profile') ? 'text-pink-700' : 'text-pink-600'}`} />
                 <span>My Profile</span>
               </button>
 
@@ -1034,7 +1181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenBooking}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-pink-700 bg-pink-50/80 hover:bg-pink-100 transition-colors cursor-pointer"
               >
-                <Scissors className="w-4 h-4 text-pink-600" />
+                <Scissors className="w-4 h-4 text-pink-600 shrink-0" />
                 <span>Book Appointment</span>
               </button>
             </>
@@ -1042,26 +1189,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <>
               <button
                 id="sidebar-login-customer-btn"
-                onClick={() => setActiveTab('login-customer')}
+                onClick={() => handleNavigation('login-customer')}
+                aria-current={isPathActive('login-customer') ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                  activeTab === 'login-customer'
-                    ? 'bg-pink-100 text-pink-900 font-bold'
+                  isPathActive('login-customer')
+                    ? 'bg-pink-100 text-pink-900 font-bold shadow-xs'
                     : 'text-pink-700 hover:bg-pink-50'
                 }`}
               >
-                <Heart className="w-4 h-4 text-pink-600" />
+                <Heart className="w-4 h-4 text-pink-600 shrink-0" />
                 <span>Client Login</span>
               </button>
               <button
                 id="sidebar-register-customer-btn"
-                onClick={() => setActiveTab('register-customer')}
+                onClick={() => handleNavigation('register-customer')}
+                aria-current={isPathActive('register-customer') ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  activeTab === 'register-customer'
-                    ? 'bg-pink-100 text-pink-900 font-bold'
+                  isPathActive('register-customer')
+                    ? 'bg-pink-100 text-pink-900 font-bold shadow-xs'
                     : 'text-gray-700 hover:bg-pink-50'
                 }`}
               >
-                <UserCheck className="w-4 h-4 text-pink-600" />
+                <UserCheck className="w-4 h-4 text-pink-600 shrink-0" />
                 <span>New Client Sign Up</span>
               </button>
             </>
@@ -1079,26 +1228,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 mt-1">
             <button
               id="sidebar-owner-login-btn"
-              onClick={() => setActiveTab('login-owner')}
+              onClick={() => handleNavigation('login-owner')}
+              aria-current={isPathActive('login-owner') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'login-owner'
-                  ? 'bg-purple-700 text-white font-bold'
+                isPathActive('login-owner')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-800 hover:bg-purple-100/70'
               }`}
             >
-              <Store className="w-4 h-4 text-purple-600" />
+              <Store className="w-4 h-4 text-purple-600 shrink-0" />
               <span>Partner Login</span>
             </button>
             <button
               id="sidebar-owner-register-btn"
-              onClick={() => setActiveTab('register-owner')}
+              onClick={() => handleNavigation('register-owner')}
+              aria-current={isPathActive('register-owner') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                activeTab === 'register-owner'
-                  ? 'bg-purple-700 text-white font-bold'
+                isPathActive('register-owner')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs'
                   : 'text-purple-900 hover:bg-purple-100/70'
               }`}
             >
-              <Scissors className="w-4 h-4 text-purple-600" />
+              <Scissors className="w-4 h-4 text-purple-600 shrink-0" />
               <span>Register Salon</span>
             </button>
           </div>
@@ -1115,14 +1266,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 mt-1">
             <button
               id="sidebar-admin-portal-btn"
-              onClick={() => setActiveTab('admin-dashboard')}
+              onClick={() => handleNavigation('admin-dashboard')}
+              aria-current={isPathActive('admin-dashboard') ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'admin-dashboard'
+                isPathActive('admin-dashboard')
                   ? 'bg-rose-600 text-white font-semibold shadow-xs'
                   : 'text-rose-900 hover:bg-rose-100/70'
               }`}
             >
-              <UserCheck className="w-4 h-4" />
+              <UserCheck className="w-4 h-4 shrink-0" />
               <span>Administration</span>
             </button>
           </div>
