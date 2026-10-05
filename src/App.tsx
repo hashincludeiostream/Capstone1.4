@@ -1409,8 +1409,13 @@ const AppContent: React.FC = () => {
                     ? 'branches'
                     : activeTab === 'owner-inventory'
                     ? 'inventory'
+                    : activeTab === 'owner-cancellation-fees'
+                    ? 'cancellation-fees'
+                    : activeTab === 'owner-emails'
+                    ? 'emails'
                     : 'overview'
                 }
+                onNavigateTab={(tab) => handleNavigate(tab)}
               />
             ) : currentUser ? (
               <div className="py-16 text-center bg-white rounded-3xl p-8 border border-purple-100 max-w-lg mx-auto shadow-sm">
@@ -1478,9 +1483,11 @@ const AppContent: React.FC = () => {
                     ? 'content'
                     : activeTab === 'admin-announcements'
                     ? 'announcements'
+                    : activeTab === 'admin-email_reports'
+                    ? 'email_reports'
                     : 'overview'
                 }
-                onNavigateTab={(tab) => setActiveTab(tab)}
+                onNavigateTab={(tab) => handleNavigate(tab)}
                 onLogout={handleLogout}
               />
             ) : currentUser ? (

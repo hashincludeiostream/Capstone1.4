@@ -277,7 +277,7 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
       </div>
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3.5">
         {/* Total Assessed */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-2xs">
           <div className="flex items-center justify-between">
@@ -351,7 +351,7 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
         </div>
 
         {/* Within Grace Window (Free) */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-2xs col-span-2 lg:col-span-1">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-2xs col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
               Within 30m Grace (Free)

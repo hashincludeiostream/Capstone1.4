@@ -230,48 +230,48 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
       </div>
 
       {/* Aggregated Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border border-purple-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Store className="w-5 h-5 text-purple-600" />
-            <span className="text-xs font-semibold text-purple-700">Total Branches</span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-3.5 sm:p-4 border border-purple-200 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 min-w-0">
+            <Store className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 shrink-0" />
+            <span className="text-xs font-semibold text-purple-700 truncate">Total Branches</span>
           </div>
-          <div className="text-2xl font-bold text-purple-900">{aggregated.totalBranches}</div>
+          <div className="text-xl sm:text-2xl font-bold text-purple-900 truncate">{aggregated.totalBranches}</div>
         </div>
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            <span className="text-xs font-semibold text-green-700">Total Revenue</span>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-3.5 sm:p-4 border border-green-200 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 min-w-0">
+            <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 shrink-0" />
+            <span className="text-xs font-semibold text-green-700 truncate">Total Revenue</span>
           </div>
-          <div className="text-2xl font-bold text-green-900">₱{aggregated.totalRevenue.toLocaleString()}</div>
+          <div className="text-xl sm:text-2xl font-bold text-green-900 truncate">₱{aggregated.totalRevenue.toLocaleString()}</div>
         </div>
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <span className="text-xs font-semibold text-blue-700">Total Bookings</span>
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3.5 sm:p-4 border border-blue-200 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 min-w-0">
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 shrink-0" />
+            <span className="text-xs font-semibold text-blue-700 truncate">Total Bookings</span>
           </div>
-          <div className="text-2xl font-bold text-blue-900">{aggregated.totalBookings}</div>
+          <div className="text-xl sm:text-2xl font-bold text-blue-900 truncate">{aggregated.totalBookings}</div>
         </div>
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-4 border border-amber-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-5 h-5 text-amber-600" />
-            <span className="text-xs font-semibold text-amber-700">Total Staff</span>
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-3.5 sm:p-4 border border-amber-200 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 min-w-0">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0" />
+            <span className="text-xs font-semibold text-amber-700 truncate">Total Staff</span>
           </div>
-          <div className="text-2xl font-bold text-amber-900">{aggregated.totalStaff}</div>
+          <div className="text-xl sm:text-2xl font-bold text-amber-900 truncate">{aggregated.totalStaff}</div>
         </div>
-        <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-4 border border-pink-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Star className="w-5 h-5 text-pink-600" />
-            <span className="text-xs font-semibold text-pink-700">Avg Rating</span>
+        <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-3.5 sm:p-4 border border-pink-200 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 min-w-0">
+            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-pink-600 shrink-0" />
+            <span className="text-xs font-semibold text-pink-700 truncate">Avg Rating</span>
           </div>
-          <div className="text-2xl font-bold text-pink-900">{aggregated.overallRating.toFixed(1)}</div>
+          <div className="text-xl sm:text-2xl font-bold text-pink-900 truncate">{aggregated.overallRating.toFixed(1)}</div>
         </div>
-        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl p-4 border border-indigo-200">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-indigo-600" />
-            <span className="text-xs font-semibold text-indigo-700">Completed</span>
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl p-3.5 sm:p-4 border border-indigo-200 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 min-w-0">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 shrink-0" />
+            <span className="text-xs font-semibold text-indigo-700 truncate">Completed</span>
           </div>
-          <div className="text-2xl font-bold text-indigo-900">{aggregated.totalCompleted}</div>
+          <div className="text-xl sm:text-2xl font-bold text-indigo-900 truncate">{aggregated.totalCompleted}</div>
         </div>
       </div>
 
@@ -309,7 +309,7 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
 
       {/* Branch Cards View */}
       {viewMode === 'cards' && sortedBranches.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 sm:gap-6">
           {sortedBranches.map((branch) => (
             <div
               key={branch.salon.id}

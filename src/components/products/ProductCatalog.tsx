@@ -326,7 +326,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 xl:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5 xl:gap-6">
           {filteredProducts.map((product) => {
             const isOutOfStock = product.stock_quantity <= 0;
             const isLowStock = !isOutOfStock && product.stock_quantity <= (product.low_stock_threshold || 5);

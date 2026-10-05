@@ -123,7 +123,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
 
             {/* Salon Banner Info */}
-            <div className="absolute bottom-3.5 left-4 sm:bottom-5 sm:left-6 right-4 sm:right-6 flex items-end justify-between gap-4">
+            <div className="absolute bottom-3.5 left-4 sm:bottom-5 sm:left-6 right-4 sm:right-6 pr-10 sm:pr-0 flex items-end justify-between gap-4">
               <div className="flex items-end gap-3 sm:gap-4 min-w-0">
                 <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-2xl bg-white p-1 shadow-xl border-2 border-white shrink-0 overflow-hidden">
                   {salon.logo ? (

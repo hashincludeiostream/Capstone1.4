@@ -84,6 +84,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports'>(
     initialTab || 'overview'
   );
+
+  const handleAdminTabClick = (tabKey: 'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports') => {
+    setActiveTab(tabKey);
+    if (onNavigateTab) {
+      const parentTab = tabKey === 'overview' ? 'admin-dashboard' : `admin-${tabKey}`;
+      onNavigateTab(parentTab);
+    }
+  };
   const [stats, setStats] = useState<any>({
     total_customers: 0,
     total_salon_owners: 0,
@@ -550,7 +558,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {onNavigateTab && (
             <button
               onClick={() => onNavigateTab('salons')}
@@ -648,9 +656,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
       {/* Admin Tab Navigation Bar */}
-      <div className="bg-white rounded-2xl p-1.5 border border-pink-100 shadow-xs flex items-center gap-1 overflow-x-auto">
+      <div className="bg-white rounded-2xl p-1.5 border border-pink-100 shadow-xs flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => handleAdminTabClick('overview')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'overview'
               ? 'bg-rose-900 text-white shadow-xs'
@@ -662,7 +670,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('salons')}
+          onClick={() => handleAdminTabClick('salons')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'salons'
               ? 'bg-rose-900 text-white shadow-xs'
@@ -679,7 +687,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('users')}
+          onClick={() => handleAdminTabClick('users')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'users'
               ? 'bg-rose-900 text-white shadow-xs'
@@ -691,7 +699,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('content')}
+          onClick={() => handleAdminTabClick('content')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'content'
               ? 'bg-rose-900 text-white shadow-xs'
@@ -703,7 +711,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('announcements')}
+          onClick={() => handleAdminTabClick('announcements')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'announcements'
               ? 'bg-rose-900 text-white shadow-xs'
@@ -715,7 +723,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('email_reports')}
+          onClick={() => handleAdminTabClick('email_reports')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'email_reports'
               ? 'bg-rose-900 text-white shadow-xs'
@@ -736,7 +744,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Key KPI Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
             <div id="admin-stats-appointments" className="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Bookings</p>
               <p className="text-xl sm:text-2xl font-serif font-bold text-gray-900 mt-1">
@@ -821,7 +829,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
 
           {/* System Overview Dashboard Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Platform Quick Governance Actions */}
             <div className="bg-white rounded-3xl p-6 border border-pink-100 shadow-xs space-y-4">
               <h3 className="text-base font-serif font-bold text-gray-900 flex items-center gap-2">
@@ -1200,7 +1208,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[640px]">
               <thead className="bg-pink-50/50 text-gray-700 font-bold border-b border-pink-100">
                 <tr>
                   <th className="p-3.5">User Identity</th>

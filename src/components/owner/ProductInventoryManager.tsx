@@ -444,7 +444,7 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
       )}
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3.5">
         <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block">
             Total Products

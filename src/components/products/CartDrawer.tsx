@@ -69,7 +69,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       />
 
       {/* Drawer Container */}
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-4 sm:pl-10">
         <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between border-l border-stone-200">
           {/* Header */}
           <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/50">

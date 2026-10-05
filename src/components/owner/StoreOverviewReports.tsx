@@ -1075,7 +1075,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       </div>
 
       {/* 1. STORE OPERATIONAL & KEY PERFORMANCE METRICS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Metric 1: Completed In-Store Appointments */}
         <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-xs hover:border-purple-200 transition-all">
           <div className="flex items-center justify-between">
@@ -1237,7 +1237,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
         </div>
 
         {/* 4 Financial KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100/80">
             <span className="text-xs font-semibold text-emerald-900 block">Gross Salon Revenue</span>
             <p className="text-2xl font-serif font-bold text-emerald-950 mt-1">

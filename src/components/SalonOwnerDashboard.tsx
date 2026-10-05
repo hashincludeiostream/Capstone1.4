@@ -114,6 +114,14 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [previewInspoImage, setPreviewInspoImage] = useState<{ url: string; clientName: string } | null>(null);
   const dashboardLoadId = React.useRef(0);
 
+  const handleTabClick = (tabKey: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails') => {
+    setActiveTab(tabKey);
+    if (onNavigateTab) {
+      const parentTab = tabKey === 'overview' ? 'owner-dashboard' : `owner-${tabKey}`;
+      onNavigateTab(parentTab);
+    }
+  };
+
   // Sync initialTab when navigation changes from navbar or sidebar
   useEffect(() => {
     if (initialTab) {
@@ -612,11 +620,11 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       {/* Main Tab Navigation Container */}
       <div className="bg-white rounded-3xl border border-pink-100 shadow-xs overflow-hidden">
         {/* Six Distinct Header Tabs */}
-        <div className="flex border-b border-pink-100 px-4 sm:px-6 bg-pink-50/30 overflow-x-auto gap-1">
+        <div className="flex border-b border-pink-100 px-4 sm:px-6 bg-pink-50/30 overflow-x-auto no-scrollbar scroll-smooth gap-1">
           {/* Tab 1: Branch Overview */}
           <button
             id="owner-tab-branches"
-            onClick={() => setActiveTab('branches')}
+            onClick={() => handleTabClick('branches')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'branches'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -630,7 +638,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 2: Overview & Store Reports (CRM) */}
           <button
             id="owner-tab-overview"
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleTabClick('overview')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -644,7 +652,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 2: Bookings & Schedule */}
           <button
             id="owner-tab-appointments"
-            onClick={() => setActiveTab('appointments')}
+            onClick={() => handleTabClick('appointments')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'appointments'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -663,7 +671,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab: Late Cancellation Fees (30-min Grace) */}
           <button
             id="owner-tab-cancellation-fees"
-            onClick={() => setActiveTab('cancellation-fees')}
+            onClick={() => handleTabClick('cancellation-fees')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'cancellation-fees'
                 ? 'border-rose-600 text-rose-950 font-bold bg-white/80 rounded-t-xl shadow-2xs'
@@ -682,7 +690,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 3: Services & Treatments */}
           <button
             id="owner-tab-services"
-            onClick={() => setActiveTab('services')}
+            onClick={() => handleTabClick('services')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'services'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -696,7 +704,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 4: Staff Roster */}
           <button
             id="owner-tab-staff"
-            onClick={() => setActiveTab('staff')}
+            onClick={() => handleTabClick('staff')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'staff'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -710,7 +718,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 5: Products & Stock Inventory */}
           <button
             id="owner-tab-inventory"
-            onClick={() => setActiveTab('inventory')}
+            onClick={() => handleTabClick('inventory')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'inventory'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -730,7 +738,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 6: Store Location & Map */}
           <button
             id="owner-tab-location"
-            onClick={() => setActiveTab('location')}
+            onClick={() => handleTabClick('location')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'location'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -744,7 +752,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 7: Studio Settings */}
           <button
             id="owner-tab-settings"
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleTabClick('settings')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'settings'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl'
@@ -758,7 +766,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* Tab 8: Email Reports & Monthly PDF */}
           <button
             id="owner-tab-emails"
-            onClick={() => setActiveTab('emails')}
+            onClick={() => handleTabClick('emails')}
             className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'emails'
                 ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl shadow-2xs'
@@ -774,7 +782,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         </div>
 
         {/* Tab Content Container */}
-        <div className="p-6">
+        <div className="p-3.5 sm:p-6">
           {/* TAB 1: BRANCH OVERVIEW */}
           {activeTab === 'branches' && (
             <BranchOverview

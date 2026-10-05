@@ -27,6 +27,8 @@ import {
   Package,
   ShoppingBag,
   LogOut,
+  ShieldAlert,
+  Mail,
 } from 'lucide-react';
 import { User } from '../types';
 import { NotificationBadge } from './common/NotificationBadge';

@@ -138,31 +138,32 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 rounded-3xl p-5 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-w-0">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           {currentUser.avatar ? (
             <img
               src={currentUser.avatar}
               alt={currentUser.fullname}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-pink-300 shadow-md"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-pink-300 shadow-md shrink-0"
             />
           ) : (
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center border-2 border-pink-300 shadow-md">
-              <span className="text-white text-xl font-bold">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center border-2 border-pink-300 shadow-md shrink-0">
+              <span className="text-white text-lg sm:text-xl font-bold">
                 {currentUser.fullname.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
-          <div>
+          <div className="min-w-0">
             <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-pink-200 text-[11px] font-semibold mb-1">
-              <Sparkles className="w-3 h-3 text-amber-300" /> Client Portal
+              <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
+              <span>Client Portal</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold truncate">
               Welcome, {currentUser.fullname}
             </h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <p className="text-xs text-pink-100/80">
-                Manage your upcoming nail appointments, beauty history, and saved pins.
+              <p className="text-xs text-pink-100/80 truncate max-w-sm sm:max-w-none">
+                Manage your upcoming appointments and beauty history.
               </p>
               <span className="hidden sm:inline text-pink-300">•</span>
               <AccountReliabilityBadge
@@ -177,7 +178,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
         <button
           onClick={onOpenBooking}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 flex items-center gap-2 cursor-pointer shrink-0"
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
           <span>New Appointment</span>
@@ -186,26 +187,26 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs">
-          <p className="text-xs font-medium text-gray-500">Total Bookings</p>
-          <p className="text-xl sm:text-2xl font-bold font-serif text-pink-900 mt-1">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+          <p className="text-xs font-medium text-gray-500 truncate">Total Bookings</p>
+          <p className="text-xl sm:text-2xl font-bold font-serif text-pink-900 mt-1 truncate">
             {appointments.length}
           </p>
         </div>
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs">
-          <p className="text-xs font-medium text-gray-500">Upcoming</p>
-          <p className="text-xl sm:text-2xl font-bold font-serif text-pink-600 mt-1">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+          <p className="text-xs font-medium text-gray-500 truncate">Upcoming</p>
+          <p className="text-xl sm:text-2xl font-bold font-serif text-pink-600 mt-1 truncate">
             {appointments.filter((a) => a.status === 'pending' || a.status === 'confirmed').length}
           </p>
         </div>
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs">
-          <p className="text-xs font-medium text-gray-500">Completed</p>
-          <p className="text-xl sm:text-2xl font-bold font-serif text-emerald-700 mt-1">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+          <p className="text-xs font-medium text-gray-500 truncate">Completed</p>
+          <p className="text-xl sm:text-2xl font-bold font-serif text-emerald-700 mt-1 truncate">
             {appointments.filter((a) => a.status === 'completed').length}
           </p>
         </div>
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 shadow-xs flex flex-col justify-between">
-          <p className="text-xs font-medium text-gray-500">Reliability</p>
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs flex flex-col justify-between min-w-0">
+          <p className="text-xs font-medium text-gray-500 truncate">Reliability</p>
           <div className="mt-1">
             <AccountReliabilityBadge
               userId={currentUser.id}
@@ -217,16 +218,16 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       </div>
 
       {/* Bookings Pipeline Section */}
-      <div className="bg-white rounded-3xl border border-pink-100 shadow-xs p-6">
+      <div className="bg-white rounded-3xl border border-pink-100 shadow-xs p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-pink-50">
-          <div>
-            <h3 className="text-lg font-serif font-bold text-gray-900">
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-serif font-bold text-gray-900 truncate">
               Appointment History & Schedule
             </h3>
-            <p className="text-xs text-gray-500">Track real-time status of your reservations.</p>
+            <p className="text-xs text-gray-500 truncate">Track real-time status of your reservations.</p>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 shrink-0">
             {[
               { id: 'all', label: `All (${appointments.length})` },
               {
@@ -241,7 +242,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setFilterStatus(tab.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   filterStatus === tab.id
                     ? 'bg-pink-600 text-white shadow-xs'
                     : 'bg-pink-50 text-gray-700 hover:bg-pink-100'
@@ -279,9 +280,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                 <div
                   key={appt.id}
                   id={`customer-appointment-${appt.id}`}
-                  className="p-4 sm:p-5 rounded-2xl border border-pink-100 hover:border-pink-300 bg-pink-50/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  className="p-4 sm:p-5 rounded-2xl border border-pink-100 hover:border-pink-300 bg-pink-50/20 transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-4 min-w-0"
                 >
-                  <div className="flex items-start gap-3.5">
+                  <div className="flex items-start gap-3.5 min-w-0 flex-1">
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex flex-col items-center justify-center shrink-0 shadow-xs">
                       <span className="text-[10px] uppercase font-bold">
                         {new Date(appt.appointment_date).toLocaleString('default', { month: 'short' })}
@@ -291,9 +292,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       </span>
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-gray-900 truncate">
                           {appt.salon_name}
                         </span>
                         {getStatusBadge(appt.status)}
@@ -391,13 +392,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-pink-100">
+                  <div className="flex flex-wrap xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-2 pt-3 sm:pt-0 border-t sm:border-t-0 border-pink-100 shrink-0">
                     <span className="text-[11px] font-mono text-gray-400">#NGH-{appt.id}</span>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       {salon && (
                         <button
                           onClick={() => onSelectSalon(salon)}
-                          className="px-3 py-1.5 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold cursor-pointer whitespace-nowrap"
                         >
                           Salon Info
                         </button>
@@ -408,7 +409,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                         <>
                           <button
                             onClick={() => setReschedulingAppt(appt)}
-                            className="px-3 py-1.5 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                            className="px-3 py-1.5 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
                             title="Reschedule to a new date with zero penalty fee"
                           >
                             <CalendarClock className="w-3.5 h-3.5 text-purple-600" />
@@ -416,7 +417,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                           </button>
                           <button
                             onClick={() => setCancellingAppt(appt)}
-                            className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                            className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
                             title="Cancel appointment (subject to store cancellation policy)"
                           >
                             <X className="w-3.5 h-3.5 text-rose-600" />
@@ -428,7 +429,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       {appt.status === 'completed' && salon && (
                         <button
                           onClick={() => onOpenLeaveReview(salon, appt.technician_id, appt.technician_name)}
-                          className="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
                         >
                           Leave Review
                         </button>
