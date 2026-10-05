@@ -47,7 +47,7 @@ async function startServer() {
   app.set('trust proxy', 1);
 
   app.use(cors());
-  app.use(express.json({ limit: '4mb' }));
+  app.use(express.json({ limit: '10mb' }));
 
   // Rate limiting for login attempts
   const loginLimiter = rateLimit({
@@ -1101,37 +1101,68 @@ async function startServer() {
   // Update User Profile
   app.put('/api/users/:id', async (req, res) => {
     const userId = Number(req.params.id);
-    const { fullname, email, phone, avatar } = req.body;
-    if (!fullname || !email) {
-      return res.status(400).json({ error: 'Full name and email are required' });
-    }
+    if (!userId) return res.status(400).json({ error: 'Valid user ID is required' });
 
     try {
-      const emailValidation = validateEmailFormat(email);
-      if (!emailValidation.valid) return res.status(400).json({ error: emailValidation.message });
-
-      const [existingRows] = await db.execute(
-        'SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id <> ?',
-        [sanitizeEmail(email), userId]
-      );
-      if ((existingRows as any[]).length > 0) {
-        return res.status(400).json({ error: 'An account with this email address already exists.' });
+      const [userRows] = await db.execute('SELECT * FROM users WHERE id = ?', [userId]);
+      if ((userRows as any[]).length === 0) {
+        return res.status(404).json({ error: 'User not found' });
       }
+      const existingUser = (userRows as any[])[0];
+
+      const { fullname, email, phone, avatar } = req.body;
+
+      // Determine updated values with graceful fallbacks to existing user fields
+      const updatedFullname =
+        fullname !== undefined && fullname !== null && String(fullname).trim() !== ''
+          ? sanitizeString(String(fullname).trim())
+          : existingUser.fullname;
+
+      let updatedEmail = existingUser.email;
+      if (email !== undefined && email !== null && String(email).trim() !== '') {
+        const cleanEmail = sanitizeEmail(String(email).trim());
+        if (cleanEmail.toLowerCase() !== (existingUser.email || '').toLowerCase()) {
+          const emailValidation = validateEmailFormat(cleanEmail);
+          if (!emailValidation.valid) return res.status(400).json({ error: emailValidation.message });
+
+          const [existingRows] = await db.execute(
+            'SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ?',
+            [cleanEmail, userId]
+          );
+          if ((existingRows as any[]).length > 0) {
+            return res.status(400).json({ error: 'An account with this email address already exists.' });
+          }
+        }
+        updatedEmail = cleanEmail;
+      }
+
+      const updatedPhone = phone !== undefined ? sanitizeString(String(phone).trim()) : (existingUser.phone || '');
+      const updatedAvatar = avatar !== undefined ? avatar : existingUser.avatar;
 
       await db.execute(
         'UPDATE users SET fullname = ?, email = ?, phone = ?, avatar = ? WHERE id = ?',
-        [sanitizeString(fullname), sanitizeEmail(email), sanitizeString(phone || ''), avatar || null, userId]
+        [updatedFullname, updatedEmail, updatedPhone, updatedAvatar, userId]
       );
+
       const [updatedRows] = await db.execute(
-        'SELECT id, fullname, email, phone, user_type, avatar, status, created_at FROM users WHERE id = ?',
+        'SELECT id, fullname, email, phone, user_type, avatar, status, cancellation_strikes, reliability_score, created_at, updated_at FROM users WHERE id = ?',
         [userId]
       );
-      const updatedUser = (updatedRows as any[])[0];
-      if (!updatedUser) return res.status(404).json({ error: 'User not found' });
-      res.json(updatedUser);
+      const rawUser = (updatedRows as any[])[0];
+      if (!rawUser) return res.status(404).json({ error: 'User not found' });
+      const { password: _, ...cleanUser } = rawUser;
+
+      res.json({
+        success: true,
+        user: cleanUser,
+        ...cleanUser,
+      });
     } catch (error) {
       console.error('Update user profile error:', error);
-      res.status(500).json({ error: 'Server error updating user profile' });
+      res.status(500).json({
+        error: 'Failed to update user',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   });
 
@@ -1186,9 +1217,10 @@ async function startServer() {
         'SELECT id, fullname, email, phone, user_type, avatar, status, cancellation_strikes, reliability_score, created_at FROM users WHERE id = ?',
         [userId]
       );
-      const user = (rows as any[])[0];
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      res.json(user);
+      const rawUser = (rows as any[])[0];
+      if (!rawUser) return res.status(404).json({ error: 'User not found' });
+      const { password: _, ...cleanUser } = rawUser;
+      res.json(cleanUser);
     } catch (error) {
       console.error('Get user error:', error);
       res.status(500).json({ error: 'Server error fetching user' });

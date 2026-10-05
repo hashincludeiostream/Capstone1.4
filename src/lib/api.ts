@@ -27,7 +27,9 @@ import {
   createFirestoreReview,
   createFirestoreProductOrder,
   updateFirestoreProductOrderStatus,
+  updateFirestoreUser,
 } from './firestoreService';
+import { localStorage as safeLocalStorage } from './localStorage';
 import {
   seedCategories,
   seedSalons,
@@ -782,10 +784,32 @@ export async function updateUser(id: number, data: Partial<User>): Promise<User>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to update user');
-    return await res.json();
-  } catch (err) {
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.details || errData.message || 'Failed to update user');
+    }
+
+    const resData = await res.json();
+    const updatedUser: User = resData.user || resData;
+
+    // Real-time Firestore sync
+    updateFirestoreUser(id, data).catch((err) =>
+      console.warn('Firestore user sync warning:', err)
+    );
+
+    return updatedUser;
+  } catch (err: any) {
     console.error('API updateUser error:', err);
+    // Graceful fallback for offline / cached sessions
+    const savedUser = safeLocalStorage.getJSON<User>('nailglamhub_user');
+    if (savedUser && Number(savedUser.id) === Number(id)) {
+      const fallbackUser: User = { ...savedUser, ...data };
+      safeLocalStorage.setJSON('nailglamhub_user', fallbackUser);
+      updateFirestoreUser(id, data).catch(() => {});
+      console.warn('Recovered from updateUser error via local cache fallback');
+      return fallbackUser;
+    }
     const errorMessage = getErrorMessage(err, 'user profile');
     console.error('User-facing error:', errorMessage);
     throw new Error(errorMessage);

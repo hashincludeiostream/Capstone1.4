@@ -234,10 +234,10 @@ class InMemoryDatabase {
 
     // 2. User queries
     if (tableName === 'users') {
-      if (/WHERE LOWER\(email\)\s*=\s*LOWER\(\?\)\s+AND\s+id\s*!=\s*\?/i.test(sql)) {
+      if (/WHERE LOWER\(email\)\s*=\s*LOWER\(\?\)\s+AND\s+id\s*(!=|<>)\s*\?/i.test(sql)) {
         const email = String(params[0]).toLowerCase();
         const id = Number(params[1]);
-        results = table.filter((u) => u.email.toLowerCase() === email && u.id !== id);
+        results = table.filter((u) => (u.email || '').toLowerCase() === email && u.id !== id);
         return [results.map((u) => ({ id: u.id })), null];
       }
       if (/WHERE LOWER\(email\)\s*=\s*LOWER\(\?\)/i.test(sql)) {
