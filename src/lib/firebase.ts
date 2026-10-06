@@ -51,17 +51,18 @@ export const activeFirebaseConfig = {
 };
 
 // Initialize Firebase App instance safely (singleton)
-export const app = getApps().length > 0 ? getApp() : initializeApp(activeFirebaseConfig);
+export const app = getApps().find(a => a.name === '[DEFAULT]') || initializeApp(activeFirebaseConfig);
+
+// Initialize dedicated Firebase App for Firestore pointing to the provisioned database project gen-lang-client-0593264091
+const firestoreApp = getApps().find(a => a.name === 'firestore-db-app') || initializeApp(PERMANENT_FIREBASE_CONFIG, 'firestore-db-app');
 
 // Initialize Firestore with auto-detected long-polling to prevent gRPC streaming drops
 function getFirestoreInstance() {
-  const dbId = activeFirebaseConfig.firestoreDatabaseId;
+  const dbId = PERMANENT_FIREBASE_CONFIG.firestoreDatabaseId;
   try {
-    return dbId
-      ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId)
-      : initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+    return initializeFirestore(firestoreApp, { experimentalAutoDetectLongPolling: true }, dbId);
   } catch {
-    return dbId ? getFirestore(app, dbId) : getFirestore(app);
+    return getFirestore(firestoreApp, dbId);
   }
 }
 
@@ -84,9 +85,12 @@ if (typeof window !== 'undefined') {
   testFirestoreConnection();
 }
 
+// Scopes configured for Google Workspace integrations
+export const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
+
 // Configure Google OAuth Provider for real Gmail/Google accounts
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+SCOPES.forEach((scope) => googleProvider.addScope(scope));
 // Enables choosing any Gmail account or clicking 'Use another account'
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -98,6 +102,28 @@ let inMemoryAccessToken: string | null = null;
 export const getCachedAccessToken = (): string | null => inMemoryAccessToken;
 export const setCachedAccessToken = (token: string | null) => {
   inMemoryAccessToken = token;
+};
+
+/**
+ * Connect Google Workspace OAuth to obtain active access token for Gmail API
+ */
+export const connectGoogleWorkspace = async (): Promise<{ success: boolean; token: string | null; error?: string }> => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken || null;
+    if (token) {
+      setCachedAccessToken(token);
+      return { success: true, token };
+    }
+    return { success: false, token: null, error: 'No OAuth access token was returned.' };
+  } catch (error: any) {
+    return {
+      success: false,
+      token: null,
+      error: error?.message || 'Google account connection failed',
+    };
+  }
 };
 
 /**

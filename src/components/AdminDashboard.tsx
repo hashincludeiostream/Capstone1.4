@@ -69,6 +69,7 @@ import {
 } from '../lib/api';
 
 interface AdminDashboardProps {
+  currentUser?: User | null;
   initialTab?: 'overview' | 'salons' | 'users' | 'content' | 'announcements' | 'email_reports';
   onNavigateTab?: (tab: string) => void;
   targetId?: string | null;
@@ -76,6 +77,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  currentUser,
   initialTab = 'overview',
   onNavigateTab,
   targetId,
@@ -1568,7 +1570,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* 6. EMAIL REPORTS & SECURITY ALERTS TAB               */}
       {/* ---------------------------------------------------- */}
       {activeTab === 'email_reports' && (
-        <AdminEmailReportsManager showToast={showToast} />
+        <AdminEmailReportsManager showToast={showToast} currentUser={currentUser || undefined} />
       )}
 
       {/* ---------------------------------------------------- */}

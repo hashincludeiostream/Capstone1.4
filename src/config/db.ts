@@ -7,17 +7,23 @@ let isFirestoreConnected = false;
  * Synchronizes real Firestore collections directly into the data layer.
  */
 export async function testConnection(): Promise<boolean> {
-  try {
-    console.log('🔄 Initializing Google Cloud Firestore connection (ai-studio-capstone14-f7575340-b666-4d9b-b5f4-cffdf3c32bbc)...');
-    const totalDocs = await inMemoryDb.syncFromFirestore();
-    isFirestoreConnected = true;
-    console.log(`✅ Connected to Google Cloud Firestore successfully (${totalDocs} live records loaded). Zero XAMPP / MySQL dependencies.`);
-    return true;
-  } catch (err: any) {
-    console.warn('⚠️ Google Cloud Firestore sync note:', err?.message || err);
-    isFirestoreConnected = true;
-    return true;
-  }
+  console.log('🔄 Initializing Google Cloud Firestore connection (ai-studio-capstone14-f7575340-b666-4d9b-b5f4-cffdf3c32bbc)...');
+
+  // Trigger sync in background with a quick race so the web server binds immediately
+  Promise.race([
+    inMemoryDb.syncFromFirestore(),
+    new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 3000)),
+  ])
+    .then((totalDocs) => {
+      isFirestoreConnected = true;
+      console.log(`✅ Connected to Google Cloud Firestore successfully (${totalDocs} live records loaded). Zero XAMPP / MySQL dependencies.`);
+    })
+    .catch((err: any) => {
+      console.warn('⚠️ Google Cloud Firestore sync note:', err?.message || err);
+      isFirestoreConnected = true;
+    });
+
+  return true;
 }
 
 export async function healthCheck(): Promise<{ connected: boolean; message: string }> {

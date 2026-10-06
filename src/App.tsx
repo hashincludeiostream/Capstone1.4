@@ -1619,6 +1619,7 @@ const AppContent: React.FC = () => {
           {activeTab.startsWith('admin') && (
             currentUser?.user_type === 'admin' ? (
               <AdminDashboard
+                currentUser={currentUser}
                 targetId={targetElementId}
                 initialTab={
                   activeTab === 'admin-salons'

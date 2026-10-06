@@ -95,17 +95,23 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
     }
   };
 
+  const printIframeRef = React.useRef<HTMLIFrameElement | null>(null);
+
   const handlePrintOrDownloadPdf = (log: EmailLog) => {
     if (!log.pdf_html && !log.html_body) return;
     const content = log.pdf_html || log.html_body;
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(content);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
+
+    if (printIframeRef.current) {
+      const doc = printIframeRef.current.contentDocument || printIframeRef.current.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(content);
+        doc.close();
+        setTimeout(() => {
+          printIframeRef.current?.contentWindow?.focus();
+          printIframeRef.current?.contentWindow?.print();
+        }, 300);
+      }
     }
   };
 
@@ -128,6 +134,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
+      <iframe ref={printIframeRef} className="hidden" title="Logs Print Frame" />
       <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-pink-100 my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Modal Top Header */}
@@ -275,13 +282,23 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                     </div>
 
                     {selectedLog.has_pdf_attachment && (
-                      <button
-                        onClick={() => handlePrintOrDownloadPdf(selectedLog)}
-                        className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0 cursor-pointer self-start"
-                      >
-                        <Printer className="w-3.5 h-3.5 mr-1.5" />
-                        Print / PDF Report
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0 self-start">
+                        <a
+                          href={`data:text/html;charset=utf-8,${encodeURIComponent(selectedLog.pdf_html || selectedLog.html_body)}`}
+                          download={selectedLog.attachment_name || 'Report.html'}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg shadow-xs transition"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1" />
+                          Download
+                        </a>
+                        <button
+                          onClick={() => handlePrintOrDownloadPdf(selectedLog)}
+                          className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5 mr-1.5" />
+                          Print / PDF
+                        </button>
+                      </div>
                     )}
                   </div>
 

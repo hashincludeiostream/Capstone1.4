@@ -896,7 +896,18 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: `${periodBadge} PDF status report successfully dispatched to ${targetEmail}`,
+        message: `${periodBadge} PDF status report successfully generated for ${targetEmail}`,
+        report: {
+          to: targetEmail,
+          toName: owner_name || salon.salon_name,
+          role: 'salon_owner',
+          subject,
+          category: 'report',
+          htmlBody,
+          hasPdfAttachment: true,
+          pdfHtml,
+          attachmentName,
+        },
         metrics: {
           monthYear: periodLabel,
           periodLabel,
@@ -1016,7 +1027,18 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: `Platform status PDF report dispatched to ${targetEmail}`,
+        message: `Platform status PDF report generated for ${targetEmail}`,
+        report: {
+          to: targetEmail,
+          toName: admin_name || 'Administrator',
+          role: 'admin',
+          subject,
+          category: 'report',
+          htmlBody,
+          hasPdfAttachment: true,
+          pdfHtml,
+          attachmentName,
+        },
       });
     } catch (error) {
       console.error('Admin platform report error:', error);
@@ -4423,8 +4445,11 @@ async function startServer() {
     ? currentDir
     : rootDistPath;
   const hasDistIndex = fs.existsSync(path.join(distPath, 'index.html'));
-  const isTsxDev = process.execArgv.some((arg) => arg.includes('tsx')) || process.env.VITE_DEV_SERVER === 'true';
-  const isProduction = !isTsxDev && (process.env.NODE_ENV === 'production' || hasDistIndex);
+  const isDevMode =
+    process.env.NODE_ENV !== 'production' ||
+    process.execArgv.some((arg) => arg.includes('tsx')) ||
+    process.env.VITE_DEV_SERVER === 'true';
+  const isProduction = !isDevMode && (process.env.NODE_ENV === 'production' || hasDistIndex);
 
   if (isProduction) {
     if (fs.existsSync(distPath)) {

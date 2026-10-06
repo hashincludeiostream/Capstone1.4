@@ -75,19 +75,59 @@ export function wrapHtmlEmailTemplate(title: string, contentHtml: string, action
 }
 
 /**
- * Builds RFC 2822 format and base64url encodes it for direct Gmail API sending
+ * Builds RFC 2822 format and base64url encodes it for direct Gmail API sending.
+ * Supports multipart/mixed for email body plus PDF/HTML report attachments.
  */
-function createRawEmail(to: string, from: string, subject: string, htmlBody: string): string {
-  const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+function createRawEmail(options: EmailDispatchOptions): string {
+  const boundary = `----=_Part_NailGlamHub_${Date.now()}`;
+  const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(options.subject)))}?=`;
+  const fromHeader = `From: ${BRAND_NAME} <notifications@nailglamhub.com>`;
+  const toHeader = options.toName ? `To: "${options.toName}" <${options.to}>` : `To: ${options.to}`;
+
+  if (options.hasPdfAttachment && (options.pdfHtml || options.attachmentName)) {
+    const attachmentContent = options.pdfHtml || options.htmlBody;
+    const attachmentFilename = options.attachmentName || 'Performance_Report.html';
+
+    const messageParts = [
+      fromHeader,
+      toHeader,
+      `Subject: ${utf8Subject}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      btoa(unescape(encodeURIComponent(options.htmlBody))),
+      '',
+      `--${boundary}`,
+      `Content-Type: text/html; name="${attachmentFilename}"`,
+      `Content-Disposition: attachment; filename="${attachmentFilename}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      btoa(unescape(encodeURIComponent(attachmentContent))),
+      '',
+      `--${boundary}--`,
+    ];
+
+    const rawMessage = messageParts.join('\r\n');
+    return btoa(rawMessage)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+
+  // Single-part rich HTML email
   const messageParts = [
-    `From: ${BRAND_NAME} <${from}>`,
-    `To: ${to}`,
+    fromHeader,
+    toHeader,
     `Subject: ${utf8Subject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     'Content-Transfer-Encoding: base64',
     '',
-    btoa(unescape(encodeURIComponent(htmlBody))),
+    btoa(unescape(encodeURIComponent(options.htmlBody))),
   ];
   const rawMessage = messageParts.join('\r\n');
   return btoa(rawMessage)
@@ -96,17 +136,28 @@ function createRawEmail(to: string, from: string, subject: string, htmlBody: str
     .replace(/=+$/, '');
 }
 
+export interface EmailSendResult {
+  success: boolean;
+  log?: EmailLog;
+  gmailSent?: boolean;
+  gmailMessageId?: string;
+  error?: string;
+}
+
 /**
- * Dispatches an email notification via server and optional direct Gmail API
+ * Dispatches an email notification via server and direct Gmail API when authorized
  */
-export async function sendEmailNotification(options: EmailDispatchOptions): Promise<{ success: boolean; log?: EmailLog; error?: string }> {
+export async function sendEmailNotification(options: EmailDispatchOptions): Promise<EmailSendResult> {
   try {
     const accessToken = getCachedAccessToken();
+    let gmailSent = false;
+    let gmailMessageId: string | undefined = undefined;
+    let gmailError: string | undefined = undefined;
 
     // 1. If user has active Google OAuth access token with Gmail scope, attempt direct dispatch
     if (accessToken) {
       try {
-        const raw = createRawEmail(options.to, options.senderEmail || DEFAULT_SENDER, options.subject, options.htmlBody);
+        const raw = createRawEmail(options);
         const gmailRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
           method: 'POST',
           headers: {
@@ -115,24 +166,43 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
           },
           body: JSON.stringify({ raw }),
         });
+
         if (gmailRes.ok) {
-          console.log(`[EmailService] Dispatched via Google Gmail API directly to: ${options.to}`);
+          const gmailData = await gmailRes.json();
+          gmailSent = true;
+          gmailMessageId = gmailData.id;
+          console.log(`[EmailService] Dispatched via Google Gmail API directly to: ${options.to} (ID: ${gmailData.id})`);
+        } else {
+          const errData = await gmailRes.json().catch(() => ({}));
+          gmailError = errData.error?.message || `Gmail API HTTP error ${gmailRes.status}`;
+          console.warn('[EmailService] Gmail API send warning:', errData);
         }
-      } catch (gmailErr) {
+      } catch (gmailErr: any) {
+        gmailError = gmailErr?.message || String(gmailErr);
         console.warn('[EmailService] Direct Gmail API call warning (falling back to relay):', gmailErr);
       }
     }
 
     // 2. Dispatch to server to record in database and trigger automated notification
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch('/api/email/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(options),
+      headers,
+      body: JSON.stringify({
+        ...options,
+        gmailSent,
+        gmailMessageId,
+        status: gmailSent ? 'delivered' : 'pending_offline',
+      }),
     });
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Server failed to dispatch email');
+      throw new Error(errData.error || 'Server failed to record email');
     }
 
     const data = await response.json();
@@ -146,12 +216,19 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
             subject: options.subject,
             category: options.category,
             hasPdf: Boolean(options.hasPdfAttachment),
+            gmailSent,
           },
         })
       );
     }
 
-    return { success: true, log: data.log };
+    return {
+      success: true,
+      log: data.log,
+      gmailSent,
+      gmailMessageId,
+      error: gmailError,
+    };
   } catch (error: any) {
     console.error('[EmailService] Dispatch error:', error);
     return { success: false, error: error.message || 'Unknown email dispatch error' };
