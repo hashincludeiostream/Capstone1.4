@@ -273,9 +273,11 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3">
-            <div className={`p-2 rounded-xl shrink-0 ${hasGoogleToken ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-              <Mail className="w-5 h-5" />
-            </div>
+            {hasGoogleToken ? (
+              <div className="p-2 rounded-xl shrink-0 bg-emerald-100 text-emerald-700">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            ) : null}
             <div>
               <div className="font-bold text-sm flex items-center gap-2">
                 <span>{hasGoogleToken ? 'Gmail Live Delivery Connected' : 'Google Workspace Connection Required for Live Inbox Delivery'}</span>

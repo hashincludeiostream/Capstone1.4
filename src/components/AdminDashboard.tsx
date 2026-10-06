@@ -31,7 +31,6 @@ import {
   FileText,
   AlertCircle,
   Building,
-  Mail,
   LogOut,
 } from 'lucide-react';
 import { Salon, User, Reel, Review, Announcement, BusinessCategory } from '../types';
@@ -734,7 +733,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               : 'text-gray-600 hover:text-gray-900 hover:bg-pink-50/50'
           }`}
         >
-          <Mail className="w-4 h-4 text-pink-400" />
           <span>Email Reports & Alerts</span>
           <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700">
             PDF

@@ -13,7 +13,6 @@ import {
   Edit2,
   Sparkles,
   Phone,
-  Mail,
   AlertCircle,
   BarChart3,
   Search,
@@ -773,7 +772,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 : 'border-transparent text-gray-500 hover:text-gray-900'
             }`}
           >
-            <Mail className="w-4 h-4 text-pink-600" />
             <span>Email Reports & Alerts</span>
             <span className="px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 text-[10px] font-bold">
               PDF

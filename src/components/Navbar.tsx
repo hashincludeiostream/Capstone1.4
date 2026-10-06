@@ -22,7 +22,6 @@ import {
   ShoppingBag,
   Package,
   Compass,
-  Mail,
   ExternalLink,
 } from 'lucide-react';
 import {
@@ -268,19 +267,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               onDismissAllAnnouncements={onDismissAllAnnouncements}
             />
 
-            {/* Email Notifications & PDF Reports Inbox Button (hidden on < sm to prevent mobile header crowding) */}
-            {currentUser && onOpenEmailHistory && (
-              <button
-                id="navbar-email-logs-btn"
-                onClick={onOpenEmailHistory}
-                title="Email Notifications & PDF Reports"
-                className="relative p-2 rounded-full text-gray-600 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer hidden sm:inline-flex"
-              >
-                <Mail className="w-5 h-5" />
-                <span className="sr-only">Delivered Email Notifications</span>
-              </button>
-            )}
-
             {/* User Account / Consolidated Navigation Menu */}
             <div ref={userMenuRef} className="relative shrink-0">
               {currentUser ? (
@@ -512,7 +498,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
                           >
-                            <Mail className="w-4 h-4 text-pink-600" />
                             <span>Email Receipts & Notifications</span>
                           </button>
                         )}
@@ -700,7 +685,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
                           >
-                            <Mail className="w-4 h-4 text-purple-600" />
                             <span>Email Reports & PDF Dossiers</span>
                           </button>
                         )}
@@ -815,7 +799,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer"
                           >
-                            <Mail className="w-4 h-4 text-rose-600" />
                             <span>Email Logs & System Reports</span>
                           </button>
                         )}

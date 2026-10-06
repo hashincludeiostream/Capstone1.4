@@ -28,8 +28,8 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
-  const [isSendingTest, setIsSendingTest] = useState(false);
-  const [testSentFeedback, setTestSentFeedback] = useState<string | null>(null);
+  const [isSendingActualEmail, setIsSendingActualEmail] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -55,43 +55,41 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
     fetchLogs();
   }, [currentUser]);
 
-  const handleSendTestEmail = async () => {
-    setIsSendingTest(true);
-    setTestSentFeedback(null);
+  // Dispatch real email to user's verified inbox using Gmail API
+  const handleSendActualEmail = async (logToSend?: EmailLog) => {
+    const targetLog = logToSend || selectedLog;
+    if (!targetLog) return;
+
+    setIsSendingActualEmail(true);
+    setActionFeedback(null);
     try {
       const result = await sendEmailNotification({
         to: currentUser.email,
         toName: currentUser.fullname,
         role: currentUser.user_type,
-        subject: `Live Test Notification 💅 Delivered to ${currentUser.email}`,
-        category: currentUser.user_type === 'salon_owner' ? 'report' : currentUser.user_type === 'admin' ? 'alert' : 'booking',
-        htmlBody: `
-          <div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
-            <h2 style="color: #BE185D; margin-top: 0;">Automated System Test Dispatched! 💅</h2>
-            <p>Hello <strong>${currentUser.fullname}</strong>,</p>
-            <p>This automated test message confirms that real-time email dispatch is connected to your Gmail address: <strong>${currentUser.email}</strong>.</p>
-            <div style="background: #ffffff; border: 1px solid #FCE7F3; border-radius: 8px; padding: 12px; margin: 16px 0;">
-              <p style="margin: 4px 0;"><strong>Recipient:</strong> ${currentUser.email}</p>
-              <p style="margin: 4px 0;"><strong>Role:</strong> ${currentUser.user_type.replace('_', ' ')}</p>
-              <p style="margin: 4px 0;"><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
-              <p style="margin: 4px 0;"><strong>Delivery Engine:</strong> Verified Platform Mailer</p>
-            </div>
-            <p style="font-size: 13px; color: #6B7280;">You will receive all transactional alerts and status updates here.</p>
-          </div>
-        `,
+        subject: targetLog.subject || `Official Report for ${currentUser.fullname}`,
+        category: (targetLog.category as any) || 'report',
+        htmlBody: targetLog.html_body,
+        hasPdfAttachment: Boolean(targetLog.has_pdf_attachment),
+        pdfHtml: targetLog.pdf_html,
+        attachmentName: targetLog.attachment_name,
       });
 
       if (result.success) {
-        setTestSentFeedback('Test email successfully dispatched!');
+        if (result.gmailSent) {
+          setActionFeedback(`✅ Actual email dispatched directly to your Gmail inbox (${currentUser.email})! Please check your inbox or Sent mail.`);
+        } else {
+          setActionFeedback(`✅ Email dispatched to ${currentUser.email}!`);
+        }
         await fetchLogs();
-        setTimeout(() => setTestSentFeedback(null), 4000);
+        setTimeout(() => setActionFeedback(null), 6000);
       } else {
-        setTestSentFeedback(result.error || 'Failed to send test email');
+        setActionFeedback(result.error || 'Failed to dispatch email');
       }
     } catch (err: any) {
-      setTestSentFeedback(err.message || 'Error dispatching test email');
+      setActionFeedback(err.message || 'Error dispatching actual email');
     } finally {
-      setIsSendingTest(false);
+      setIsSendingActualEmail(false);
     }
   };
 
@@ -158,14 +156,17 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
           </div>
 
           <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0">
-            <button
-              onClick={handleSendTestEmail}
-              disabled={isSendingTest}
-              className="inline-flex items-center px-2.5 sm:px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <Send className={`w-3.5 h-3.5 mr-1.5 ${isSendingTest ? 'animate-spin' : ''}`} />
-              <span className="truncate">{isSendingTest ? 'Sending...' : 'Send Test'}</span>
-            </button>
+            {selectedLog && (
+              <button
+                onClick={() => handleSendActualEmail(selectedLog)}
+                disabled={isSendingActualEmail}
+                className="inline-flex items-center px-2.5 sm:px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                title="Send this actual email to your inbox"
+              >
+                <Send className={`w-3.5 h-3.5 mr-1.5 ${isSendingActualEmail ? 'animate-spin' : ''}`} />
+                <span className="truncate">{isSendingActualEmail ? 'Sending...' : 'Email to Me'}</span>
+              </button>
+            )}
             <button
               onClick={fetchLogs}
               title="Refresh"
@@ -183,11 +184,11 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
         </div>
 
         {/* Feedback Banner */}
-        {testSentFeedback && (
+        {actionFeedback && (
           <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2.5 flex items-center justify-between text-xs text-emerald-800 font-medium animate-in fade-in">
             <div className="flex items-center space-x-2">
-              <Check className="w-4 h-4 text-emerald-600" />
-              <span>{testSentFeedback}</span>
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{actionFeedback}</span>
             </div>
           </div>
         )}
@@ -206,13 +207,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
               <div className="p-8 text-center text-gray-400">
                 <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-sm font-semibold text-gray-600">No email records found</p>
-                <p className="text-xs text-gray-400 mt-1">Notifications and reports will appear here when dispatched.</p>
-                <button
-                  onClick={handleSendTestEmail}
-                  className="mt-3 text-xs text-pink-600 font-semibold hover:underline inline-flex items-center"
-                >
-                  Send a test notification now →
-                </button>
+                <p className="text-xs text-gray-400 mt-1">Official reports and transactional alerts will appear here when dispatched.</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
@@ -281,25 +276,28 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                       </div>
                     </div>
 
-                    {selectedLog.has_pdf_attachment && (
-                      <div className="flex items-center gap-2 shrink-0 self-start">
+                    <div className="flex items-center gap-2 shrink-0 self-start">
+                      <button
+                        onClick={() => handleSendActualEmail(selectedLog)}
+                        disabled={isSendingActualEmail}
+                        className="inline-flex items-center px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"
+                        title="Send actual email to your inbox via Gmail API"
+                      >
+                        <Send className={`w-3.5 h-3.5 mr-1.5 ${isSendingActualEmail ? 'animate-spin' : ''}`} />
+                        {isSendingActualEmail ? 'Sending...' : 'Send to My Email'}
+                      </button>
+                      {selectedLog.has_pdf_attachment && (
                         <a
                           href={`data:text/html;charset=utf-8,${encodeURIComponent(selectedLog.pdf_html || selectedLog.html_body)}`}
                           download={selectedLog.attachment_name || 'Report.html'}
                           className="inline-flex items-center px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg shadow-xs transition"
+                          title="Download report file"
                         >
                           <Download className="w-3.5 h-3.5 mr-1" />
                           Download
                         </a>
-                        <button
-                          onClick={() => handlePrintOrDownloadPdf(selectedLog)}
-                          className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5 mr-1.5" />
-                          Print / PDF
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
                   {selectedLog.has_pdf_attachment && (

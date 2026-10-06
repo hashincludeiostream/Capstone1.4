@@ -269,9 +269,11 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3">
-            <div className={`p-2 rounded-xl shrink-0 ${hasGoogleToken ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-              <Mail className="w-5 h-5" />
-            </div>
+            {hasGoogleToken ? (
+              <div className="p-2 rounded-xl shrink-0 bg-emerald-100 text-emerald-700">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            ) : null}
             <div>
               <div className="font-bold text-sm flex items-center gap-2">
                 <span>{hasGoogleToken ? 'Gmail Live Delivery Connected' : 'Google Workspace Connection Required for Live Inbox Delivery'}</span>
@@ -326,7 +328,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       <div className="bg-gradient-to-r from-purple-900 via-purple-800 to-pink-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 max-w-4xl space-y-4">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold">
-            <Mail className="w-3.5 h-3.5 text-pink-300" />
+            <Sparkles className="w-3.5 h-3.5 text-pink-300" />
             <span>Automated Reports & Notifications Engine</span>
           </div>
 
