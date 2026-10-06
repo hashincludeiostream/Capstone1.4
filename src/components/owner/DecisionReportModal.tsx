@@ -37,8 +37,6 @@ import {
   openPrintableReport,
 } from '../../utils/reportGenerators';
 import { Salon, Service, Technician, Appointment, Product, ProductOrder } from '../../types';
-import { sendEmailNotification } from '../../lib/emailService';
-import { getCachedAccessToken, connectGoogleWorkspace } from '../../lib/firebase';
 
 export interface FiveYearRange {
   label: string;
@@ -119,15 +117,6 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
     const targetSalonId = salon?.id || 1;
     setIsEmailing(true);
     try {
-      let token = getCachedAccessToken();
-      if (!token) {
-        showToast('Connecting Google Workspace to send email...');
-        const conn = await connectGoogleWorkspace();
-        if (conn.success && conn.token) {
-          token = conn.token;
-        }
-      }
-
       const res = await fetch('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,16 +129,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.report) {
-          const sendRes = await sendEmailNotification(data.report);
-          if (sendRes.gmailSent) {
-            showToast(`✅ ${selectedTimeGrain.toUpperCase()} PDF report delivered directly to ${data.report.to} via Gmail!`);
-          } else {
-            showToast(`${selectedTimeGrain.toUpperCase()} PDF status report logged to audit ledger`);
-          }
-        } else {
-          showToast(`${selectedTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
-        }
+        showToast(`${selectedTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
       } else {
         showToast(data.error || 'Failed to email report');
       }

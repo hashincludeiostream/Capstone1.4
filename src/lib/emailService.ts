@@ -4,8 +4,7 @@
  */
 
 import { EmailLog, User, Salon, Appointment, ProductOrder, UserRole, PlatformStats } from '../types';
-import { getCachedAccessToken, getCachedGmailUserEmail } from './firebase';
-import { jsPDF } from 'jspdf';
+import { getCachedAccessToken } from './firebase';
 
 export interface EmailDispatchOptions {
   to: string;
@@ -22,228 +21,6 @@ export interface EmailDispatchOptions {
 
 const BRAND_NAME = 'Nail Glam Hub';
 const DEFAULT_SENDER = 'notifications@nailglamhub.com';
-
-/**
- * Encodes string to UTF-8 Base64 (RFC 4648 safe, no Latin1 DOMException errors)
- */
-function utf8ToBase64(str: string): string {
-  try {
-    const bytes = new TextEncoder().encode(str);
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  } catch (err) {
-    console.warn('utf8ToBase64 fallback used:', err);
-    return btoa(unescape(encodeURIComponent(str)));
-  }
-}
-
-/**
- * Encodes string to URL-safe Base64 for Gmail API messages.send
- */
-function toUrlSafeBase64(str: string): string {
-  return utf8ToBase64(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-/**
- * Generates an official, certified binary PDF report for email attachments using jsPDF
- */
-export function generateCertifiedPdfDocument(options: {
-  title: string;
-  recipientName?: string;
-  recipientEmail?: string;
-  periodLabel?: string;
-  salonName?: string;
-  salonAddress?: string;
-  metrics?: {
-    grossRevenue?: number;
-    netProfit?: number;
-    profitMargin?: number;
-    appointmentCount?: number;
-    orderCount?: number;
-    averageTicket?: number;
-  };
-  summaryText?: string;
-}): string {
-  try {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
-
-    // Brand Header Bar
-    doc.setFillColor(219, 39, 119); // #DB2777 Rose Pink
-    doc.rect(0, 0, 210, 22, 'F');
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('NAIL GLAM HUB • OFFICIAL PERFORMANCE AUDIT', 14, 14);
-
-    // Document Title & Metadata
-    doc.setTextColor(157, 23, 77); // #9D174D
-    doc.setFontSize(18);
-    doc.text(options.title || 'Official Performance Statement', 14, 34);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(107, 114, 128); // #6B7280
-    const subline = options.salonName
-      ? `Salon: ${options.salonName} ${options.salonAddress ? `| ${options.salonAddress}` : ''}`
-      : 'Ecosystem Governance & Executive Intelligence';
-    doc.text(subline, 14, 40);
-
-    const period = options.periodLabel || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    doc.text(`Reporting Period: ${period}  |  Generated: ${new Date().toLocaleString()}`, 14, 46);
-    if (options.recipientEmail) {
-      doc.text(`Dispatched To: ${options.recipientName || 'Authorized Recipient'} (${options.recipientEmail})`, 14, 52);
-    }
-
-    // Divider
-    doc.setDrawColor(252, 231, 243); // #FCE7F3
-    doc.setLineWidth(0.5);
-    doc.line(14, 56, 196, 56);
-
-    // KPI Cards
-    let currentY = 62;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(131, 24, 67);
-    doc.text('EXECUTIVE METRICS OVERVIEW', 14, currentY);
-    currentY += 6;
-
-    const kpiCards = [
-      { label: 'Gross Revenue', value: `₱${(options.metrics?.grossRevenue || 45200).toLocaleString()}`, color: [190, 24, 93] },
-      { label: 'Operating Profit', value: `₱${(options.metrics?.netProfit || 35256).toLocaleString()}`, color: [6, 95, 70] },
-      { label: 'Margin', value: `${(options.metrics?.profitMargin || 78).toFixed(1)}%`, color: [131, 24, 67] },
-      { label: 'Visits & Orders', value: `${(options.metrics?.appointmentCount || 28) + (options.metrics?.orderCount || 8)}`, color: [31, 41, 55] },
-    ];
-
-    const cardWidth = 42;
-    const cardHeight = 22;
-    kpiCards.forEach((kpi, idx) => {
-      const x = 14 + idx * (cardWidth + 4);
-      doc.setFillColor(255, 249, 251); // #FFF9FB
-      doc.setDrawColor(252, 231, 243);
-      doc.roundedRect(x, currentY, cardWidth, cardHeight, 2, 2, 'FD');
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(157, 23, 77);
-      doc.text(kpi.label.toUpperCase(), x + cardWidth / 2, currentY + 7, { align: 'center' });
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
-      doc.text(kpi.value, x + cardWidth / 2, currentY + 16, { align: 'center' });
-    });
-
-    currentY += cardHeight + 10;
-
-    // Detail breakdown table
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(131, 24, 67);
-    doc.text('PERFORMANCE BREAKDOWN STATEMENT', 14, currentY);
-    currentY += 6;
-
-    // Table Header
-    doc.setFillColor(255, 241, 247);
-    doc.rect(14, currentY, 182, 8, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(131, 24, 67);
-    doc.text('Activity Category', 18, currentY + 5.5);
-    doc.text('Volume / Units', 90, currentY + 5.5);
-    doc.text('Reconciled Amount (PHP)', 140, currentY + 5.5);
-    currentY += 8;
-
-    const rev = options.metrics?.grossRevenue || 45200;
-    const rows = [
-      {
-        cat: 'Salon Appointments & Services',
-        vol: `${options.metrics?.appointmentCount || 28} completed sessions`,
-        amt: `₱${Math.round(rev * 0.82).toLocaleString()}`,
-      },
-      {
-        cat: 'Boutique & Retail Fulfillment',
-        vol: `${options.metrics?.orderCount || 8} verified orders`,
-        amt: `₱${Math.round(rev * 0.18).toLocaleString()}`,
-      },
-      {
-        cat: 'Total Certified Business Turnover',
-        vol: `${(options.metrics?.appointmentCount || 28) + (options.metrics?.orderCount || 8)} transactions`,
-        amt: `₱${rev.toLocaleString()}`,
-        bold: true,
-      },
-    ];
-
-    rows.forEach((r) => {
-      if (r.bold) {
-        doc.setFillColor(255, 249, 251);
-        doc.rect(14, currentY, 182, 8, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(190, 24, 93);
-      } else {
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(55, 65, 81);
-      }
-      doc.setFontSize(9);
-      doc.text(r.cat, 18, currentY + 5.5);
-      doc.text(r.vol, 90, currentY + 5.5);
-      doc.text(r.amt, 140, currentY + 5.5);
-
-      doc.setDrawColor(243, 244, 246);
-      doc.line(14, currentY + 8, 196, currentY + 8);
-      currentY += 8;
-    });
-
-    currentY += 8;
-
-    // Narrative summary
-    if (options.summaryText) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(75, 85, 99);
-      const splitText = doc.splitTextToSize(options.summaryText, 180);
-      doc.text(splitText, 14, currentY);
-      currentY += splitText.length * 5 + 6;
-    }
-
-    // Certification badge
-    doc.setFillColor(254, 242, 242);
-    doc.setDrawColor(254, 205, 211);
-    doc.roundedRect(14, currentY, 182, 18, 2, 2, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(190, 24, 93);
-    doc.text('CERTIFICATE OF RECONCILIATION & INTEGRITY', 20, currentY + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(107, 114, 128);
-    doc.text(`Reconciled and certified by Nail Glam Hub Platform Engine. Immutable Audit Hash: NGH-${Date.now().toString(36).toUpperCase()}`, 20, currentY + 12);
-
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(156, 163, 175);
-    doc.text('Nail Glam Hub • Confidential Business Performance Dossier', 105, 285, { align: 'center' });
-
-    // Output base64 data string (strip data URI prefix)
-    const dataUri = doc.output('datauristring');
-    const base64Data = dataUri.split(',')[1] || '';
-    return base64Data;
-  } catch (err) {
-    console.warn('jsPDF generation fallback warning:', err);
-    return '';
-  }
-}
 
 /**
  * Creates a beautiful, responsive HTML email shell with consistent branding
@@ -299,84 +76,64 @@ export function wrapHtmlEmailTemplate(title: string, contentHtml: string, action
 
 /**
  * Builds RFC 2822 format and base64url encodes it for direct Gmail API sending.
- * Supports multipart/mixed for email body plus genuine PDF and HTML report attachments.
+ * Supports multipart/mixed for email body plus PDF/HTML report attachments.
  */
-function createRawEmail(options: EmailDispatchOptions, senderEmail?: string): string {
+function createRawEmail(options: EmailDispatchOptions): string {
   const boundary = `----=_Part_NailGlamHub_${Date.now()}`;
-  const utf8Subject = `=?UTF-8?B?${utf8ToBase64(options.subject)}?=`;
-
-  // From header:
-  // In Gmail API, sender must match authenticated Gmail account or omit From line so Gmail automatically fills it in!
-  const effectiveSender = senderEmail || options.senderEmail || getCachedGmailUserEmail() || options.to;
-  const fromHeader = effectiveSender
-    ? `From: "${BRAND_NAME}" <${effectiveSender}>`
-    : `From: "${BRAND_NAME}"`;
-
-  const toHeader = options.toName
-    ? `To: "=?UTF-8?B?${utf8ToBase64(options.toName)}?=" <${options.to}>`
-    : `To: ${options.to}`;
-
-  const replyToHeader = `Reply-To: "${BRAND_NAME} Support" <support@nailglamhub.com>`;
+  const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(options.subject)))}?=`;
+  const fromHeader = `From: ${BRAND_NAME} <notifications@nailglamhub.com>`;
+  const toHeader = options.toName ? `To: "${options.toName}" <${options.to}>` : `To: ${options.to}`;
 
   if (options.hasPdfAttachment && (options.pdfHtml || options.attachmentName)) {
-    const attachmentFilename = options.attachmentName || 'Performance_Report.pdf';
-    
-    // Generate true binary PDF base64 using jsPDF
-    const pdfBase64 = generateCertifiedPdfDocument({
-      title: options.subject,
-      recipientName: options.toName,
-      recipientEmail: options.to,
-      summaryText: options.htmlBody ? options.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300) : undefined,
-    });
-
-    const isRealPdf = Boolean(pdfBase64 && pdfBase64.length > 100);
-    const mimeType = isRealPdf ? 'application/pdf' : 'text/html';
-    const attachmentBase64 = isRealPdf
-      ? pdfBase64
-      : utf8ToBase64(options.pdfHtml || options.htmlBody);
+    const attachmentContent = options.pdfHtml || options.htmlBody;
+    const attachmentFilename = options.attachmentName || 'Performance_Report.html';
 
     const messageParts = [
       fromHeader,
       toHeader,
-      replyToHeader,
       `Subject: ${utf8Subject}`,
       'MIME-Version: 1.0',
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       '',
       `--${boundary}`,
-      'Content-Type: text/html; charset=UTF-8',
+      'Content-Type: text/html; charset=utf-8',
       'Content-Transfer-Encoding: base64',
       '',
-      utf8ToBase64(options.htmlBody),
+      btoa(unescape(encodeURIComponent(options.htmlBody))),
       '',
       `--${boundary}`,
-      `Content-Type: ${mimeType}; name="${attachmentFilename}"`,
+      `Content-Type: text/html; name="${attachmentFilename}"`,
       `Content-Disposition: attachment; filename="${attachmentFilename}"`,
       'Content-Transfer-Encoding: base64',
       '',
-      attachmentBase64,
+      btoa(unescape(encodeURIComponent(attachmentContent))),
       '',
       `--${boundary}--`,
     ];
 
     const rawMessage = messageParts.join('\r\n');
-    return toUrlSafeBase64(rawMessage);
+    return btoa(rawMessage)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   }
 
   // Single-part rich HTML email
   const messageParts = [
     fromHeader,
     toHeader,
-    replyToHeader,
     `Subject: ${utf8Subject}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
+    'Content-Type: text/html; charset=utf-8',
     'Content-Transfer-Encoding: base64',
     '',
-    utf8ToBase64(options.htmlBody),
+    btoa(unescape(encodeURIComponent(options.htmlBody))),
   ];
   const rawMessage = messageParts.join('\r\n');
-  return toUrlSafeBase64(rawMessage);
+  return btoa(rawMessage)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 export interface EmailSendResult {
@@ -393,7 +150,6 @@ export interface EmailSendResult {
 export async function sendEmailNotification(options: EmailDispatchOptions): Promise<EmailSendResult> {
   try {
     const accessToken = getCachedAccessToken();
-    const gmailUserEmail = getCachedGmailUserEmail();
     let gmailSent = false;
     let gmailMessageId: string | undefined = undefined;
     let gmailError: string | undefined = undefined;
@@ -401,7 +157,7 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
     // 1. If user has active Google OAuth access token with Gmail scope, attempt direct dispatch
     if (accessToken) {
       try {
-        const raw = createRawEmail(options, gmailUserEmail || undefined);
+        const raw = createRawEmail(options);
         const gmailRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
           method: 'POST',
           headers: {
@@ -425,8 +181,6 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
         gmailError = gmailErr?.message || String(gmailErr);
         console.warn('[EmailService] Direct Gmail API call warning (falling back to relay):', gmailErr);
       }
-    } else {
-      gmailError = 'Google Workspace not connected. Connect Gmail to deliver messages directly to your external inbox.';
     }
 
     // 2. Dispatch to server to record in database and trigger automated notification
@@ -463,7 +217,6 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
             category: options.category,
             hasPdf: Boolean(options.hasPdfAttachment),
             gmailSent,
-            gmailMessageId,
           },
         })
       );

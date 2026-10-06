@@ -37,11 +37,8 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   currentUser,
   showToast,
 }) => {
-  const defaultTargetEmail = currentUser.email || salon.email || 'salon@nailglamhub.com';
+  const targetEmail = currentUser.email || salon.email || 'salon@nailglamhub.com';
   const ownerName = currentUser.fullname || salon.salon_name || 'Salon Partner';
-
-  const [recipientEmail, setRecipientEmail] = useState(defaultTargetEmail);
-  const targetEmail = recipientEmail;
 
   // Toggle between 'monthly' and 'yearly' reporting frequencies for PDF generation
   const [reportFrequency, setReportFrequency] = useState<'monthly' | 'yearly'>('monthly');
@@ -170,34 +167,18 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   };
 
   // Step 2: User explicitly confirmed sending
-  const handleConfirmSendReport = async (forceConnectGoogle: boolean = false) => {
+  const handleConfirmSendReport = async () => {
     setShowConfirmModal(false);
     setIsGeneratingReport(true);
     setFeedback(null);
     try {
-      // 1. If not connected yet or explicitly requested, obtain Google Workspace token
-      let activeToken = getCachedAccessToken();
-      if (!activeToken || forceConnectGoogle) {
-        showToast('Connecting Google Workspace to send email...');
-        const connResult = await connectGoogleWorkspace();
-        if (connResult.success && connResult.token) {
-          activeToken = connResult.token;
-          setHasGoogleToken(true);
-          if (connResult.email && !recipientEmail) {
-            setRecipientEmail(connResult.email);
-          }
-        }
-      }
-
-      const emailToUse = recipientEmail.trim() || defaultTargetEmail;
-
-      // 2. Generate certified report payload from backend
+      // 1. Generate certified report payload from backend
       const res = await fetch('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           salon_id: salon.id,
-          owner_email: emailToUse,
+          owner_email: targetEmail,
           owner_name: ownerName,
           time_grain: reportFrequency,
         }),
@@ -208,14 +189,10 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         throw new Error(data.error || 'Failed to compile report payload');
       }
 
-      // 3. Dispatch via Gmail API
+      // 2. Dispatch via Gmail API if available
       let gmailDelivered = false;
-      let sendResult: any = null;
       if (data.report) {
-        sendResult = await sendEmailNotification({
-          ...data.report,
-          to: emailToUse,
-        });
+        const sendResult = await sendEmailNotification(data.report);
         if (sendResult.gmailSent) {
           gmailDelivered = true;
         }
@@ -223,19 +200,19 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
 
       if (gmailDelivered) {
         setFeedback(
-          `✅ Official ${reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF report delivered directly to your Gmail inbox (${emailToUse})!`
+          `✅ Official ${reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF report delivered directly to your Gmail inbox (${targetEmail})! Check your inbox or Sent mail.`
         );
-        showToast(`Dispatched via Gmail to ${emailToUse}`);
-      } else if (sendResult?.error) {
+        showToast(`Dispatched via Gmail to ${targetEmail}`);
+      } else if (hasGoogleToken) {
         setFeedback(
-          `Report generated and logged to ledger! Note: ${sendResult.error}`
+          `Report generated and logged! Note: Gmail API relay was attempted. If not in your inbox, check spam or view/download directly below.`
         );
-        showToast('Report saved to ledger');
+        showToast('Report generated and logged to ledger');
       } else {
         setFeedback(
-          `Report compiled and recorded in your ledger! Connect Google Workspace to receive live delivery in your external Gmail.`
+          `Report compiled and recorded in your ledger! To receive it directly in your external Gmail inbox, connect Google Workspace with the button above.`
         );
-        showToast('Report saved to ledger');
+        showToast('Report saved to ledger. Connect Gmail for live delivery.');
       }
 
       await fetchEmailLogs();
@@ -244,48 +221,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       showToast(err.message || 'Error generating report');
     } finally {
       setIsGeneratingReport(false);
-    }
-  };
-
-  const [isResending, setIsResending] = useState(false);
-
-  const handleResendToGmail = async (log: EmailLog) => {
-    setIsResending(true);
-    try {
-      let token = getCachedAccessToken();
-      if (!token) {
-        showToast('Connecting Google Workspace...');
-        const conn = await connectGoogleWorkspace();
-        if (conn.success && conn.token) {
-          token = conn.token;
-          setHasGoogleToken(true);
-        }
-      }
-
-      const sendResult = await sendEmailNotification({
-        to: log.recipient_email,
-        toName: log.recipient_name,
-        role: (log.recipient_role as any) || 'salon_owner',
-        subject: log.subject,
-        category: (log.category as any) || 'report',
-        htmlBody: log.html_body,
-        hasPdfAttachment: Boolean(log.has_pdf_attachment),
-        attachmentName: log.attachment_name,
-        pdfHtml: log.pdf_html,
-      });
-
-      if (sendResult.gmailSent) {
-        showToast(`✅ Dispatched to ${log.recipient_email} via Gmail!`);
-      } else if (sendResult.error) {
-        showToast(`Note: ${sendResult.error}`);
-      } else {
-        showToast('Logged to ledger. Connect Google Workspace for live Gmail delivery.');
-      }
-      await fetchEmailLogs();
-    } catch (err: any) {
-      showToast(err.message || 'Error resending email');
-    } finally {
-      setIsResending(false);
     }
   };
 
@@ -710,17 +645,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => handleResendToGmail(selectedLog)}
-                      disabled={isResending}
-                      className="inline-flex items-center px-3 py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-bold rounded-lg transition cursor-pointer"
-                      title="Dispatch this email report directly to Gmail inbox"
-                    >
-                      <Mail className="w-3.5 h-3.5 mr-1.5" />
-                      {isResending ? 'Sending...' : 'Resend to Gmail'}
-                    </button>
-
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setPreviewLog(selectedLog)}
                       className="inline-flex items-center px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold rounded-lg transition cursor-pointer"
@@ -774,69 +699,49 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
 
             <div className="space-y-3">
               <h3 className="font-bold text-gray-900 text-base">
-                Send {reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF Business Report
+                Send {reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF Business Report?
               </h3>
               <p className="text-xs text-gray-600 leading-relaxed">
-                This will compile and certify your {reportFrequency} revenue, appointments, and retail performance report for <strong>{salon.salon_name}</strong>.
+                This will compile and certify your {reportFrequency} revenue, appointments, and retail performance report for <strong>{salon.salon_name}</strong> and deliver it to:
               </p>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Recipient Gmail / Email Address:
-                </label>
-                <input
-                  type="email"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-purple-50/50 border border-purple-200 rounded-xl text-xs font-semibold text-purple-950 focus:outline-none focus:ring-2 focus:ring-pink-500 transition"
-                  placeholder="e.g. yourname@gmail.com"
-                />
+              <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 text-xs font-semibold text-purple-950 flex items-center justify-between">
+                <span>Recipient Address:</span>
+                <strong className="underline text-purple-700">{targetEmail}</strong>
               </div>
 
               <div className="p-3 rounded-xl border text-xs leading-relaxed flex items-start gap-2 bg-gray-50 border-gray-200 text-gray-700">
                 <AlertCircle className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
                 <div>
                   {hasGoogleToken ? (
-                    <span className="text-emerald-700 font-medium">
-                      ✓ Google Workspace is connected. The certified PDF statement will be delivered directly to <strong>{recipientEmail || defaultTargetEmail}</strong> via Gmail API.
+                    <span>
+                      Your Google Workspace account is connected. The message will be dispatched directly to your Gmail inbox via the Gmail API.
                     </span>
                   ) : (
                     <span>
-                      To receive live PDF delivery directly in your Gmail inbox, connecting your Google account is required. Click below to connect and dispatch immediately.
+                      Your report will be compiled and logged in your ledger. Connect Google Workspace above if you wish to receive live emails in your external inbox.
                     </span>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer text-center"
+                className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
               >
                 Cancel
               </button>
-              
-              {!hasGoogleToken ? (
-                <button
-                  type="button"
-                  onClick={() => handleConfirmSendReport(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Connect Gmail & Send Report</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleConfirmSendReport(false)}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Send PDF Report via Gmail</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleConfirmSendReport}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Send Email Report</span>
+              </button>
             </div>
           </div>
         </div>
