@@ -34,8 +34,9 @@ import {
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
-import { sendEmailNotification } from '../../lib/emailService';
-import { getCachedAccessToken, connectGoogleWorkspace } from '../../lib/firebase';
+import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
+import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
+import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 import {
   StoreReportData,
   FinancialPeriodItem,
@@ -993,20 +994,25 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
     setIsEmailingReport(true);
     try {
       let token = getCachedAccessToken();
+      let connectedEmail = getCachedGmailUserEmail();
       if (!token) {
         showToast('Connecting Google Workspace to send email...');
         const conn = await connectGoogleWorkspace();
         if (conn.success && conn.token) {
           token = conn.token;
+          if (conn.email) connectedEmail = conn.email;
         }
       }
+
+      const savedUser = safeLocalStorage.getJSON<any>('nailglamhub_user');
+      const emailToUse = (connectedEmail || savedUser?.email || salon.email || 'salon@nailglamhub.com').trim();
 
       const res = await fetch('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           salon_id: salon.id,
-          owner_email: salon.email,
+          owner_email: emailToUse,
           owner_name: salon.salon_name,
           time_grain: volumeTimeGrain,
         }),
@@ -1014,9 +1020,14 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         if (data.report) {
-          const sendRes = await sendEmailNotification(data.report);
+          const sendRes = await sendEmailNotification({
+            ...data.report,
+            to: emailToUse,
+          });
           if (sendRes.gmailSent) {
-            showToast(`✅ ${volumeTimeGrain.toUpperCase()} PDF report delivered directly to ${data.report.to} via Gmail!`);
+            showToast(`✅ ${volumeTimeGrain.toUpperCase()} PDF report delivered directly to ${emailToUse} via Gmail!`);
+          } else if (sendRes.error) {
+            showToast(`Report logged to ledger. Note: ${sendRes.error}`);
           } else {
             showToast(`${volumeTimeGrain.toUpperCase()} PDF status report logged to ledger`);
           }
@@ -1030,6 +1041,31 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       showToast('Error emailing report');
     } finally {
       setIsEmailingReport(false);
+    }
+  };
+
+  const handleDownloadDirectPdf = () => {
+    try {
+      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_${volumeTimeGrain}_Report.pdf`;
+      const ok = downloadCertifiedPdfFile(filename, {
+        title: `${salon.salon_name} ${volumeTimeGrain.toUpperCase()} Store Overview Audit`,
+        salonName: salon.salon_name,
+        salonAddress: salon.address,
+        periodLabel: volumeTimeGrain.toUpperCase(),
+        metrics: {
+          grossRevenue: pnlData.summary.totalGrossRevenue,
+          netProfit: pnlData.summary.netProfit,
+          profitMargin: pnlData.summary.profitMargin,
+          appointmentCount: reportData.stats.completedCount,
+        },
+      });
+      if (ok) {
+        showToast(`Downloaded ${filename} successfully!`);
+      } else {
+        showToast('Failed to download PDF document');
+      }
+    } catch (err: any) {
+      showToast('Error downloading PDF');
     }
   };
 
@@ -1129,6 +1165,16 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             >
               <Mail className="w-3.5 h-3.5" />
               <span>{isEmailingReport ? 'Sending...' : 'Email PDF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadDirectPdf}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-900 border border-pink-200/80 text-xs font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
+              title="Download certified PDF performance report file"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
             </button>
 
             <button

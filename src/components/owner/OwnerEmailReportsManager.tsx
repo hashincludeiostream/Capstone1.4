@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 import { Salon, User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
-import { getCachedAccessToken, connectGoogleWorkspace } from '../../lib/firebase';
-import { sendEmailNotification } from '../../lib/emailService';
+import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
+import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 
 interface OwnerEmailReportsManagerProps {
   salon: Salon;
@@ -37,7 +37,8 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   currentUser,
   showToast,
 }) => {
-  const defaultTargetEmail = currentUser.email || salon.email || 'salon@nailglamhub.com';
+  const cachedGoogleEmail = getCachedGmailUserEmail();
+  const defaultTargetEmail = cachedGoogleEmail || currentUser.email || salon.email || 'salon@nailglamhub.com';
   const ownerName = currentUser.fullname || salon.salon_name || 'Salon Partner';
 
   const [recipientEmail, setRecipientEmail] = useState(defaultTargetEmail);
@@ -111,7 +112,10 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       const res = await connectGoogleWorkspace();
       if (res.success && res.token) {
         setHasGoogleToken(true);
-        showToast('Google Workspace connected! Live Gmail delivery is active.');
+        if (res.email) {
+          setRecipientEmail(res.email);
+        }
+        showToast(`Google Workspace connected (${res.email || 'Gmail'})!`);
       } else {
         showToast(res.error || 'Failed to connect Google account');
       }
@@ -119,6 +123,28 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       showToast(err?.message || 'Connection error');
     } finally {
       setIsConnectingGoogle(false);
+    }
+  };
+
+  // Instant direct PDF download
+  const handleDownloadDirectPdf = async () => {
+    try {
+      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_${reportFrequency}_Report.pdf`;
+      const ok = downloadCertifiedPdfFile(filename, {
+        title: `${salon.salon_name} ${reportFrequency.toUpperCase()} Performance Audit`,
+        salonName: salon.salon_name,
+        salonAddress: salon.address,
+        recipientName: ownerName,
+        recipientEmail: recipientEmail.trim() || defaultTargetEmail,
+        periodLabel: `${reportFrequency.toUpperCase()} Dossier`,
+      });
+      if (ok) {
+        showToast(`Downloaded ${filename} successfully!`);
+      } else {
+        showToast('Failed to download PDF document');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Error downloading PDF');
     }
   };
 
@@ -177,19 +203,21 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
     try {
       // 1. If not connected yet or explicitly requested, obtain Google Workspace token
       let activeToken = getCachedAccessToken();
+      let connectedGmailEmail = getCachedGmailUserEmail();
       if (!activeToken || forceConnectGoogle) {
         showToast('Connecting Google Workspace to send email...');
         const connResult = await connectGoogleWorkspace();
         if (connResult.success && connResult.token) {
           activeToken = connResult.token;
           setHasGoogleToken(true);
-          if (connResult.email && !recipientEmail) {
+          if (connResult.email) {
+            connectedGmailEmail = connResult.email;
             setRecipientEmail(connResult.email);
           }
         }
       }
 
-      const emailToUse = recipientEmail.trim() || defaultTargetEmail;
+      const emailToUse = (recipientEmail.trim() || connectedGmailEmail || defaultTargetEmail).trim();
 
       // 2. Generate certified report payload from backend
       const res = await fetch('/api/email/reports/monthly', {
@@ -462,6 +490,15 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
             </button>
 
             <button
+              onClick={handleDownloadDirectPdf}
+              className="inline-flex items-center px-4 py-2.5 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold rounded-xl text-xs sm:text-sm backdrop-blur-sm transition cursor-pointer"
+              title="Download certified PDF performance report file"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              <span>Download PDF File</span>
+            </button>
+
+            <button
               onClick={handleToggleAutomatedPdf}
               className="inline-flex items-center px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-xl text-xs sm:text-sm backdrop-blur-sm transition cursor-pointer"
             >
@@ -730,13 +767,34 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                     </button>
 
                     {selectedLog.has_pdf_attachment && (
-                      <button
-                        onClick={() => handlePrintLog(selectedLog)}
-                        className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5 mr-1.5" />
-                        Print / PDF
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            const filename = selectedLog.attachment_name || `${salon.salon_name}_Report.pdf`;
+                            downloadCertifiedPdfFile(filename, {
+                              title: selectedLog.subject,
+                              recipientName: selectedLog.recipient_name,
+                              recipientEmail: selectedLog.recipient_email,
+                              salonName: salon.salon_name,
+                              salonAddress: salon.address,
+                              summaryText: selectedLog.content_preview,
+                            });
+                            showToast(`Downloaded ${filename} successfully!`);
+                          }}
+                          className="inline-flex items-center px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg transition cursor-pointer"
+                          title="Download certified PDF file directly"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1.5" />
+                          Download PDF
+                        </button>
+                        <button
+                          onClick={() => handlePrintLog(selectedLog)}
+                          className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5 mr-1.5" />
+                          Print / PDF
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -816,6 +874,19 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                 className="px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer text-center"
               >
                 Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleDownloadDirectPdf();
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                title="Download certified PDF file directly"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF File</span>
               </button>
               
               {!hasGoogleToken ? (

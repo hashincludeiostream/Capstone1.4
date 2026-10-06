@@ -85,13 +85,8 @@ if (typeof window !== 'undefined') {
   testFirestoreConnection();
 }
 
-// Scopes configured for Google Workspace integrations (Gmail Send, Compose, Modify, and Full Access)
-export const SCOPES = [
-  'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/gmail.modify',
-  'https://mail.google.com/',
-];
+// Scopes configured for Google Workspace integrations (Least privilege: Gmail Send)
+export const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
 
 // Configure Google OAuth Provider for real Gmail/Google accounts
 export const googleProvider = new GoogleAuthProvider();

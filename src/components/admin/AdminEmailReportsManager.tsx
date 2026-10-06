@@ -22,8 +22,8 @@ import {
 } from 'lucide-react';
 import { User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
-import { getCachedAccessToken, connectGoogleWorkspace } from '../../lib/firebase';
-import { sendEmailNotification } from '../../lib/emailService';
+import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
+import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 
 interface AdminEmailReportsManagerProps {
   currentUser?: User;
@@ -34,7 +34,8 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
   currentUser,
   showToast,
 }) => {
-  const defaultAdminEmail = currentUser?.email || 'jessemuelmedayo02@gmail.com';
+  const cachedGoogleEmail = getCachedGmailUserEmail();
+  const defaultAdminEmail = cachedGoogleEmail || currentUser?.email || 'jessemuelmedayo02@gmail.com';
   const adminName = currentUser?.fullname || 'System Administrator';
 
   const [adminTargetEmail, setAdminTargetEmail] = useState(defaultAdminEmail);
@@ -100,7 +101,10 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
       const res = await connectGoogleWorkspace();
       if (res.success && res.token) {
         setHasGoogleToken(true);
-        showToast('Google Workspace connected! Live Gmail delivery is active.');
+        if (res.email) {
+          setAdminTargetEmail(res.email);
+        }
+        showToast(`Google Workspace connected (${res.email || 'Gmail'})!`);
       } else {
         showToast(res.error || 'Failed to connect Google account');
       }
@@ -108,6 +112,27 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
       showToast(err?.message || 'Connection error');
     } finally {
       setIsConnectingGoogle(false);
+    }
+  };
+
+  // Instant direct PDF download
+  const handleDownloadDirectPdf = async () => {
+    try {
+      const filename = `Platform_Ecosystem_Executive_Report.pdf`;
+      const ok = downloadCertifiedPdfFile(filename, {
+        title: `Nail Glam Hub Executive Ecosystem Performance Audit`,
+        recipientName: adminName,
+        recipientEmail: adminTargetEmail.trim() || defaultAdminEmail,
+        periodLabel: 'Full Platform Ecosystem Audit',
+        summaryText: 'Executive dossier auditing active partner studios, transaction volumes, revenue settlement integrity, and customer retention metrics.',
+      });
+      if (ok) {
+        showToast(`Downloaded ${filename} successfully!`);
+      } else {
+        showToast('Failed to download PDF document');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Error downloading PDF');
     }
   };
 
@@ -151,19 +176,21 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
     try {
       // 1. Ensure active Google Workspace token
       let activeToken = getCachedAccessToken();
+      let connectedGmailEmail = getCachedGmailUserEmail();
       if (!activeToken || forceConnectGoogle) {
         showToast('Connecting Google Workspace to send email...');
         const connResult = await connectGoogleWorkspace();
         if (connResult.success && connResult.token) {
           activeToken = connResult.token;
           setHasGoogleToken(true);
-          if (connResult.email && !adminTargetEmail) {
+          if (connResult.email) {
+            connectedGmailEmail = connResult.email;
             setAdminTargetEmail(connResult.email);
           }
         }
       }
 
-      const emailToUse = adminTargetEmail.trim() || defaultAdminEmail;
+      const emailToUse = (adminTargetEmail.trim() || connectedGmailEmail || defaultAdminEmail).trim();
 
       // 2. Generate platform status report from server
       const res = await fetch('/api/email/reports/admin-platform', {
@@ -418,6 +445,15 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
             >
               <FileText className={`w-4 h-4 mr-2 ${isGeneratingReport ? 'animate-spin' : ''}`} />
               {isGeneratingReport ? 'Generating & Delivering PDF...' : 'Email Platform PDF Report Now'}
+            </button>
+
+            <button
+              onClick={handleDownloadDirectPdf}
+              className="inline-flex items-center px-4 py-2.5 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold rounded-xl text-xs sm:text-sm backdrop-blur-sm transition cursor-pointer"
+              title="Download certified PDF ecosystem audit file"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              <span>Download PDF File</span>
             </button>
 
             <button
@@ -681,13 +717,32 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
                     </button>
 
                     {selectedLog.has_pdf_attachment && (
-                      <button
-                        onClick={() => handlePrintLog(selectedLog)}
-                        className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5 mr-1.5" />
-                        Print / PDF
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            const filename = selectedLog.attachment_name || 'Platform_Audit_Report.pdf';
+                            downloadCertifiedPdfFile(filename, {
+                              title: selectedLog.subject,
+                              recipientName: selectedLog.recipient_name,
+                              recipientEmail: selectedLog.recipient_email,
+                              summaryText: selectedLog.content_preview,
+                            });
+                            showToast(`Downloaded ${filename} successfully!`);
+                          }}
+                          className="inline-flex items-center px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg transition cursor-pointer"
+                          title="Download certified PDF file directly"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1.5" />
+                          Download PDF
+                        </button>
+                        <button
+                          onClick={() => handlePrintLog(selectedLog)}
+                          className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5 mr-1.5" />
+                          Print / PDF
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -767,6 +822,19 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
                 className="px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer text-center"
               >
                 Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleDownloadDirectPdf();
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                title="Download certified PDF file directly"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF File</span>
               </button>
               
               {!hasGoogleToken ? (
