@@ -255,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ----------------------------------------------------
   if (isAdmin) {
     return (
-      <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-20 xl:top-24 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 space-y-3.5">
+      <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-[84px] self-start max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain pr-2 space-y-3.5 z-30">
         {/* Admin Identity Card */}
         <div className="bg-gradient-to-br from-stone-950 via-rose-950 to-purple-950 rounded-2xl p-4 text-white shadow-md border border-rose-900/40">
           <div className="flex items-center gap-2.5">
@@ -580,7 +580,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ----------------------------------------------------
   if (isOwner) {
     return (
-      <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-20 xl:top-24 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 space-y-3.5">
+      <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-[84px] self-start max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain pr-2 space-y-3.5 z-30">
         {/* Salon Partner Studio Card */}
         <div className="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl p-4 text-white shadow-md border border-purple-800">
           <div className="flex items-center gap-2">
@@ -942,7 +942,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // CLIENT & GUEST SIDEBAR VIEW
   // ----------------------------------------------------
   return (
-    <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-20 xl:top-24 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 space-y-3.5">
+    <aside className="w-60 xl:w-64 2xl:w-72 shrink-0 hidden lg:block sticky top-[84px] self-start max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain pr-2 space-y-3.5 z-30">
       {/* Primary Discovery Menu */}
       <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 border border-pink-100/80 shadow-xs">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1.5">

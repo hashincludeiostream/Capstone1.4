@@ -52,7 +52,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     return (
       <nav
         aria-label="Mobile Admin Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-950/95 backdrop-blur-lg border-t border-rose-900/40 shadow-2xl px-2 py-1.5 safe-bottom"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-950/85 backdrop-blur-md supports-[backdrop-filter]:bg-stone-950/80 border-t border-rose-900/40 shadow-2xl px-2 py-1.5 safe-bottom"
       >
         <div className="grid grid-cols-5 items-center justify-around max-w-md mx-auto">
           <button
@@ -135,7 +135,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     return (
       <nav
         aria-label="Mobile Partner Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-purple-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 safe-bottom"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-t border-purple-100/80 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 safe-bottom"
       >
         <div className="grid grid-cols-5 items-center justify-around max-w-md mx-auto">
           <button
@@ -217,7 +217,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       aria-label="Mobile Customer Navigation"
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-pink-100 shadow-[0_-4px_25px_rgba(236,72,153,0.08)] px-2 py-1.5 safe-bottom"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-t border-pink-100/80 shadow-[0_-4px_25px_rgba(236,72,153,0.08)] px-2 py-1.5 safe-bottom"
     >
       <div className="grid grid-cols-5 items-center justify-around max-w-md mx-auto">
         {/* Explore / Home */}

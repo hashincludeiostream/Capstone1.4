@@ -1152,7 +1152,7 @@ const AppContent: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex items-start gap-6 xl:gap-8 flex-1 min-h-[calc(100vh-10rem)] max-w-full overflow-x-hidden">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex items-start gap-6 xl:gap-8 flex-1 min-h-[calc(100vh-10rem)] max-w-full overflow-x-clip">
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}

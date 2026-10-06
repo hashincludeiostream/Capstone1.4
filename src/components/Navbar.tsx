@@ -169,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAdmin = currentUser?.user_type === 'admin';
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-pink-100/80 shadow-xs">
+    <header className="sticky top-0 z-40 w-full bg-white/75 backdrop-blur-md supports-[backdrop-filter]:bg-white/70 border-b border-pink-100/70 shadow-xs transition-colors duration-200">
       <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12">
         <div className="flex items-center justify-between h-18">
           {/* Brand Logo */}
