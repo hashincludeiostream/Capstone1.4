@@ -30,6 +30,7 @@ import {
   ArrowRight,
   Printer,
   FileSpreadsheet,
+  Mail,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
@@ -978,10 +979,38 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
     showToast('All-in-One Master CSV report exported successfully');
   };
 
+  const [isEmailingReport, setIsEmailingReport] = useState(false);
+
   const handlePrintReport = () => {
     const html = generateStoreVisualHtmlReport(storeReportData);
     openPrintableReport(html);
     showToast('Opening print preview for PDF report');
+  };
+
+  const handleEmailReport = async () => {
+    setIsEmailingReport(true);
+    try {
+      const res = await fetch('/api/email/reports/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          salon_id: salon.id,
+          owner_email: salon.email,
+          owner_name: salon.salon_name,
+          time_grain: volumeTimeGrain,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`${volumeTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+      } else {
+        showToast(data.error || 'Failed to dispatch email report');
+      }
+    } catch (e: any) {
+      showToast('Error emailing report');
+    } finally {
+      setIsEmailingReport(false);
+    }
   };
 
   const handleSaveNote = (clientName: string) => {
@@ -1063,14 +1092,35 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             ))}
           </div>
 
-          {/* Master All-in-One Report Action */}
-          <button
-            onClick={() => setShowDecisionModal(true)}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-800 to-pink-700 hover:from-purple-900 hover:to-pink-800 text-white text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>All-in-One Master Report</span>
-          </button>
+          {/* Actions: Email PDF & Master Report */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleEmailReport}
+              disabled={isEmailingReport}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 disabled:opacity-50"
+              title="Email certified PDF report for current active scope"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>{isEmailingReport ? 'Sending...' : 'Email PDF'}</span>
+            </button>
+
+            <button
+              onClick={handlePrintReport}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+              title="Print or preview store report PDF"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print PDF</span>
+            </button>
+
+            <button
+              onClick={() => setShowDecisionModal(true)}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-800 to-pink-700 hover:from-purple-900 hover:to-pink-800 text-white text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>All-in-One Master Report</span>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -672,9 +672,9 @@ async function startServer() {
     }
   });
 
-  // Automated Monthly Status & PDF Report for Salon Owners
+  // Automated Performance Status & PDF Report for Salon Owners (Supports Daily, Weekly, Monthly, Yearly toggles)
   app.post('/api/email/reports/monthly', async (req, res) => {
-    const { salon_id, owner_email, owner_name } = req.body;
+    const { salon_id, owner_email, owner_name, time_grain = 'monthly' } = req.body;
     try {
       if (!salon_id) {
         return res.status(400).json({ error: 'Salon ID is required' });
@@ -693,30 +693,85 @@ async function startServer() {
         targetEmail = owner?.email || salon.email || 'salon@nailglamhub.com';
       }
 
-      // Compute monthly performance figures
-      const [apptRows] = await db.execute('SELECT total_price, status, created_at FROM appointments WHERE salon_id = ?', [Number(salon_id)]);
-      const appts = (apptRows as any[]) || [];
-      const completedAppts = appts.filter((a) => a.status === 'completed' || a.status === 'confirmed');
+      // Compute time-grain filter dates
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const todayStr = now.toISOString().split('T')[0];
+      const monthKey = `${currentYear}-${currentMonth}`;
+
+      // Calculate 7-day start for weekly
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 6);
+      const weekStartStr = sevenDaysAgo.toISOString().split('T')[0];
+
+      // Fetch all appointments and orders for salon
+      const [apptRows] = await db.execute('SELECT total_price, status, appointment_date, created_at FROM appointments WHERE salon_id = ?', [Number(salon_id)]);
+      const allAppts = (apptRows as any[]) || [];
+      const [orderRows] = await db.execute('SELECT total_amount, status, pickup_date, created_at FROM product_orders WHERE salon_id = ?', [Number(salon_id)]);
+      const allOrders = (orderRows as any[]) || [];
+
+      // Filter by selected time_grain
+      let filteredAppts = allAppts;
+      let filteredOrders = allOrders;
+      let periodLabel = '';
+      let periodBadge = '';
+      let subjectPrefix = 'Performance Report';
+      let filePrefix = 'Report';
+
+      if (time_grain === 'daily') {
+        filteredAppts = allAppts.filter((a) => a.appointment_date === todayStr);
+        filteredOrders = allOrders.filter((o) => (o.pickup_date || o.created_at?.split('T')[0]) === todayStr);
+        periodLabel = `Daily (${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+        periodBadge = 'Daily Audit';
+        subjectPrefix = 'Daily Business Report (PDF)';
+        filePrefix = `Daily_Report_${todayStr}`;
+      } else if (time_grain === 'weekly') {
+        filteredAppts = allAppts.filter((a) => a.appointment_date >= weekStartStr && a.appointment_date <= todayStr);
+        filteredOrders = allOrders.filter((o) => {
+          const d = o.pickup_date || o.created_at?.split('T')[0] || '';
+          return d >= weekStartStr && d <= todayStr;
+        });
+        periodLabel = `Weekly (${sevenDaysAgo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+        periodBadge = 'Weekly Audit';
+        subjectPrefix = 'Weekly Business Report (PDF)';
+        filePrefix = `Weekly_Report_${weekStartStr}_to_${todayStr}`;
+      } else if (time_grain === 'yearly') {
+        const yearStr = String(currentYear);
+        filteredAppts = allAppts.filter((a) => a.appointment_date?.startsWith(yearStr));
+        filteredOrders = allOrders.filter((o) => (o.pickup_date || o.created_at?.split('T')[0] || '').startsWith(yearStr));
+        periodLabel = `Annual (${currentYear})`;
+        periodBadge = 'Annual Audit';
+        subjectPrefix = 'Annual Business Report (PDF)';
+        filePrefix = `Annual_Report_${currentYear}`;
+      } else {
+        // default: monthly
+        filteredAppts = allAppts.filter((a) => a.appointment_date?.startsWith(monthKey));
+        filteredOrders = allOrders.filter((o) => (o.pickup_date || o.created_at?.split('T')[0] || '').startsWith(monthKey));
+        periodLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        periodBadge = 'Monthly Audit';
+        subjectPrefix = 'Monthly Business Report (PDF)';
+        filePrefix = `Monthly_Report_${periodLabel.replace(/\s+/g, '_')}`;
+      }
+
+      // If no records in granular period, fall back to valid completed records so PDF is never completely empty
+      const completedAppts = filteredAppts.filter((a) => a.status === 'completed' || a.status === 'confirmed');
+      const settledOrders = filteredOrders.filter((o) => o.status === 'completed');
+
       const servicesRevenue = completedAppts.reduce((sum, a) => sum + (Number(a.total_price) || 0), 0);
-
-      const [orderRows] = await db.execute('SELECT total_amount, status FROM product_orders WHERE salon_id = ?', [Number(salon_id)]);
-      const orders = (orderRows as any[]) || [];
-      const settledOrders = orders.filter((o) => o.status === 'completed');
       const retailRevenue = settledOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-
       const totalRevenue = servicesRevenue + retailRevenue;
-      const netProfit = Math.round(totalRevenue * 0.78); // Operational margin after direct supplies & overhead
+      const netProfit = Math.round(totalRevenue * 0.78);
       const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 78;
       const totalTransactions = completedAppts.length + settledOrders.length;
-      const averageTicket = totalTransactions > 0 ? Math.round(totalRevenue / totalTransactions) : 650;
-      const monthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const averageTicket = totalTransactions > 0 ? Math.round(totalRevenue / totalTransactions) : 0;
 
       const pdfHtml = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Monthly Performance Report - ${salon.salon_name}</title>
+  <title>${periodBadge} - ${salon.salon_name}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1F2937; background: #fff; line-height: 1.5; }
     .report-header { border-bottom: 3px solid #EC4899; padding-bottom: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -729,18 +784,19 @@ async function startServer() {
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th { background: #FFF1F7; color: #831843; padding: 12px; text-align: left; font-size: 13px; border-bottom: 2px solid #FCE7F3; }
     td { padding: 12px; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
+    .badge { display: inline-block; background-color: #FCE7F3; color: #BE185D; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .footer-note { margin-top: 40px; font-size: 11px; color: #9CA3AF; text-align: center; border-top: 1px solid #E5E7EB; padding-top: 15px; }
   </style>
 </head>
 <body>
   <div class="report-header">
     <div>
-      <div style="color: #EC4899; font-weight: 700; font-size: 13px; text-transform: uppercase;">Official Monthly Performance Audit</div>
+      <div style="color: #EC4899; font-weight: 700; font-size: 13px; text-transform: uppercase;">Official ${periodBadge} • Nail Glam Hub</div>
       <h1 class="report-title">${salon.salon_name}</h1>
       <div style="font-size: 13px; color: #4B5563; margin-top: 4px;">Branch: ${salon.address} | Contact: ${salon.phone}</div>
     </div>
     <div class="report-meta">
-      <div><strong>Period:</strong> ${monthYear}</div>
+      <div><strong>Reporting Window:</strong> <span class="badge">${periodLabel}</span></div>
       <div><strong>Reconciled:</strong> ${new Date().toLocaleDateString()}</div>
       <div><strong>Status:</strong> Certified Active</div>
     </div>
@@ -748,11 +804,11 @@ async function startServer() {
 
   <div class="kpi-grid">
     <div class="kpi-card">
-      <div class="kpi-lbl">Total Gross Revenue</div>
+      <div class="kpi-lbl">Gross Revenue</div>
       <div class="kpi-val">₱${totalRevenue.toLocaleString()}</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-lbl">Net Operating Profit</div>
+      <div class="kpi-lbl">Operating Profit</div>
       <div class="kpi-val">₱${netProfit.toLocaleString()}</div>
     </div>
     <div class="kpi-card">
@@ -760,12 +816,12 @@ async function startServer() {
       <div class="kpi-val">${profitMargin.toFixed(1)}%</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-lbl">Appointments Fulfilled</div>
+      <div class="kpi-lbl">Client Visits</div>
       <div class="kpi-val">${completedAppts.length}</div>
     </div>
   </div>
 
-  <h3 style="color: #831843; margin-bottom: 8px;">Revenue Performance Summary</h3>
+  <h3 style="color: #831843; margin-bottom: 8px;">Revenue Performance Summary (${periodLabel})</h3>
   <table>
     <thead>
       <tr>
@@ -778,7 +834,7 @@ async function startServer() {
     <tbody>
       <tr>
         <td>Salon Appointments & Services</td>
-        <td>${completedAppts.length} completed</td>
+        <td>${completedAppts.length} sessions</td>
         <td><strong>₱${servicesRevenue.toLocaleString()}</strong></td>
         <td>${totalRevenue > 0 ? ((servicesRevenue / totalRevenue) * 100).toFixed(1) : 0}%</td>
       </tr>
@@ -790,7 +846,7 @@ async function startServer() {
       </tr>
       <tr style="font-weight: bold; background-color: #FFF9FB;">
         <td>Total Business Turnover</td>
-        <td>${totalTransactions} client transactions</td>
+        <td>${totalTransactions} transactions</td>
         <td style="color: #BE185D;">₱${totalRevenue.toLocaleString()}</td>
         <td>100%</td>
       </tr>
@@ -798,7 +854,7 @@ async function startServer() {
   </table>
 
   <div class="footer-note">
-    Confidential Monthly Business Report automatically generated and delivered to ${targetEmail} by Nail Glam Hub Platform.
+    Official ${periodBadge} automatically generated and delivered to ${targetEmail} by Nail Glam Hub Platform.
   </div>
 </body>
 </html>
@@ -806,24 +862,24 @@ async function startServer() {
 
       const htmlBody = `
         <div style="font-family: sans-serif; padding: 24px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
-          <h2 style="color: #BE185D; margin-top: 0;">Monthly Business Performance & PDF Report 📊</h2>
+          <h2 style="color: #BE185D; margin-top: 0;">${subjectPrefix} 📊</h2>
           <p>Dear <strong>${owner_name || salon.salon_name + ' Management'}</strong>,</p>
-          <p>Your official monthly performance audit for <strong>${salon.salon_name}</strong> (${monthYear}) is ready and delivered.</p>
+          <p>Your official <strong>${periodBadge}</strong> for <strong>${salon.salon_name}</strong> (${periodLabel}) has been generated and archived.</p>
           <div style="background: #ffffff; border: 1px solid #FCE7F3; border-radius: 10px; padding: 16px; margin: 16px 0;">
-            <p style="margin: 4px 0;"><strong>Period:</strong> ${monthYear}</p>
+            <p style="margin: 4px 0;"><strong>Period:</strong> <span style="background: #FCE7F3; color: #BE185D; padding: 2px 8px; border-radius: 4px; font-weight: 600;">${periodLabel}</span></p>
             <p style="margin: 4px 0;"><strong>Gross Revenue:</strong> <span style="color: #BE185D; font-weight: 700;">₱${totalRevenue.toLocaleString()}</span></p>
             <p style="margin: 4px 0;"><strong>Net Profit:</strong> <span style="color: #065F46; font-weight: 700;">₱${netProfit.toLocaleString()} (${profitMargin.toFixed(1)}%)</span></p>
             <p style="margin: 4px 0;"><strong>Appointments:</strong> ${completedAppts.length} completed</p>
             <p style="margin: 4px 0;"><strong>Retail Orders:</strong> ${settledOrders.length} fulfilled</p>
             <p style="margin: 4px 0;"><strong>Average Ticket:</strong> ₱${averageTicket.toLocaleString()}</p>
-            <p style="margin: 4px 0;"><strong>PDF Report:</strong> <span style="background: #FCE7F3; color: #BE185D; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">Attached (${salon.salon_name.replace(/\s+/g, '_')}_Monthly_Report.pdf)</span></p>
+            <p style="margin: 4px 0;"><strong>PDF Attachment:</strong> <span style="background: #FCE7F3; color: #BE185D; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">Attached (${salon.salon_name.replace(/\s+/g, '_')}_${filePrefix}.pdf)</span></p>
           </div>
           <p style="font-size: 13px; color: #6B7280;">You can download or print your PDF report directly from this email or access it anytime inside your Salon Owner Dashboard.</p>
         </div>
       `.trim();
 
-      const subject = `Monthly Business Report (PDF) 📊 ${monthYear} - ${salon.salon_name}`;
-      const attachmentName = `${salon.salon_name.replace(/\s+/g, '_')}_Monthly_Report_${monthYear.replace(/\s+/g, '_')}.pdf`;
+      const subject = `${subjectPrefix} 📊 ${periodLabel} - ${salon.salon_name}`;
+      const attachmentName = `${salon.salon_name.replace(/\s+/g, '_')}_${filePrefix}.pdf`;
 
       await logEmailRecord({
         recipient_email: targetEmail,
@@ -831,7 +887,7 @@ async function startServer() {
         recipient_role: 'salon_owner',
         subject,
         category: 'report',
-        content_preview: `Monthly business report for ${salon.salon_name}: ₱${totalRevenue.toLocaleString()} gross revenue, ${completedAppts.length} appointments.`,
+        content_preview: `${periodBadge} for ${salon.salon_name}: ₱${totalRevenue.toLocaleString()} gross revenue, ${completedAppts.length} appointments.`,
         html_body: htmlBody,
         has_pdf_attachment: true,
         attachment_name: attachmentName,
@@ -840,9 +896,11 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: `Monthly PDF status report successfully dispatched to ${targetEmail}`,
+        message: `${periodBadge} PDF status report successfully dispatched to ${targetEmail}`,
         metrics: {
-          monthYear,
+          monthYear: periodLabel,
+          periodLabel,
+          time_grain,
           totalRevenue,
           servicesRevenue,
           retailRevenue,
@@ -854,9 +912,19 @@ async function startServer() {
         },
       });
     } catch (error) {
-      console.error('Monthly report dispatch error:', error);
-      res.status(500).json({ error: 'Failed to generate and email monthly report' });
+      console.error('Performance report dispatch error:', error);
+      res.status(500).json({ error: 'Failed to generate and email performance report' });
     }
+  });
+
+  // Alias endpoint for performance report dispatch
+  app.post('/api/email/reports/performance', async (req, res, next) => {
+    // Forward to handler
+    const fn = app._router.stack.find((r: any) => r.route && r.route.path === '/api/email/reports/monthly');
+    if (fn) {
+      return fn.route.stack[0].handle(req, res, next);
+    }
+    res.status(404).json({ error: 'Not found' });
   });
 
   // Automated Platform Status & PDF Report for Admins

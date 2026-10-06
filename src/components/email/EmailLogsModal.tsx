@@ -28,7 +28,6 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testSentFeedback, setTestSentFeedback] = useState<string | null>(null);
 
@@ -55,11 +54,6 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
   useEffect(() => {
     fetchLogs();
   }, [currentUser]);
-
-  const filteredLogs = logs.filter((log) => {
-    if (filterCategory === 'all') return true;
-    return log.category === filterCategory;
-  });
 
   const handleSendTestEmail = async () => {
     setIsSendingTest(true);
@@ -191,27 +185,6 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
           </div>
         )}
 
-        {/* Filter bar */}
-        <div className="px-4 sm:px-6 py-2 border-b border-gray-100 bg-gray-50/70 flex items-center space-x-2 overflow-x-auto text-xs shrink-0 no-scrollbar">
-          <span className="text-gray-500 font-medium mr-1 shrink-0">Filter:</span>
-          {['all', 'booking', 'order', 'report', 'promo', 'alert', 'verification'].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilterCategory(cat)}
-              className={`px-2.5 sm:px-3 py-1 rounded-full font-medium transition capitalize shrink-0 cursor-pointer ${
-                filterCategory === cat
-                  ? 'bg-pink-600 text-white shadow-xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-          <span className="ml-auto text-gray-400 font-normal shrink-0 hidden sm:inline text-[11px]">
-            Showing {filteredLogs.length} delivered email(s)
-          </span>
-        </div>
-
         {/* Two-Column Split Pane */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           
@@ -222,7 +195,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-pink-500" />
                 <p className="text-xs">Loading email records...</p>
               </div>
-            ) : filteredLogs.length === 0 ? (
+            ) : logs.length === 0 ? (
               <div className="p-8 text-center text-gray-400">
                 <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-sm font-semibold text-gray-600">No email records found</p>
@@ -236,7 +209,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {filteredLogs.map((log) => {
+                {logs.map((log) => {
                   const isSelected = selectedLog?.id === log.id;
                   const dateStr = log.sent_at ? new Date(log.sent_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent';
 

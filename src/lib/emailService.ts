@@ -414,12 +414,13 @@ export async function sendOwnerNewOrderAlert(
 }
 
 /**
- * Salon Owner: Automated Monthly PDF Business & Revenue Report
+ * Salon Owner: Automated PDF Business & Performance Report (Daily, Weekly, Monthly, Yearly)
  */
-export async function sendOwnerMonthlyPdfReport(
+export async function sendOwnerPerformancePdfReport(
   ownerEmail: string,
   ownerName: string,
   salon: Salon,
+  timeGrain: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'monthly',
   reportMetrics: {
     monthYear: string;
     totalRevenue: number;
@@ -433,7 +434,15 @@ export async function sendOwnerMonthlyPdfReport(
     peakPeriod: string;
   }
 ) {
-  const subject = `Monthly Business Report (PDF) 📊 ${reportMetrics.monthYear} - ${salon.salon_name}`;
+  const periodTitles: Record<'daily' | 'weekly' | 'monthly' | 'yearly', { badge: string; prefix: string; fileTag: string }> = {
+    daily: { badge: 'Daily Performance Audit', prefix: 'Daily Business Report', fileTag: 'Daily_Report' },
+    weekly: { badge: 'Weekly Performance Audit', prefix: 'Weekly Business Report', fileTag: 'Weekly_Report' },
+    monthly: { badge: 'Monthly Financial Audit', prefix: 'Monthly Business Report', fileTag: 'Monthly_Report' },
+    yearly: { badge: 'Annual Performance Audit', prefix: 'Annual Business Report', fileTag: 'Annual_Report' },
+  };
+
+  const config = periodTitles[timeGrain] || periodTitles.monthly;
+  const subject = `${config.prefix} (PDF) 📊 ${reportMetrics.monthYear} - ${salon.salon_name}`;
   
   // PDF Document HTML template for attachment / printing
   const pdfHtml = `
@@ -441,7 +450,7 @@ export async function sendOwnerMonthlyPdfReport(
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Monthly Performance Report - ${salon.salon_name}</title>
+  <title>${config.badge} - ${salon.salon_name}</title>
   <style>
     body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #1F2937; background: #fff; }
     .report-header { border-bottom: 2px solid #EC4899; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -460,7 +469,7 @@ export async function sendOwnerMonthlyPdfReport(
 <body>
   <div class="report-header">
     <div>
-      <div style="color: #EC4899; font-weight: 700; font-size: 14px; text-transform: uppercase;">Nail Glam Hub • Monthly Financial Audit</div>
+      <div style="color: #EC4899; font-weight: 700; font-size: 14px; text-transform: uppercase;">Nail Glam Hub • ${config.badge}</div>
       <h1 class="report-title">${salon.salon_name}</h1>
       <div style="font-size: 13px; color: #4B5563; margin-top: 4px;">Branch: ${salon.address} | Contact: ${salon.phone}</div>
     </div>
@@ -523,11 +532,11 @@ export async function sendOwnerMonthlyPdfReport(
   </table>
 
   <div style="margin-top: 25px; background: #FFF9FB; border: 1px solid #FCE7F3; padding: 16px; border-radius: 8px; font-size: 13px;">
-    <strong>Strategic Notes:</strong> Average ticket revenue per client transaction this month was <strong>₱${reportMetrics.averageTicket.toLocaleString()}</strong>. Peak client traffic recorded during <strong>${reportMetrics.peakPeriod}</strong>.
+    <strong>Strategic Notes:</strong> Average ticket revenue per client transaction this period was <strong>₱${reportMetrics.averageTicket.toLocaleString()}</strong>. Peak client traffic recorded during <strong>${reportMetrics.peakPeriod}</strong>.
   </div>
 
   <div class="footer-note">
-    Confidential Monthly Report automatically dispatched to ${ownerEmail}. Verified by Nail Glam Hub Platform Engine.
+    Confidential Performance Report automatically dispatched to ${ownerEmail}. Verified by Nail Glam Hub Platform Engine.
   </div>
 </body>
 </html>
@@ -535,7 +544,7 @@ export async function sendOwnerMonthlyPdfReport(
 
   const content = `
     <p>Dear <strong>${ownerName || 'Salon Owner'}</strong>,</p>
-    <p>Your official <strong>${reportMetrics.monthYear} Monthly Business & Financial Report</strong> for <strong>${salon.salon_name}</strong> is ready. Your PDF report is attached below and archived in your owner records.</p>
+    <p>Your official <strong>${config.prefix}</strong> for <strong>${salon.salon_name}</strong> (${reportMetrics.monthYear}) is ready. Your certified PDF report is attached below and archived in your owner records.</p>
     
     <div class="card">
       <div class="detail-row"><span class="detail-label">Period:</span><span class="detail-value">${reportMetrics.monthYear}</span></div>
@@ -544,7 +553,7 @@ export async function sendOwnerMonthlyPdfReport(
       <div class="detail-row"><span class="detail-label">Appointments:</span><span class="detail-value">${reportMetrics.appointmentCount} booked</span></div>
       <div class="detail-row"><span class="detail-label">Retail Boutique Orders:</span><span class="detail-value">${reportMetrics.orderCount} fulfilled</span></div>
       <div class="detail-row"><span class="detail-label">Average Ticket:</span><span class="detail-value">₱${reportMetrics.averageTicket.toLocaleString()}</span></div>
-      <div class="detail-row"><span class="detail-label">PDF Attachment:</span><span class="detail-value badge badge-pink">Attached (${salon.salon_name.replace(/\s+/g, '_')}_Monthly_Report.pdf)</span></div>
+      <div class="detail-row"><span class="detail-label">PDF Attachment:</span><span class="detail-value badge badge-pink">Attached (${salon.salon_name.replace(/\s+/g, '_')}_${config.fileTag}.pdf)</span></div>
     </div>
 
     <p style="font-size: 13px; color: #6B7280;">
@@ -552,7 +561,7 @@ export async function sendOwnerMonthlyPdfReport(
     </p>
   `;
 
-  const html = wrapHtmlEmailTemplate(`Monthly PDF Status Report: ${reportMetrics.monthYear}`, content, { text: 'Open Salon Dashboard', url: 'https://nailglamhub.com' });
+  const html = wrapHtmlEmailTemplate(`${config.prefix}: ${reportMetrics.monthYear}`, content, { text: 'Open Salon Dashboard', url: 'https://nailglamhub.com' });
   return sendEmailNotification({
     to: ownerEmail,
     toName: ownerName,
@@ -562,8 +571,31 @@ export async function sendOwnerMonthlyPdfReport(
     htmlBody: html,
     hasPdfAttachment: true,
     pdfHtml,
-    attachmentName: `${salon.salon_name.replace(/\s+/g, '_')}_Monthly_Report_${reportMetrics.monthYear.replace(/\s+/g, '_')}.pdf`,
+    attachmentName: `${salon.salon_name.replace(/\s+/g, '_')}_${config.fileTag}_${reportMetrics.monthYear.replace(/\s+/g, '_')}.pdf`,
   });
+}
+
+/**
+ * Salon Owner: Automated Monthly PDF Business & Revenue Report (Backwards compatibility)
+ */
+export async function sendOwnerMonthlyPdfReport(
+  ownerEmail: string,
+  ownerName: string,
+  salon: Salon,
+  reportMetrics: {
+    monthYear: string;
+    totalRevenue: number;
+    servicesRevenue: number;
+    retailRevenue: number;
+    appointmentCount: number;
+    orderCount: number;
+    netProfit: number;
+    profitMargin: number;
+    averageTicket: number;
+    peakPeriod: string;
+  }
+) {
+  return sendOwnerPerformancePdfReport(ownerEmail, ownerName, salon, 'monthly', reportMetrics);
 }
 
 // =========================================================================

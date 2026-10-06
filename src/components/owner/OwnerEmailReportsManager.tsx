@@ -16,6 +16,7 @@ import {
   ToggleLeft,
   ToggleRight,
   ExternalLink,
+  TrendingUp,
 } from 'lucide-react';
 import { Salon, User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
@@ -31,18 +32,35 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   currentUser,
   showToast,
 }) => {
-  // Notification Preferences (with toggle on and off)
+  // Toggle between 'monthly' and 'yearly' reporting frequencies for PDF generation
+  const [reportFrequency, setReportFrequency] = useState<'monthly' | 'yearly'>('monthly');
+
+  // Notification Preferences (with toggle on and off and frequency)
   const prefsKey = `email_prefs_owner_${currentUser.id}_${salon.id}`;
-  const [monthlyPdfEnabled, setMonthlyPdfEnabled] = useState(() => {
+  const [automatedPdfEnabled, setAutomatedPdfEnabled] = useState(() => {
     const saved = safeLocalStorage.getItem(prefsKey);
     if (saved) {
       try {
-        return JSON.parse(saved).monthlyPdfEnabled ?? true;
+        const parsed = JSON.parse(saved);
+        return parsed.automatedPdfEnabled ?? parsed.monthlyPdfEnabled ?? true;
       } catch (e) {
         return true;
       }
     }
     return true;
+  });
+
+  const [deliveryFrequency, setDeliveryFrequency] = useState<'monthly' | 'yearly'>(() => {
+    const saved = safeLocalStorage.getItem(prefsKey);
+    if (saved) {
+      try {
+        const freq = JSON.parse(saved).deliveryFrequency;
+        return freq === 'yearly' ? 'yearly' : 'monthly';
+      } catch (e) {
+        return 'monthly';
+      }
+    }
+    return 'monthly';
   });
 
   const [bookingAlertsEnabled, setBookingAlertsEnabled] = useState(true);
@@ -56,11 +74,23 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   const [feedback, setFeedback] = useState<string | null>(null);
 
   // Save preferences
-  const handleToggleMonthlyPdf = () => {
-    const newVal = !monthlyPdfEnabled;
-    setMonthlyPdfEnabled(newVal);
-    safeLocalStorage.setItem(prefsKey, JSON.stringify({ monthlyPdfEnabled: newVal }));
-    showToast(newVal ? 'Monthly automated PDF reports enabled' : 'Monthly automated PDF reports disabled');
+  const handleToggleAutomatedPdf = () => {
+    const newVal = !automatedPdfEnabled;
+    setAutomatedPdfEnabled(newVal);
+    safeLocalStorage.setItem(
+      prefsKey,
+      JSON.stringify({ automatedPdfEnabled: newVal, deliveryFrequency })
+    );
+    showToast(newVal ? `Automated ${deliveryFrequency} PDF reports enabled` : 'Automated PDF reports disabled');
+  };
+
+  const handleFrequencyChange = (freq: 'monthly' | 'yearly') => {
+    setDeliveryFrequency(freq);
+    safeLocalStorage.setItem(
+      prefsKey,
+      JSON.stringify({ automatedPdfEnabled, deliveryFrequency: freq })
+    );
+    showToast(`Automated report frequency set to: ${freq.toUpperCase()}`);
   };
 
   const fetchEmailLogs = async () => {
@@ -86,8 +116,8 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
     fetchEmailLogs();
   }, [salon.id, currentUser.email]);
 
-  // Dispatch Monthly PDF Report to email
-  const handleSendMonthlyReport = async () => {
+  // Dispatch PDF Report to email with selected reporting frequency ('monthly' or 'yearly')
+  const handleSendReport = async () => {
     setIsGeneratingReport(true);
     setFeedback(null);
     try {
@@ -98,19 +128,23 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
           salon_id: salon.id,
           owner_email: currentUser.email || salon.email,
           owner_name: currentUser.fullname || salon.salon_name,
+          time_grain: reportFrequency,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setFeedback(`Monthly PDF status report generated and delivered to ${currentUser.email}!`);
-        showToast('Monthly PDF report sent to your email');
+        setFeedback(
+          data.message ||
+            `${reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF status report generated and delivered to ${currentUser.email}!`
+        );
+        showToast(`${reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF report dispatched to your email`);
         await fetchEmailLogs();
       } else {
-        setFeedback(data.error || 'Failed to dispatch monthly report');
+        setFeedback(data.error || 'Failed to dispatch report');
       }
     } catch (err: any) {
-      setFeedback(err.message || 'Error generating monthly report');
+      setFeedback(err.message || 'Error generating report');
     } finally {
       setIsGeneratingReport(false);
     }
@@ -130,51 +164,118 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
     }
   };
 
+  const frequencyDescriptions: Record<'monthly' | 'yearly', { label: string; periodText: string; desc: string }> = {
+    monthly: {
+      label: 'Monthly Report',
+      periodText: 'Current Month',
+      desc: 'Certified monthly turnover, net operating profit, completed appointments, and customer retention audit.',
+    },
+    yearly: {
+      label: 'Yearly Report',
+      periodText: 'Current Year',
+      desc: 'Annual business turnover, fiscal health, retail product sales, and certified yearly P&L dossier.',
+    },
+  };
+
   return (
     <div className="space-y-6">
       
       {/* Top Controls & Toggle Banner */}
       <div className="bg-gradient-to-r from-purple-900 via-purple-800 to-pink-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold mb-3">
+        <div className="relative z-10 max-w-3xl space-y-4">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold">
             <Mail className="w-3.5 h-3.5 text-pink-300" />
             <span>Automated Reports & Notifications Engine</span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-bold font-serif">
-            Email Reports & Transactional Alerts
-          </h2>
-          <p className="text-purple-200 text-sm mt-2 leading-relaxed">
-            Automatic delivery of booking requests, customer in-store pickup orders, and certified monthly PDF performance reports directly to <strong className="text-white underline">{currentUser.email}</strong>.
-          </p>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold font-serif">
+              Email Reports & Transactional Alerts
+            </h2>
+            <p className="text-purple-200 text-sm mt-1 leading-relaxed">
+              Automated delivery of booking requests, customer in-store orders, and certified printable PDF performance reports dispatched to <strong className="text-white underline">{currentUser.email || salon.email}</strong>.
+            </p>
+          </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          {/* Reporting Frequency Toggle: Monthly vs Yearly */}
+          <div className="bg-black/25 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-bold text-pink-200 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-amber-300" />
+                <span>PDF Reporting Frequency:</span>
+              </span>
+              <span className="text-[11px] font-medium text-purple-200">
+                {frequencyDescriptions[reportFrequency].desc}
+              </span>
+            </div>
+
+            <div className="inline-flex p-1 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15">
+              <button
+                type="button"
+                onClick={() => setReportFrequency('monthly')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  reportFrequency === 'monthly'
+                    ? 'bg-pink-500 text-white shadow-md shadow-pink-500/30'
+                    : 'text-purple-200 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Monthly</span>
+                {reportFrequency === 'monthly' && <Check className="w-3 h-3 text-white ml-0.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportFrequency('yearly')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  reportFrequency === 'yearly'
+                    ? 'bg-pink-500 text-white shadow-md shadow-pink-500/30'
+                    : 'text-purple-200 hover:text-white'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Yearly</span>
+                {reportFrequency === 'yearly' && <Check className="w-3 h-3 text-white ml-0.5" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-1 flex flex-wrap items-center gap-3">
             <button
-              onClick={handleSendMonthlyReport}
+              onClick={handleSendReport}
               disabled={isGeneratingReport}
-              className="inline-flex items-center px-4 py-2.5 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <FileText className={`w-4 h-4 mr-2 ${isGeneratingReport ? 'animate-spin' : ''}`} />
-              {isGeneratingReport ? 'Compiling & Delivering PDF...' : 'Email Monthly PDF Report Now'}
+              {isGeneratingReport
+                ? 'Compiling & Delivering PDF...'
+                : `Email ${reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF Report Now`}
             </button>
 
             <button
-              onClick={handleToggleMonthlyPdf}
+              onClick={handleToggleAutomatedPdf}
               className="inline-flex items-center px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-xl text-xs sm:text-sm backdrop-blur-sm transition cursor-pointer"
             >
-              {monthlyPdfEnabled ? (
+              {automatedPdfEnabled ? (
                 <>
                   <ToggleRight className="w-5 h-5 text-emerald-400 mr-2" />
-                  <span>Monthly PDF Delivery: <strong>ON</strong></span>
+                  <span>Scheduled Delivery: <strong>ON ({deliveryFrequency.toUpperCase()})</strong></span>
                 </>
               ) : (
                 <>
                   <ToggleLeft className="w-5 h-5 text-gray-400 mr-2" />
-                  <span>Monthly PDF Delivery: <strong>OFF</strong></span>
+                  <span>Scheduled Delivery: <strong>OFF</strong></span>
                 </>
               )}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Info Notice on Simulated vs Real Accounts */}
+      <div className="p-4 rounded-2xl bg-purple-50/90 border border-purple-200 text-purple-950 text-xs flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <span className="font-bold">Real Accounts & Simulated Delivery:</span> When your account uses a verified Gmail address with OAuth access, emails and PDF attachments are dispatched directly to your external inbox. For test or simulated accounts, all reports and PDF attachments are recorded in the real-time system database below, where you can view, print, or download them at any time with <strong>Print / PDF</strong>.
         </div>
       </div>
 
@@ -186,7 +287,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
           </div>
           <button
             onClick={() => setFeedback(null)}
-            className="text-xs text-emerald-700 hover:underline"
+            className="text-xs text-emerald-700 hover:underline cursor-pointer"
           >
             Dismiss
           </button>
@@ -195,6 +296,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
 
       {/* Settings Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Automated PDF Performance Audits with Frequency Toggle */}
         <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
@@ -202,27 +304,61 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                 <FileText className="w-5 h-5" />
               </span>
               <button
-                onClick={handleToggleMonthlyPdf}
+                onClick={handleToggleAutomatedPdf}
                 className="cursor-pointer"
                 title="Toggle on/off"
               >
-                {monthlyPdfEnabled ? (
+                {automatedPdfEnabled ? (
                   <ToggleRight className="w-7 h-7 text-purple-600" />
                 ) : (
                   <ToggleLeft className="w-7 h-7 text-gray-400" />
                 )}
               </button>
             </div>
-            <h3 className="font-bold text-gray-900 text-sm mt-3">Monthly Audit Reports (PDF)</h3>
+            <h3 className="font-bold text-gray-900 text-sm mt-3">Scheduled Audit Reports (PDF)</h3>
             <p className="text-xs text-gray-500 mt-1">
-              Automatically compiles revenue, expenses, and booking volumes into a PDF delivered on the 1st of every month.
+              Automatically compiles revenue, expenses, and booking volumes into a certified PDF report.
             </p>
+
+            {/* Frequency options (Monthly vs Yearly) */}
+            <div className="mt-3 pt-3 border-t border-purple-50">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 block mb-1.5">
+                Delivery Cadence:
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleFrequencyChange('monthly')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center flex items-center justify-center gap-1 ${
+                    deliveryFrequency === 'monthly'
+                      ? 'bg-purple-100 text-purple-900 font-bold border border-purple-300'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Monthly</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFrequencyChange('yearly')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center flex items-center justify-center gap-1 ${
+                    deliveryFrequency === 'yearly'
+                      ? 'bg-purple-100 text-purple-900 font-bold border border-purple-300'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Yearly</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <span className={`text-[11px] font-semibold mt-3 ${monthlyPdfEnabled ? 'text-emerald-600' : 'text-gray-400'}`}>
-            Status: {monthlyPdfEnabled ? 'Active (Monthly Delivery)' : 'Disabled by Owner'}
+          <span className={`text-[11px] font-semibold mt-3 ${automatedPdfEnabled ? 'text-emerald-600' : 'text-gray-400'}`}>
+            Status: {automatedPdfEnabled ? `Active (${deliveryFrequency.toUpperCase()} Delivery)` : 'Disabled by Owner'}
           </span>
         </div>
 
+        {/* Card 2: Instant Booking Notifications */}
         <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
@@ -250,6 +386,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
           </span>
         </div>
 
+        {/* Card 3: In-Store Product Orders */}
         <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
@@ -283,7 +420,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Mail className="w-5 h-5 text-purple-600" />
-            <h3 className="font-bold text-gray-900 text-sm">Delivered Emails & Monthly PDF Reports</h3>
+            <h3 className="font-bold text-gray-900 text-sm">Delivered PDF Reports & Email Ledger</h3>
           </div>
           <button
             onClick={fetchEmailLogs}
@@ -301,9 +438,9 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
             {logs.length === 0 ? (
               <div className="p-8 text-center text-gray-400">
                 <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-xs font-semibold">No emails delivered yet</p>
+                <p className="text-xs font-semibold">No reports or emails delivered yet</p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Click "Email Monthly PDF Report Now" above to generate your first audit report.
+                  Click "Email Monthly PDF Report Now" or "Email Yearly PDF Report Now" above to generate your first audit report.
                 </p>
               </div>
             ) : (

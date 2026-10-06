@@ -26,6 +26,7 @@ import {
   Check,
   Calendar,
   CalendarDays,
+  Mail,
 } from 'lucide-react';
 import {
   StoreReportData,
@@ -110,6 +111,34 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
   const [laborPercent, setLaborPercent] = useState(40);
   const [suppliesPercent, setSuppliesPercent] = useState(15);
   const [overheadPercent, setOverheadPercent] = useState(8);
+  const [isEmailing, setIsEmailing] = useState(false);
+
+  const handleEmailReport = async () => {
+    const targetSalonId = salon?.id || 1;
+    setIsEmailing(true);
+    try {
+      const res = await fetch('/api/email/reports/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          salon_id: targetSalonId,
+          owner_email: salon?.email,
+          owner_name: salon?.salon_name,
+          time_grain: selectedTimeGrain,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`${selectedTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+      } else {
+        showToast(data.error || 'Failed to email report');
+      }
+    } catch (e: any) {
+      showToast('Error sending email report');
+    } finally {
+      setIsEmailing(false);
+    }
+  };
 
   const timeGrainDescription: Record<'daily' | 'weekly' | 'monthly' | 'yearly', string> = {
     daily: 'Daily Velocity (Past 7 Days & Today)',
@@ -778,6 +807,15 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleEmailReport}
+              disabled={isEmailing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              title={`Email certified ${selectedTimeGrain.toUpperCase()} PDF report`}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>{isEmailing ? 'Delivering...' : `Email ${selectedTimeGrain.toUpperCase()} PDF`}</span>
+            </button>
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
