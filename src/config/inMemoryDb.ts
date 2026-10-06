@@ -149,16 +149,22 @@ class InMemoryDatabase {
       const docRef = doc(firestoreDb, colName, String(id));
       if (action === 'delete') {
         deleteDoc(docRef).catch((err) => {
-          console.warn(`[Firestore] Failed to delete doc in "${colName}/${id}":`, err?.message || err);
+          const msg = err?.message || String(err);
+          if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable')) {
+            console.warn(`[Firestore] Sync note for "${colName}/${id}":`, msg);
+          }
         });
       } else if (data) {
         const clean = cleanForFirestore(data);
         setDoc(docRef, clean, { merge: true }).catch((err) => {
-          console.warn(`[Firestore] Failed to write doc in "${colName}/${id}":`, err?.message || err);
+          const msg = err?.message || String(err);
+          if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable')) {
+            console.warn(`[Firestore] Sync note for "${colName}/${id}":`, msg);
+          }
         });
       }
     } catch (err: any) {
-      console.warn(`[Firestore] Sync invocation error for ${tableName}:`, err?.message || err);
+      // Safe catch for network stream drop
     }
   }
 

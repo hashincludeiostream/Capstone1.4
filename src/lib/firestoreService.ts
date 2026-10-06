@@ -46,55 +46,15 @@ export async function initializeFirestoreData() {
   initialized = true;
 
   try {
-    // Check if salons collection has documents
+    // Verify connection to Cloud Firestore
     const salonsSnap = await getDocs(collection(db, 'salons'));
-    if (salonsSnap.empty) {
-      console.log('[Firestore] Seeding relational collections to Firestore...');
-
-      // 1. Categories
-      for (const cat of seedCategories) {
-        await setDoc(doc(db, 'categories', String(cat.id)), cat);
-      }
-
-      // 2. Users
-      for (const user of seedUsers) {
-        await setDoc(doc(db, 'users', String(user.id)), user);
-      }
-
-      // 3. Salons
-      for (const salon of seedSalons) {
-        await setDoc(doc(db, 'salons', String(salon.id)), salon);
-      }
-
-      // 4. Services (Relational link: salon_id)
-      for (const service of seedServices) {
-        await setDoc(doc(db, 'services', String(service.id)), service);
-      }
-
-      // 5. Technicians (Relational link: salon_id)
-      for (const tech of seedTechnicians) {
-        await setDoc(doc(db, 'technicians', String(tech.id)), tech);
-      }
-
-      // 6. Appointments (Relational links: salon_id, customer_id, service_id, technician_id)
-      for (const appt of seedAppointments) {
-        await setDoc(doc(db, 'appointments', String(appt.id)), appt);
-      }
-
-      // 7. Reviews (Relational links: salon_id, user_id)
-      for (const review of seedReviews) {
-        await setDoc(doc(db, 'reviews', String(review.id)), review);
-      }
-
-      // 8. Products (Relational links: salon_id)
-      for (const product of seedProducts) {
-        await setDoc(doc(db, 'products', String(product.id)), product);
-      }
-
-      console.log('✅ [Firestore] All relational seed collections seeded successfully!');
+    if (!salonsSnap.empty) {
+      console.log(`🔥 [Firestore] Connected to Cloud Firestore (${salonsSnap.size} live salons loaded).`);
+    } else {
+      console.log('🔥 [Firestore] Connected to Cloud Firestore.');
     }
   } catch (err) {
-    console.warn('[Firestore] Initialization check failed (using fallback/offline mode):', err);
+    console.warn('[Firestore] Initialization check note (using fallback/offline mode):', err);
   }
 }
 

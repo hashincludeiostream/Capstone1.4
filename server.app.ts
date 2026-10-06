@@ -4011,7 +4011,7 @@ async function startServer() {
           const paymongoPaymentMethods = ['gcash', 'paymaya', 'card', 'billease'];
 
           // Derive app origin for PayMongo redirect return
-          const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : 'https://ais-pre-erjbe6ntfeutupdlfn6yfz-419686186624.asia-southeast1.run.app');
+          const origin = req.body.origin || req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : 'http://localhost:3000');
 
           const pmRes = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
             method: 'POST',
@@ -4167,6 +4167,85 @@ async function startServer() {
     }
   });
 
+  // Fetch Receipt details by Transaction Reference (for PayMongo redirect return & persistent receipts)
+  app.get('/api/payments/receipt-by-ref', async (req, res) => {
+    const ref = String(req.query.ref || '').trim();
+    if (!ref) {
+      return res.status(400).json({ error: 'Transaction reference is required' });
+    }
+
+    try {
+      // 1. Fetch transaction
+      const [txRows] = await db.execute(
+        'SELECT * FROM transactions WHERE transaction_reference = ? LIMIT 1',
+        [ref]
+      );
+      const transaction = (txRows as any[])[0] || null;
+
+      // 2. Fetch associated appointment
+      let appointment: any = null;
+      const [apptRows] = await db.execute(
+        'SELECT * FROM appointments WHERE transaction_reference = ? LIMIT 1',
+        [ref]
+      );
+      appointment = (apptRows as any[])[0] || null;
+
+      if (!appointment && transaction?.entity_id) {
+        const [apptById] = await db.execute(
+          'SELECT * FROM appointments WHERE id = ? LIMIT 1',
+          [Number(transaction.entity_id)]
+        );
+        appointment = (apptById as any[])[0] || null;
+      }
+
+      // If status=success indicated and appointment is present, ensure status is marked paid
+      const isSuccess = req.query.status === 'success' || req.query.payment_status === 'success';
+      if (isSuccess) {
+        if (transaction && transaction.payment_status !== 'succeeded') {
+          await db.execute(
+            "UPDATE transactions SET payment_status = 'succeeded' WHERE transaction_reference = ?",
+            [ref]
+          );
+          transaction.payment_status = 'succeeded';
+        }
+        if (appointment) {
+          const targetStatus = appointment.payment_type === 'full_payment' ? 'fully_paid' : 'deposit_paid';
+          if (appointment.payment_status !== targetStatus) {
+            await db.execute(
+              "UPDATE appointments SET payment_status = ? WHERE id = ?",
+              [targetStatus, appointment.id]
+            );
+            appointment.payment_status = targetStatus;
+          }
+        }
+      }
+
+      // 3. Fetch salon info
+      let salon: any = null;
+      const salonId = appointment?.salon_id || transaction?.salon_id;
+      if (salonId) {
+        const [salonRows] = await db.execute(
+          'SELECT id, salon_name, address, city, phone, email, logo FROM salons WHERE id = ? LIMIT 1',
+          [Number(salonId)]
+        );
+        salon = (salonRows as any[])[0] || null;
+      }
+
+      res.json({
+        success: true,
+        transaction,
+        appointment,
+        salon,
+      });
+    } catch (error) {
+      console.error('Fetch receipt by reference error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve receipt',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   // AI Chatbot Assistant Endpoint (Customer, Salon Owner, and Admin support with strict session isolation)
   app.post('/api/chat', async (req, res) => {
     try {
@@ -4269,9 +4348,12 @@ async function startServer() {
   const currentDir = typeof __dirname !== 'undefined'
     ? __dirname
     : process.cwd();
-  const distPath = fs.existsSync(path.join(currentDir, 'index.html'))
+  const rootDistPath = path.join(process.cwd(), 'dist');
+  const distPath = fs.existsSync(path.join(rootDistPath, 'index.html'))
+    ? rootDistPath
+    : (fs.existsSync(path.join(currentDir, 'index.html')) && currentDir !== process.cwd())
     ? currentDir
-    : path.join(process.cwd(), 'dist');
+    : rootDistPath;
   const hasDistIndex = fs.existsSync(path.join(distPath, 'index.html'));
   const isTsxDev = process.execArgv.some((arg) => arg.includes('tsx')) || process.env.VITE_DEV_SERVER === 'true';
   const isProduction = !isTsxDev && (process.env.NODE_ENV === 'production' || hasDistIndex);

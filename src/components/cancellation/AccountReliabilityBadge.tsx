@@ -45,20 +45,24 @@ export const AccountReliabilityBadge: React.FC<AccountReliabilityBadgeProps> = (
     <>
       <div
         onClick={() => setShowDetailModal(true)}
-        className={`inline-flex items-center space-x-1.5 cursor-pointer rounded-full transition-all hover:opacity-90 ${
-          compact ? 'px-2.5 py-0.5 text-xs' : 'px-3 py-1 text-xs font-medium'
+        className={`inline-flex items-center gap-1 cursor-pointer rounded-full transition-all hover:opacity-90 max-w-full min-w-0 overflow-hidden ${
+          compact ? 'px-2 py-0.5 text-[10px] sm:text-[11px]' : 'px-2.5 py-1 text-xs font-medium'
         } ${info.badgeClasses}`}
         title="Click to view store cancellation policy and account standing"
       >
         {info.tier === 'excellent' ? (
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
         ) : info.tier === 'good' ? (
-          <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+          <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
         ) : (
-          <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
         )}
-        <span>{info.title}</span>
-        <HelpCircle className="w-3 h-3 opacity-60 ml-0.5" />
+        <span className="truncate min-w-0 max-w-[100px] xs:max-w-[130px] sm:max-w-none">
+          {compact
+            ? `${info.tier === 'excellent' ? 'Premier' : info.tier === 'good' ? 'Good' : info.tier === 'caution' ? 'Caution' : 'Probation'} (${info.score}%)`
+            : info.title}
+        </span>
+        <HelpCircle className="w-3 h-3 opacity-60 ml-0.5 shrink-0" />
       </div>
 
       {/* Policy Details Modal */}

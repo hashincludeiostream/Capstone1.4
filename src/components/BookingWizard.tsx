@@ -21,6 +21,7 @@ import { Salon, Service, Technician, User, Appointment, WorkingHour, PaymentMeth
 import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, createAppointment } from '../lib/api';
 import { calculatePaymentBreakdown, initiatePayment, checkPaymentGatewayStatus } from '../lib/paymentService';
 import { createFirestoreTransaction } from '../lib/firestoreService';
+import { localStorage as safeLocalStorage } from '../lib/localStorage';
 
 interface BookingWizardProps {
   salons: Salon[];
@@ -291,15 +292,55 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       });
 
       if (res.success && res.appointment) {
-        // Sync transaction to Firestore
-        if (paymentResult.transaction) {
-          const fullTx: PaymentTransaction = {
-            ...paymentResult.transaction,
-            entity_id: res.appointment.id,
-          };
-          setConfirmedTx(fullTx);
-          createFirestoreTransaction(fullTx).catch((err) =>
-            console.warn('Firestore transaction sync warning:', err)
+        // Sync transaction to Firestore & prepare full transaction record
+        const fullTx: PaymentTransaction = paymentResult.transaction
+          ? {
+              ...paymentResult.transaction,
+              entity_id: res.appointment.id,
+            }
+          : {
+              id: Date.now(),
+              transaction_reference:
+                res.appointment.transaction_reference || `TX-PM-${Date.now().toString(36).toUpperCase()}`,
+              entity_type: 'appointment',
+              entity_id: res.appointment.id,
+              customer_id: res.appointment.customer_id,
+              customer_name: res.appointment.customer_name || fullName || 'Valued Client',
+              customer_email: res.appointment.customer_email || email || '',
+              customer_phone: res.appointment.customer_phone || phone || '',
+              salon_id: res.appointment.salon_id,
+              salon_name: res.appointment.salon_name || currentSalon?.salon_name || 'Nail Salon',
+              amount: chargedAmount,
+              total_service_price: Number(currentService.price) || 0,
+              remaining_balance: breakdown.remainingBalance,
+              currency: 'PHP',
+              payment_method: paymentMethod,
+              payment_type: paymentType,
+              payment_status: 'succeeded',
+              provider: paymentResult.mode === 'live' ? 'paymongo_live' : 'paymongo_sandbox',
+              receipt_number: `REC-PM-${Math.floor(100000 + Math.random() * 900000)}`,
+              created_at: new Date().toISOString(),
+            };
+
+        setConfirmedTx(fullTx);
+        createFirestoreTransaction(fullTx).catch((err) =>
+          console.warn('Firestore transaction sync warning:', err)
+        );
+
+        // Persist receipt state in localStorage so return from PayMongo redirect preserves receipt
+        const receiptPayload = {
+          appointment: res.appointment,
+          transaction: fullTx,
+          salon: currentSalon,
+          checkoutUrl: paymentResult.checkoutUrl,
+          timestamp: new Date().toISOString(),
+        };
+
+        safeLocalStorage.setJSON('nailglamhub_active_receipt', receiptPayload);
+        if (fullTx.transaction_reference) {
+          safeLocalStorage.setJSON(
+            `nailglamhub_receipt_${fullTx.transaction_reference}`,
+            receiptPayload
           );
         }
 
@@ -311,7 +352,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         setStep(6); // Step 6: Confirmation
         onSuccess(res.appointment);
 
-        // If a real PayMongo checkout session URL was returned, open PayMongo in a new tab or window
+        // If a real PayMongo checkout session URL was returned, open PayMongo
         if (paymentResult.checkoutUrl && !isSandboxMode) {
           try {
             window.open(paymentResult.checkoutUrl, '_blank', 'noopener,noreferrer');
@@ -335,16 +376,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   }, [currentService?.price, paymentType]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-pink-100 max-h-[92vh] sm:max-h-[90vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-[calc(100vw-1rem)] sm:max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-pink-100 max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <CalendarIcon className="w-4 h-4 text-white" />
+        <div className="px-3.5 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-serif font-bold text-sm sm:text-lg truncate">
+              <h3 className="font-serif font-bold text-xs sm:text-lg truncate">
                 Book Your Nail Appointment
               </h3>
               <p className="text-[10px] sm:text-[11px] text-pink-100 truncate">
@@ -354,9 +395,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-2"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-1.5"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
@@ -456,7 +497,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       <div
                         key={service.id}
                         onClick={() => setSelectedServiceId(service.id)}
-                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 sm:gap-3 min-w-0 max-w-full ${
                           selectedServiceId === service.id
                             ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20'
                             : 'border-pink-100 hover:border-pink-300 bg-white'
@@ -475,25 +516,25 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                              <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                              <p className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                                 {service.service_name}
                               </p>
-                              <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.2 rounded-md shrink-0">
+                              <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded-md shrink-0">
                                 {service.category}
                               </span>
                             </div>
-                            <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5">
+                            <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5 break-words">
                               {service.description}
                             </p>
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="inline-block px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-pink-100/80 text-pink-800 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap">
-                            Pay In-Store
+                          <span className="block text-xs sm:text-sm font-bold text-pink-700 whitespace-nowrap">
+                            ₱{Number(service.price).toLocaleString()}
                           </span>
-                          <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">{service.duration} mins</p>
+                          <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{service.duration} mins</p>
                         </div>
                       </div>
                     ))}
@@ -827,30 +868,32 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               </div>
 
               {/* Step 4 Summary Preview */}
-              <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800">
-                <div className="flex justify-between font-semibold">
-                  <span>Salon:</span>
-                  <span className="text-pink-900">{currentSalon?.salon_name}</span>
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800 max-w-full">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 shrink-0">Salon:</span>
+                  <span className="text-pink-900 font-semibold break-words text-right min-w-0">{currentSalon?.salon_name}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Treatment:</span>
-                  <span className="font-semibold">{currentService?.service_name} (₱{Number(currentService?.price || 0).toLocaleString()})</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 shrink-0">Treatment:</span>
+                  <span className="font-semibold text-gray-900 break-words text-right min-w-0">
+                    {currentService?.service_name} (₱{Number(currentService?.price || 0).toLocaleString()})
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Date & Time:</span>
-                  <span className="font-semibold">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 shrink-0">Date &amp; Time:</span>
+                  <span className="font-semibold text-gray-900 text-right min-w-0">
                     {appointmentDate} at {appointmentTime}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Specialist:</span>
-                  <span className="font-semibold">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 shrink-0">Specialist:</span>
+                  <span className="font-semibold text-gray-900 break-words text-right min-w-0">
                     {currentTech?.fullname || 'Any Available Specialist'}
                   </span>
                 </div>
-                <div className="pt-2 border-t border-pink-200/80 flex items-center justify-between text-xs font-semibold text-pink-900">
-                  <span>Estimated Total Service:</span>
-                  <span className="text-base font-bold text-pink-700">₱{Number(currentService?.price || 0).toLocaleString()}</span>
+                <div className="pt-2 border-t border-pink-200/80 flex items-center justify-between gap-3 text-xs font-semibold text-pink-900">
+                  <span className="shrink-0">Estimated Total Service:</span>
+                  <span className="text-base font-bold text-pink-700 whitespace-nowrap">₱{Number(currentService?.price || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -858,9 +901,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
           {/* STEP 5: PAYMENT SELECTION (DUAL-MODE PAYMONGO) */}
           {step === 5 && (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6 max-w-full">
               <div>
-                <h4 className="font-serif font-bold text-lg text-gray-900">
+                <h4 className="font-serif font-bold text-base sm:text-lg text-gray-900">
                   Payment Preference
                 </h4>
                 <p className="text-xs text-gray-500">
@@ -869,23 +912,23 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               </div>
 
               {/* Dual-Mode Simulator / Production Gateway Banner */}
-              <div className="p-3 rounded-2xl border border-pink-200 bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+              <div className="p-3 rounded-2xl border border-pink-200 bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs max-w-full overflow-hidden">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
                     isSandboxMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                   }`}>
                     {isSandboxMode ? 'DEMO' : 'LIVE'}
                   </div>
-                  <div>
-                    <div className="font-bold text-gray-900 flex items-center gap-1.5">
-                      <span>Gateway: {gatewayStatus.gatewayName}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-gray-900 flex flex-wrap items-center gap-1.5">
+                      <span className="break-words">Gateway: {gatewayStatus.gatewayName}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${
                         isSandboxMode ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
                       }`}>
                         {isSandboxMode ? 'Interactive Sandbox Mode' : 'Live Production Mode'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-[11px] text-gray-500 break-words mt-0.5">
                       {isSandboxMode
                         ? 'Simulates GCash / Maya / Card transactions with authentic checkout receipts'
                         : 'Processes actual online charges via registered PayMongo secret key'}
@@ -893,17 +936,17 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                   {gatewayStatus.liveAvailable ? (
                     <button
                       type="button"
                       onClick={() => setIsSandboxMode(!isSandboxMode)}
-                      className="px-3 py-1.5 rounded-xl border border-pink-300 bg-white hover:bg-pink-50 text-[11px] font-semibold text-pink-700 transition-colors cursor-pointer shadow-2xs"
+                      className="w-full sm:w-auto px-3 py-1.5 rounded-xl border border-pink-300 bg-white hover:bg-pink-50 text-[11px] font-semibold text-pink-700 transition-colors cursor-pointer shadow-2xs text-center"
                     >
                       Switch to {isSandboxMode ? 'Live Gateway' : 'Sandbox Simulator'}
                     </button>
                   ) : (
-                    <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-amber-200 text-[10px] font-semibold text-amber-800">
+                    <span className="w-full sm:w-auto px-2.5 py-1 rounded-lg bg-white/80 border border-amber-200 text-[10px] font-semibold text-amber-800 text-center">
                       Add PAYMONGO_SECRET_KEY in Settings to enable Live
                     </span>
                   )}
@@ -1050,14 +1093,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               )}
 
               {/* Price Breakdown Card */}
-              <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Service Fee:</span>
-                  <span className="font-semibold text-gray-900">₱{Number(currentService?.price || 0).toLocaleString()}</span>
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-pink-50 border border-pink-200 space-y-2 text-xs text-gray-800 max-w-full">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 shrink-0">Service Fee:</span>
+                  <span className="font-semibold text-gray-900 text-right min-w-0">₱{Number(currentService?.price || 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Payment Option:</span>
-                  <span className="font-semibold capitalize text-pink-800">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 shrink-0">Payment Option:</span>
+                  <span className="font-semibold capitalize text-pink-800 text-right min-w-0">
                     {paymentType === 'deposit'
                       ? 'Slot Deposit (20%)'
                       : paymentType === 'full_payment'
@@ -1066,14 +1109,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </span>
                 </div>
                 {paymentType === 'deposit' && (
-                  <div className="flex justify-between text-gray-600">
-                    <span>Remaining Balance Due In-Salon:</span>
-                    <span className="font-bold text-amber-700">₱{paymentBreakdown.remainingBalance.toLocaleString()}</span>
+                  <div className="flex items-start justify-between gap-3 text-gray-600">
+                    <span className="shrink-0">Remaining Balance Due In-Salon:</span>
+                    <span className="font-bold text-amber-700 text-right min-w-0">₱{paymentBreakdown.remainingBalance.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="pt-2.5 border-t border-pink-200 flex items-center justify-between text-sm font-bold text-pink-900">
-                  <span>Due Today:</span>
-                  <span className="text-lg text-pink-700">₱{paymentBreakdown.dueNow.toLocaleString()}</span>
+                <div className="pt-2.5 border-t border-pink-200 flex items-center justify-between gap-3 text-sm font-bold text-pink-900">
+                  <span className="shrink-0">Due Today:</span>
+                  <span className="text-lg text-pink-700 whitespace-nowrap">₱{paymentBreakdown.dueNow.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -1088,66 +1131,66 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
           {/* STEP 6: BOOKING CONFIRMED & PAYMENT RECEIPT */}
           {step === 6 && confirmedAppt && (
-            <div className="py-6 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-10 h-10" />
+            <div className="py-4 sm:py-6 text-center space-y-4 max-w-full overflow-hidden">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />
               </div>
 
               <div>
-                <h4 className="text-2xl font-serif font-bold text-gray-900">
+                <h4 className="text-xl sm:text-2xl font-serif font-bold text-gray-900">
                   Appointment Confirmed!
                 </h4>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1 break-words">
                   Appointment ID: <strong className="text-pink-700">#NGH-{confirmedAppt.id}</strong>
                   {confirmedAppt.transaction_reference && (
-                    <span className="ml-2 font-mono text-gray-400">
+                    <span className="ml-1 sm:ml-2 font-mono text-gray-400 break-all inline-block">
                       (Ref: {confirmedAppt.transaction_reference})
                     </span>
                   )}
                 </p>
               </div>
 
-              <div className="max-w-md mx-auto p-4 rounded-2xl bg-pink-50 border border-pink-200 text-left text-xs space-y-2.5">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Salon:</span>
-                  <span className="font-bold text-gray-900">{confirmedAppt.salon_name}</span>
+              <div className="max-w-md mx-auto p-3.5 sm:p-4 rounded-2xl bg-pink-50 border border-pink-200 text-left text-xs space-y-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Salon:</span>
+                  <span className="font-bold text-gray-900 text-right min-w-0 break-words">{confirmedAppt.salon_name}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Service:</span>
-                  <span className="font-bold text-gray-900">{confirmedAppt.service_name}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Service:</span>
+                  <span className="font-bold text-gray-900 text-right min-w-0 break-words">{confirmedAppt.service_name}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Schedule:</span>
-                  <span className="font-bold text-pink-700">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Schedule:</span>
+                  <span className="font-bold text-pink-700 text-right min-w-0">
                     {confirmedAppt.appointment_date} at {confirmedAppt.appointment_time}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Specialist:</span>
-                  <span className="font-bold text-gray-900">{confirmedAppt.staff_name}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Specialist:</span>
+                  <span className="font-bold text-gray-900 text-right min-w-0 break-words">{confirmedAppt.staff_name}</span>
                 </div>
 
                 {/* Payment Breakdown Info */}
                 <div className="border-t border-pink-200/80 pt-2 space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Payment Channel:</span>
-                    <span className="font-semibold text-gray-900 capitalize">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500 shrink-0">Payment Channel:</span>
+                    <span className="font-semibold text-gray-900 capitalize text-right min-w-0">
                       {confirmedAppt.payment_method?.replace('paymongo_', 'PayMongo ').toUpperCase() || 'In-Store'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Amount Paid Online:</span>
-                    <span className="font-bold text-emerald-700">₱{Number(confirmedAppt.paid_amount || 0).toLocaleString()}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500 shrink-0">Amount Paid Online:</span>
+                    <span className="font-bold text-emerald-700 text-right whitespace-nowrap">₱{Number(confirmedAppt.paid_amount || 0).toLocaleString()}</span>
                   </div>
                   {Number(confirmedAppt.remaining_balance || 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Balance Due in Salon:</span>
-                      <span className="font-bold text-amber-700">₱{Number(confirmedAppt.remaining_balance).toLocaleString()}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-gray-500 shrink-0">Balance Due in Salon:</span>
+                      <span className="font-bold text-amber-700 text-right whitespace-nowrap">₱{Number(confirmedAppt.remaining_balance).toLocaleString()}</span>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Payment Status:</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500 shrink-0">Payment Status:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
                       confirmedAppt.payment_status === 'fully_paid'
                         ? 'bg-emerald-100 text-emerald-800'
                         : confirmedAppt.payment_status === 'deposit_paid'
@@ -1161,12 +1204,12 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
                 {confirmedAppt.design_image && (
                   <div className="flex items-center justify-between border-t border-pink-200/60 pt-2">
-                    <span className="text-gray-500">Design Inspo:</span>
+                    <span className="text-gray-500 shrink-0">Design Inspo:</span>
                     <div className="flex items-center gap-2">
                       <img
                         src={confirmedAppt.design_image}
                         alt="Attached design inspo"
-                        className="w-9 h-9 rounded-lg object-cover border border-pink-200 shadow-xs"
+                        className="w-9 h-9 rounded-lg object-cover border border-pink-200 shadow-xs shrink-0"
                       />
                       <span className="text-[11px] font-semibold text-pink-900">Photo Attached</span>
                     </div>
@@ -1202,7 +1245,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               <div className="pt-2">
                 <button
                   onClick={onClose}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white text-xs font-semibold shadow-md shadow-pink-500/20 cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white text-xs font-semibold shadow-md shadow-pink-500/20 cursor-pointer"
                 >
                   Done & View My Bookings
                 </button>

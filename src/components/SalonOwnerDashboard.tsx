@@ -857,7 +857,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               </div>
 
               {/* Booking Controls & Filters */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-gray-50/70 p-3.5 rounded-2xl border border-gray-200/70">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-gray-50/70 p-3 sm:p-3.5 rounded-2xl border border-gray-200/70 max-w-full overflow-hidden">
                 {/* Search Client / Treatment */}
                 <div className="relative w-full md:w-64">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -871,7 +871,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 </div>
 
                 {/* Status Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto no-scrollbar pb-1 max-w-full">
                   {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map((status) => (
                     <button
                       key={status}
@@ -917,23 +917,23 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3.5">
+                <div className="space-y-3.5 max-w-full">
                   {filteredBookings.map((appt) => (
                     <div
                       key={appt.id}
                       id={`owner-appointment-${appt.id}`}
-                      className="p-4 sm:p-5 rounded-2xl border border-pink-100 hover:border-purple-300 bg-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs transition-all"
+                      className="p-3.5 sm:p-5 rounded-2xl border border-pink-100 hover:border-purple-300 bg-white flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 shadow-xs transition-all max-w-full overflow-hidden min-w-0"
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-bold text-gray-900">
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="text-xs font-bold text-gray-900 truncate">
                             {appt.customer_name}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-gray-400 truncate max-w-[180px] sm:max-w-none">
                             ({appt.customer_phone || appt.customer_email || 'No phone recorded'})
                           </span>
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
                               appt.status === 'confirmed'
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : appt.status === 'completed'
@@ -947,35 +947,35 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                           </span>
                         </div>
 
-                        <h4 className="text-sm font-serif font-bold text-purple-950 flex items-center gap-2 flex-wrap">
-                          <span>{appt.service_name}</span>
-                          <span className="text-xs text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md font-sans font-medium">
+                        <h4 className="text-sm font-serif font-bold text-purple-950 flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                          <span className="break-words">{appt.service_name}</span>
+                          <span className="text-xs text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md font-sans font-medium shrink-0">
                             {appt.service_duration || 60} mins
                           </span>
                           {appt.payment_method ? (
-                            <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-sans font-semibold">
+                            <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-sans font-semibold max-w-full truncate">
                               {appt.payment_method.replace('paymongo_', 'PayMongo ').toUpperCase()}
                               {appt.paid_amount ? ` (₱${Number(appt.paid_amount).toLocaleString()} Paid)` : ''}
                             </span>
                           ) : (
-                            <span className="text-[11px] text-pink-700 bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-md font-sans font-semibold">
+                            <span className="text-[11px] text-pink-700 bg-pink-50 border border-pink-200 px-2 py-0.5 rounded-md font-sans font-semibold shrink-0">
                               In-Store Settlement
                             </span>
                           )}
                           {Number(appt.remaining_balance || 0) > 0 && (
-                            <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-sans font-medium">
+                            <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-sans font-medium shrink-0">
                               ₱{Number(appt.remaining_balance).toLocaleString()} Due In-Store
                             </span>
                           )}
                         </h4>
 
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-                          <span className="font-semibold text-purple-900 bg-purple-50 px-2.5 py-0.5 rounded-md">
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-gray-600">
+                          <span className="font-semibold text-purple-900 bg-purple-50 px-2.5 py-0.5 rounded-md shrink-0">
                             📅 {appt.appointment_date} at {appt.appointment_time}
                           </span>
-                          <span>•</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-gray-500">Specialist:</span>
+                          <span className="text-purple-200 hidden sm:inline">•</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-gray-500 shrink-0">Specialist:</span>
                             <select
                               value={appt.technician_id || appt.staff_id || ''}
                               onChange={(e) => {
@@ -985,7 +985,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                                   handleAssignTechnician(appt.id, tech.id, tech.fullname);
                                 }
                               }}
-                              className="bg-gray-50 border border-gray-200 text-xs font-semibold rounded-lg px-2 py-1 text-gray-800 focus:outline-none cursor-pointer"
+                              className="bg-gray-50 border border-gray-200 text-xs font-semibold rounded-lg px-2 py-1 text-gray-800 focus:outline-none cursor-pointer max-w-[160px] sm:max-w-xs truncate"
                             >
                               <option value="">{appt.staff_name || 'Select Specialist'}</option>
                               {technicians.map((t) => (
@@ -998,7 +998,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                         </div>
 
                         {appt.notes && (
-                          <p className="text-xs text-gray-600 mt-1 italic bg-pink-50/50 p-2.5 rounded-xl border border-pink-100/70">
+                          <p className="text-xs text-gray-600 mt-1 italic bg-pink-50/50 p-2.5 rounded-xl border border-pink-100/70 break-words max-w-full">
                             <span className="font-semibold text-pink-900 not-italic">Client Note: </span>
                             "{appt.notes}"
                           </p>
@@ -1009,7 +1009,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                             <button
                               type="button"
                               onClick={() => setPreviewInspoImage({ url: appt.design_image!, clientName: appt.customer_name || 'Client' })}
-                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-xs font-semibold text-purple-900 cursor-pointer transition-colors shadow-2xs"
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-xs font-semibold text-purple-900 cursor-pointer transition-colors shadow-2xs max-w-full"
                               title="Click to view reference photo uploaded by client"
                             >
                               <img
@@ -1017,9 +1017,9 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                                 alt="Inspo Thumbnail"
                                 className="w-6 h-6 rounded-md object-cover border border-purple-300 shrink-0"
                               />
-                              <span className="flex items-center gap-1">
-                                <ImageIcon className="w-3.5 h-3.5 text-purple-700" />
-                                View Client Design Inspo Photo
+                              <span className="flex items-center gap-1 truncate">
+                                <ImageIcon className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                                <span className="truncate">View Client Design Inspo Photo</span>
                               </span>
                             </button>
                           </div>
@@ -1027,18 +1027,18 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
                         {/* Cancellation Reason and Policy info for Salon Owner */}
                         {appt.status === 'cancelled' && (
-                          <div className="mt-2.5 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-xs text-rose-900 space-y-1.5">
-                            <div className="font-bold flex items-center justify-between gap-2 text-rose-950">
-                              <span className="flex items-center gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                Cancellation Log ({appt.cancelled_by === 'customer' ? 'By Client' : 'By Salon'}): {appt.cancellation_reason || 'Client cancelled appointment'}
+                          <div className="mt-2.5 p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-xs text-rose-900 space-y-1.5 min-w-0 max-w-full overflow-hidden">
+                            <div className="font-bold flex flex-wrap items-center justify-between gap-2 text-rose-950">
+                              <span className="flex items-start gap-1.5 break-words min-w-0 flex-1">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                                <span className="break-words">Cancellation Log ({appt.cancelled_by === 'customer' ? 'By Client' : 'By Salon'}): {appt.cancellation_reason || 'Client cancelled appointment'}</span>
                               </span>
                               {appt.outside_grace_period ? (
-                                <span className="px-2 py-0.5 rounded-md bg-rose-200 text-rose-900 font-bold text-[10px]">
+                                <span className="px-2 py-0.5 rounded-md bg-rose-200 text-rose-900 font-bold text-[10px] shrink-0">
                                   Outside 30m Grace
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] shrink-0">
                                   Within 30m Grace
                                 </span>
                               )}
@@ -1060,14 +1060,14 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                               </button>
                             </div>
                             {appt.cancellation_notes && (
-                              <p className="text-[11px] text-rose-700 italic pl-5">"{appt.cancellation_notes}"</p>
+                              <p className="text-[11px] text-rose-700 italic pl-5 break-words">"{appt.cancellation_notes}"</p>
                             )}
                           </div>
                         )}
                       </div>
 
                       {/* Status Action Buttons */}
-                      <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-end md:self-center mt-2 md:mt-0 w-full sm:w-auto justify-end">
                         {appt.status === 'pending' && (
                           <button
                             onClick={() => handleStatusChange(appt.id, 'confirmed')}

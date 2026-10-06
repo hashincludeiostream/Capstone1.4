@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   RotateCcw,
   AlertTriangle,
+  ReceiptText,
 } from 'lucide-react';
 import { Appointment, Salon, User } from '../types';
 import { fetchAppointments, cancelAppointment, rescheduleAppointment } from '../lib/api';
@@ -33,6 +34,7 @@ interface CustomerDashboardProps {
   onSelectSalon: (salon: Salon) => void;
   onRefreshAppointments?: () => void;
   targetAppointmentId?: number | null;
+  onViewReceipt?: (appointment: Appointment) => void;
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
@@ -43,6 +45,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   onSelectSalon,
   onRefreshAppointments,
   targetAppointmentId,
+  onViewReceipt,
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,33 +139,33 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 rounded-3xl p-5 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-w-0">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      <div className="bg-gradient-to-r from-pink-900 via-rose-900 to-purple-950 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-w-0 max-w-full overflow-hidden">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full md:w-auto">
           {currentUser.avatar ? (
             <img
               src={currentUser.avatar}
               alt={currentUser.fullname}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-pink-300 shadow-md shrink-0"
+              className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-pink-300 shadow-md shrink-0"
             />
           ) : (
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center border-2 border-pink-300 shadow-md shrink-0">
-              <span className="text-white text-lg sm:text-xl font-bold">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center border-2 border-pink-300 shadow-md shrink-0">
+              <span className="text-white text-base sm:text-xl font-bold">
                 {currentUser.fullname.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-pink-200 text-[11px] font-semibold mb-1">
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-pink-200 text-[10px] sm:text-[11px] font-semibold mb-1">
               <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
               <span>Client Portal</span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold truncate">
+            <h2 className="text-lg sm:text-2xl md:text-3xl font-serif font-bold truncate">
               Welcome, {currentUser.fullname}
             </h2>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <p className="text-xs text-pink-100/80 truncate max-w-sm sm:max-w-none">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 min-w-0">
+              <p className="text-[11px] sm:text-xs text-pink-100/80 truncate max-w-[200px] sm:max-w-none">
                 Manage your upcoming appointments and beauty history.
               </p>
               <span className="hidden sm:inline text-pink-300">•</span>
@@ -178,7 +181,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
         <button
           onClick={onOpenBooking}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
+          className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
           <span>New Appointment</span>
@@ -186,48 +189,52 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
-          <p className="text-xs font-medium text-gray-500 truncate">Total Bookings</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 max-w-full">
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+          <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Total Bookings</p>
           <p className="text-xl sm:text-2xl font-bold font-serif text-pink-900 mt-1 truncate">
             {appointments.length}
           </p>
         </div>
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
-          <p className="text-xs font-medium text-gray-500 truncate">Upcoming</p>
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+          <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Upcoming</p>
           <p className="text-xl sm:text-2xl font-bold font-serif text-pink-600 mt-1 truncate">
             {appointments.filter((a) => a.status === 'pending' || a.status === 'confirmed').length}
           </p>
         </div>
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
-          <p className="text-xs font-medium text-gray-500 truncate">Completed</p>
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
+          <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Completed</p>
           <p className="text-xl sm:text-2xl font-bold font-serif text-emerald-700 mt-1 truncate">
             {appointments.filter((a) => a.status === 'completed').length}
           </p>
         </div>
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-pink-100 shadow-xs flex flex-col justify-between min-w-0">
-          <p className="text-xs font-medium text-gray-500 truncate">Reliability</p>
-          <div className="mt-1">
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-pink-100 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
+          <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Reliability</p>
+          <div className="mt-1 flex items-center justify-between gap-1 max-w-full min-w-0">
+            <span className="text-lg sm:text-2xl font-bold font-serif text-pink-700 shrink-0">
+              {currentUser.reliability_score ?? 100}%
+            </span>
             <AccountReliabilityBadge
               userId={currentUser.id}
               cancellationStrikes={currentUser.cancellation_strikes}
               reliabilityScore={currentUser.reliability_score}
+              compact
             />
           </div>
         </div>
       </div>
 
       {/* Bookings Pipeline Section */}
-      <div className="bg-white rounded-3xl border border-pink-100 shadow-xs p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-pink-50">
+      <div className="bg-white rounded-3xl border border-pink-100 shadow-xs p-3.5 sm:p-6 max-w-full overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-pink-50 min-w-0">
           <div className="min-w-0">
             <h3 className="text-base sm:text-lg font-serif font-bold text-gray-900 truncate">
-              Appointment History & Schedule
+              Appointment History &amp; Schedule
             </h3>
             <p className="text-xs text-gray-500 truncate">Track real-time status of your reservations.</p>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 shrink-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto max-w-full">
             {[
               { id: 'all', label: `All (${appointments.length})` },
               {
@@ -280,54 +287,56 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                 <div
                   key={appt.id}
                   id={`customer-appointment-${appt.id}`}
-                  className="p-4 sm:p-5 rounded-2xl border border-pink-100 hover:border-pink-300 bg-pink-50/20 transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-4 min-w-0"
+                  className="p-3.5 sm:p-5 rounded-2xl border border-pink-100 hover:border-pink-300 bg-pink-50/20 transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 sm:gap-4 min-w-0 max-w-full overflow-hidden"
                 >
-                  <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex flex-col items-center justify-center shrink-0 shadow-xs">
-                      <span className="text-[10px] uppercase font-bold">
+                  <div className="flex items-start gap-3 sm:gap-3.5 min-w-0 flex-1">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex flex-col items-center justify-center shrink-0 shadow-xs">
+                      <span className="text-[9px] sm:text-[10px] uppercase font-bold leading-tight">
                         {new Date(appt.appointment_date).toLocaleString('default', { month: 'short' })}
                       </span>
-                      <span className="text-base font-bold leading-none">
+                      <span className="text-sm sm:text-base font-bold leading-none mt-0.5">
                         {new Date(appt.appointment_date).getDate()}
                       </span>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-gray-900 truncate">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1 min-w-0">
+                        <span className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[180px] sm:max-w-none">
                           {appt.salon_name}
                         </span>
                         {getStatusBadge(appt.status)}
                       </div>
 
-                      <h4 className="text-sm font-semibold text-pink-900">
+                      <h4 className="text-xs sm:text-sm font-semibold text-pink-900 break-words">
                         {appt.service_name}
                       </h4>
 
-                      <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-pink-500" />
-                          {appt.appointment_time} ({appt.service_duration || 60} mins)
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-gray-600">
+                        <span className="inline-flex items-center gap-1 text-gray-700 shrink-0">
+                          <Clock className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                          <span>{appt.appointment_time} ({appt.service_duration || 60}m)</span>
                         </span>
-                        <span>•</span>
-                        <span>Specialist: <strong>{appt.staff_name || 'Any'}</strong></span>
+                        <span className="text-pink-200 hidden sm:inline">•</span>
+                        <span className="text-gray-700 shrink-0">
+                          Specialist: <strong className="text-gray-900">{appt.staff_name || 'Any'}</strong>
+                        </span>
                         {appt.payment_method ? (
                           <>
-                            <span>•</span>
-                            <span className="text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                              {appt.payment_method.replace('paymongo_', 'PayMongo ').toUpperCase()}
-                              {appt.paid_amount ? ` (₱${Number(appt.paid_amount).toLocaleString()} Paid)` : ''}
+                            <span className="text-pink-200 hidden sm:inline">•</span>
+                            <span className="inline-flex items-center gap-1 text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[11px] max-w-full">
+                              <span>{appt.payment_method.replace('paymongo_', 'PayMongo ').toUpperCase()}</span>
+                              {appt.paid_amount ? <span className="font-bold">₱{Number(appt.paid_amount).toLocaleString()}</span> : null}
                             </span>
                             {Number(appt.remaining_balance || 0) > 0 && (
-                              <span className="text-amber-800 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              <span className="text-amber-800 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-[11px]">
                                 ₱{Number(appt.remaining_balance).toLocaleString()} Due in Salon
                               </span>
                             )}
                           </>
                         ) : (
                           <>
-                            <span>•</span>
-                            <span className="text-pink-800 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
+                            <span className="text-pink-200 hidden sm:inline">•</span>
+                            <span className="text-pink-800 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100 text-[11px]">
                               In-Store Settlement
                             </span>
                           </>
@@ -335,7 +344,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       </div>
 
                       {appt.notes && (
-                        <p className="text-[11px] text-gray-500 mt-2 italic bg-white p-2 rounded-lg border border-pink-100 inline-block">
+                        <p className="text-[11px] text-gray-500 mt-2 italic bg-white p-2 rounded-lg border border-pink-100 inline-block break-words max-w-full">
                           Note: "{appt.notes}"
                         </p>
                       )}
@@ -351,7 +360,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                             <img
                               src={appt.design_image}
                               alt="Design Reference"
-                              className="w-5 h-5 rounded object-cover border border-pink-300"
+                              className="w-5 h-5 rounded object-cover border border-pink-300 shrink-0"
                             />
                             <span>View Design Inspo</span>
                           </button>
@@ -360,30 +369,30 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
                       {/* Cancellation Sanctions & Audit Banner if cancelled */}
                       {appt.status === 'cancelled' && (
-                        <div className="mt-3 p-3 bg-red-50/80 border border-red-200 rounded-xl text-xs space-y-1 text-red-900">
-                          <div className="flex items-center gap-1.5 font-bold text-red-950">
-                            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                            <span>Cancellation: {appt.cancellation_reason || 'Client requested cancellation'}</span>
+                        <div className="mt-2.5 p-2.5 sm:p-3 bg-red-50/80 border border-red-200 rounded-xl text-xs space-y-1 text-red-900 min-w-0 max-w-full overflow-hidden">
+                          <div className="flex items-start gap-1.5 font-bold text-red-950">
+                            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                            <span className="break-words min-w-0">Cancellation: {appt.cancellation_reason || 'Client requested cancellation'}</span>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-red-800 font-medium pl-5.5">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-red-800 font-medium pt-0.5">
                             {appt.cancellation_tier && (
-                              <span className="bg-red-100 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px]">
+                              <span className="bg-red-100 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px] shrink-0">
                                 {appt.cancellation_tier} tier
                               </span>
                             )}
                             {Number(appt.cancellation_fee || 0) > 0 ? (
-                              <span className="bg-rose-200 text-rose-950 px-2 py-0.5 rounded-md font-bold">
+                              <span className="bg-rose-200 text-rose-950 px-2 py-0.5 rounded-md font-bold shrink-0">
                                 ₱{Number(appt.cancellation_fee).toLocaleString()} Late Fee Applied
                               </span>
                             ) : (
-                              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                              <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md shrink-0">
                                 ₱0 Fee (Standard Notice)
                               </span>
                             )}
-                            <span>• Specialist schedule released</span>
+                            <span className="text-red-600 text-[11px]">• Schedule released</span>
                           </div>
                           {appt.cancellation_notes && (
-                            <p className="text-[11px] text-red-700 italic pl-5.5">
+                            <p className="text-[11px] text-red-700 italic break-words">
                               "{appt.cancellation_notes}"
                             </p>
                           )}
@@ -392,15 +401,27 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-2 pt-3 sm:pt-0 border-t sm:border-t-0 border-pink-100 shrink-0">
-                    <span className="text-[11px] font-mono text-gray-400">#NGH-{appt.id}</span>
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <div className="flex flex-col sm:flex-row xl:flex-col items-start sm:items-center xl:items-end justify-between xl:justify-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-pink-100/80 w-full xl:w-auto min-w-0">
+                    <span className="text-[11px] font-mono text-gray-400 shrink-0">#NGH-{appt.id}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
                       {salon && (
                         <button
                           onClick={() => onSelectSalon(salon)}
-                          className="px-3 py-1.5 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold cursor-pointer whitespace-nowrap"
+                          className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold cursor-pointer whitespace-nowrap"
                         >
                           Salon Info
+                        </button>
+                      )}
+
+                      {/* Official Payment & Booking Receipt */}
+                      {onViewReceipt && (appt.paid_amount || appt.transaction_reference || appt.payment_status) && (
+                        <button
+                          onClick={() => onViewReceipt(appt)}
+                          className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-800 hover:bg-emerald-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
+                          title="View official PayMongo payment receipt"
+                        >
+                          <ReceiptText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Receipt</span>
                         </button>
                       )}
 
@@ -409,18 +430,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                         <>
                           <button
                             onClick={() => setReschedulingAppt(appt)}
-                            className="px-3 py-1.5 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
+                            className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
                             title="Reschedule to a new date with zero penalty fee"
                           >
-                            <CalendarClock className="w-3.5 h-3.5 text-purple-600" />
+                            <CalendarClock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                             <span>Reschedule</span>
                           </button>
                           <button
                             onClick={() => setCancellingAppt(appt)}
-                            className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
+                            className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap"
                             title="Cancel appointment (subject to store cancellation policy)"
                           >
-                            <X className="w-3.5 h-3.5 text-rose-600" />
+                            <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                             <span>Cancel</span>
                           </button>
                         </>
@@ -441,7 +462,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             })}
           </div>
         )}
-
+      </div>
         {/* Lightbox Modal for Inspiration Photo */}
         {previewImage && (
           <div
@@ -496,6 +517,5 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
           onConfirmReschedule={handleConfirmReschedule}
         />
       </div>
-    </div>
-  );
-};
+    );
+  };

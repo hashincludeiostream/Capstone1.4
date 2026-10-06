@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getFirestore,
+  initializeFirestore,
   collection,
   doc,
   getDocs,
@@ -52,12 +53,36 @@ export const activeFirebaseConfig = {
 // Initialize Firebase App instance safely (singleton)
 export const app = getApps().length > 0 ? getApp() : initializeApp(activeFirebaseConfig);
 
-// Initialize Firestore with specific database ID from configuration
-export const db = activeFirebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, activeFirebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Firestore with auto-detected long-polling to prevent gRPC streaming drops
+function getFirestoreInstance() {
+  const dbId = activeFirebaseConfig.firestoreDatabaseId;
+  try {
+    return dbId
+      ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId)
+      : initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  } catch {
+    return dbId ? getFirestore(app, dbId) : getFirestore(app);
+  }
+}
+
+export const db = getFirestoreInstance();
 
 export const auth = getAuth(app);
+
+// Validate Firestore connection on boot
+export async function testFirestoreConnection(): Promise<void> {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Notice: Firestore running in offline/cache mode.');
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  testFirestoreConnection();
+}
 
 // Configure Google OAuth Provider for real Gmail/Google accounts
 export const googleProvider = new GoogleAuthProvider();

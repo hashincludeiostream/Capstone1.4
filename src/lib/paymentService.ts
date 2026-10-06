@@ -131,6 +131,7 @@ export async function initiatePayment(
   }
 
   try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
     const response = await fetch('/api/payments/create-charge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -139,6 +140,7 @@ export async function initiatePayment(
         amount: amountToCharge,
         remaining_balance: breakdown.remainingBalance,
         forceSandbox,
+        origin,
       }),
     });
 
@@ -183,5 +185,43 @@ export async function initiatePayment(
       mode: 'simulated',
       message: `Simulated sandbox payment of ₱${amountToCharge.toLocaleString()} succeeded.`,
     };
+  }
+}
+
+export interface ReceiptData {
+  transaction: PaymentTransaction | null;
+  appointment: any | null;
+  salon: any | null;
+}
+
+/**
+ * Retrieves official payment transaction and booking details by reference.
+ * Used after PayMongo checkout redirects and for viewing persistent receipts.
+ */
+export async function fetchReceiptByReference(
+  ref: string,
+  paymentStatus?: string
+): Promise<{ success: boolean; data?: ReceiptData; error?: string }> {
+  try {
+    const query = new URLSearchParams({ ref });
+    if (paymentStatus) {
+      query.append('payment_status', paymentStatus);
+    }
+    const res = await fetch(`/api/payments/receipt-by-ref?${query.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || `Failed with status ${res.status}` };
+    }
+    const data = await res.json();
+    return {
+      success: true,
+      data: {
+        transaction: data.transaction,
+        appointment: data.appointment,
+        salon: data.salon,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error' };
   }
 }

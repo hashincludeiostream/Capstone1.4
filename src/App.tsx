@@ -21,9 +21,10 @@ import {
   LayoutGrid,
   User as UserIcon,
 } from 'lucide-react';
-import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem, PlatformStats, Reel, Review, Technician } from './types';
+import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem, PlatformStats, Reel, Review, Technician, PaymentTransaction } from './types';
 import { initializeFirestoreData, subscribeToAppointments, updateFirestoreUser } from './lib/firestoreService';
 import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments, fetchStats, fetchReels, fetchReviews, fetchTechnicians, fetchServices, verifyAdminPermission, API_BASE } from './lib/api';
+import { fetchReceiptByReference } from './lib/paymentService';
 import { localStorage as safeLocalStorage } from './lib/localStorage';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -35,6 +36,7 @@ import { SalonDetailsModal } from './components/SalonDetailsModal';
 import { ServiceCatalog } from './components/ServiceCatalog';
 import { ReelsView } from './components/ReelsView';
 import { BookingWizard } from './components/BookingWizard';
+import { PaymentReceiptModal } from './components/payment/PaymentReceiptModal';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { SalonOwnerDashboard } from './components/SalonOwnerDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -217,6 +219,110 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     safeLocalStorage.setJSON('nailglamhub_cart', cartItems);
   }, [cartItems]);
+
+  // PayMongo Payment Receipt Modal State & Persistence
+  const [paymentReceiptOpen, setPaymentReceiptOpen] = useState<boolean>(false);
+  const [receiptData, setReceiptData] = useState<{
+    appointment?: Appointment | null;
+    transaction?: PaymentTransaction | null;
+    salon?: Salon | null;
+  } | null>(() => {
+    return safeLocalStorage.getJSON<any>('nailglamhub_active_receipt') || null;
+  });
+
+  // Handler to open receipt for any past/current appointment
+  const handleOpenReceiptForAppointment = (appt: Appointment) => {
+    const salon = salons.find((s) => s.id === appt.salon_id) || null;
+    const ref = appt.transaction_reference;
+    const cached = ref ? safeLocalStorage.getJSON<any>(`nailglamhub_receipt_${ref}`) : null;
+
+    if (cached?.appointment || cached?.transaction) {
+      setReceiptData(cached);
+      setPaymentReceiptOpen(true);
+      return;
+    }
+
+    if (ref) {
+      fetchReceiptByReference(ref).then((res) => {
+        if (res.success && res.data) {
+          const loaded = {
+            appointment: res.data.appointment || appt,
+            transaction: res.data.transaction,
+            salon: res.data.salon || salon,
+          };
+          setReceiptData(loaded);
+          setPaymentReceiptOpen(true);
+          safeLocalStorage.setJSON(`nailglamhub_receipt_${ref}`, loaded);
+          return;
+        }
+        setReceiptData({ appointment: appt, salon, transaction: null });
+        setPaymentReceiptOpen(true);
+      });
+    } else {
+      setReceiptData({ appointment: appt, salon, transaction: null });
+      setPaymentReceiptOpen(true);
+    }
+  };
+
+  // PayMongo Redirect Return & State Persistence Listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const url = new URL(window.location.href);
+      const paymentStatus = url.searchParams.get('payment_status');
+      const ref = url.searchParams.get('ref');
+
+      if (paymentStatus === 'success' || ref) {
+        console.log('💳 PayMongo return detected:', { paymentStatus, ref });
+
+        // 1. Immediately restore receipt from localStorage if present
+        const cachedReceipt =
+          (ref && safeLocalStorage.getJSON<any>(`nailglamhub_receipt_${ref}`)) ||
+          safeLocalStorage.getJSON<any>('nailglamhub_active_receipt');
+
+        if (cachedReceipt?.appointment || cachedReceipt?.transaction) {
+          setReceiptData(cachedReceipt);
+          setPaymentReceiptOpen(true);
+        }
+
+        // 2. Query backend to verify payment and synchronize status
+        if (ref) {
+          fetchReceiptByReference(ref, paymentStatus || 'success').then((res) => {
+            if (res.success && res.data) {
+              const verifiedReceipt = {
+                appointment: res.data.appointment,
+                transaction: res.data.transaction,
+                salon: res.data.salon,
+              };
+              setReceiptData(verifiedReceipt);
+              setPaymentReceiptOpen(true);
+              safeLocalStorage.setJSON('nailglamhub_active_receipt', verifiedReceipt);
+              safeLocalStorage.setJSON(`nailglamhub_receipt_${ref}`, verifiedReceipt);
+            }
+          });
+        }
+
+        // 3. Refresh user's appointments and show confirmation
+        loadCustomerAppointments();
+        showToast('Payment verified via PayMongo! Your appointment receipt is ready.');
+
+        // 4. Clean up query parameters from browser URL so refreshes remain clean
+        url.searchParams.delete('payment_status');
+        url.searchParams.delete('ref');
+        const cleanUrl = url.pathname + (url.search ? url.search : '') + url.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      } else if (paymentStatus === 'cancelled') {
+        showToast('PayMongo checkout was cancelled. You can retry payment or pay in-salon.');
+        url.searchParams.delete('payment_status');
+        if (url.searchParams.get('ref')) url.searchParams.delete('ref');
+        const cleanUrl = url.pathname + (url.search ? url.search : '') + url.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch (e) {
+      console.warn('Error processing PayMongo redirect URL:', e);
+    }
+  }, []);
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1046,7 +1152,7 @@ const AppContent: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex items-start gap-6 xl:gap-8 flex-1 min-h-[calc(100vh-10rem)]">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-12 py-4 sm:py-6 flex items-start gap-6 xl:gap-8 flex-1 min-h-[calc(100vh-10rem)] max-w-full overflow-x-hidden">
         {/* Pinterest-Style Sidebar */}
         <Sidebar
           currentUser={currentUser}
@@ -1093,7 +1199,7 @@ const AppContent: React.FC = () => {
         />
 
         {/* Dynamic Center Stage Views */}
-        <main className="flex-1 min-w-0 pb-32 sm:pb-28 lg:pb-12">
+        <main className="flex-1 min-w-0 max-w-full pb-32 sm:pb-28 lg:pb-12">
           {/* 0. LANDING PAGE VIEW */}
           {activeTab === 'landing' && (
             <LandingPage
@@ -1328,6 +1434,7 @@ const AppContent: React.FC = () => {
                 onOpenLeaveReview={(salon) => handleOpenLeaveReviewForSalon(salon)}
                 onSelectSalon={(salon) => setSelectedSalonForDetails(salon)}
                 onRefreshAppointments={loadCustomerAppointments}
+                onViewReceipt={handleOpenReceiptForAppointment}
                 targetAppointmentId={
                   targetElementId && targetElementId.startsWith('customer-appointment-')
                     ? Number(targetElementId.replace('customer-appointment-', ''))
@@ -1785,6 +1892,27 @@ const AppContent: React.FC = () => {
           onSuccess={(newAppt) => {
             showToast(`Appointment reserved with ${newAppt.salon_name}!`);
             loadCustomerAppointments();
+          }}
+        />
+      )}
+
+      {/* 2b. Official PayMongo Payment & Booking Receipt Modal (Permanent & Persistent across redirects) */}
+      {paymentReceiptOpen && (
+        <PaymentReceiptModal
+          isOpen={paymentReceiptOpen}
+          onClose={() => setPaymentReceiptOpen(false)}
+          appointment={receiptData?.appointment}
+          transaction={receiptData?.transaction}
+          salon={receiptData?.salon}
+          onViewAppointments={() => {
+            setActiveTab('customer-dashboard');
+            setPaymentReceiptOpen(false);
+          }}
+          onBookAnother={() => {
+            setPaymentReceiptOpen(false);
+            setBookingSalon(salons[0] || null);
+            setBookingService(null);
+            setBookingModalOpen(true);
           }}
         />
       )}
