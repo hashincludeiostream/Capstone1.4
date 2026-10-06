@@ -42,7 +42,7 @@ export const activeFirebaseConfig = {
   appId: rawConfig?.appId || PERMANENT_FIREBASE_CONFIG.appId,
   apiKey: rawConfig?.apiKey || PERMANENT_FIREBASE_CONFIG.apiKey,
   authDomain: rawConfig?.authDomain || PERMANENT_FIREBASE_CONFIG.authDomain,
-  firestoreDatabaseId: rawConfig?.firestoreDatabaseId || PERMANENT_FIREBASE_CONFIG.firestoreDatabaseId,
+  firestoreDatabaseId: (rawConfig as any)?.firestoreDatabaseId || PERMANENT_FIREBASE_CONFIG.firestoreDatabaseId,
   storageBucket: rawConfig?.storageBucket || PERMANENT_FIREBASE_CONFIG.storageBucket,
   messagingSenderId: rawConfig?.messagingSenderId || PERMANENT_FIREBASE_CONFIG.messagingSenderId,
   measurementId: rawConfig?.measurementId ?? PERMANENT_FIREBASE_CONFIG.measurementId,
@@ -85,8 +85,13 @@ if (typeof window !== 'undefined') {
   testFirestoreConnection();
 }
 
-// Scopes configured for Google Workspace integrations
-export const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
+// Scopes configured for Google Workspace integrations (Gmail Send, Compose, Modify, and Full Access)
+export const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.compose',
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://mail.google.com/',
+];
 
 // Configure Google OAuth Provider for real Gmail/Google accounts
 export const googleProvider = new GoogleAuthProvider();
@@ -96,27 +101,69 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-// In-memory OAuth access token cache (complies with security guidelines)
-let inMemoryAccessToken: string | null = null;
+// OAuth access token & user email session cache
+const TOKEN_KEY = 'nailglamhub_google_oauth_token';
+const EMAIL_KEY = 'nailglamhub_google_oauth_email';
+let inMemoryAccessToken: string | null = typeof window !== 'undefined' ? sessionStorage.getItem(TOKEN_KEY) : null;
+let inMemoryUserEmail: string | null = typeof window !== 'undefined' ? sessionStorage.getItem(EMAIL_KEY) : null;
 
-export const getCachedAccessToken = (): string | null => inMemoryAccessToken;
-export const setCachedAccessToken = (token: string | null) => {
+export const getCachedAccessToken = (): string | null => {
+  if (inMemoryAccessToken) return inMemoryAccessToken;
+  if (typeof window !== 'undefined') {
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (saved) {
+      inMemoryAccessToken = saved;
+      return saved;
+    }
+  }
+  return null;
+};
+
+export const getCachedGmailUserEmail = (): string | null => {
+  if (inMemoryUserEmail) return inMemoryUserEmail;
+  if (typeof window !== 'undefined') {
+    const saved = sessionStorage.getItem(EMAIL_KEY);
+    if (saved) {
+      inMemoryUserEmail = saved;
+      return saved;
+    }
+  }
+  return auth.currentUser?.email || null;
+};
+
+export const setCachedAccessToken = (token: string | null, email?: string | null) => {
   inMemoryAccessToken = token;
+  if (email !== undefined) {
+    inMemoryUserEmail = email;
+  }
+  if (typeof window !== 'undefined') {
+    if (token) {
+      sessionStorage.setItem(TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
+    if (email) {
+      sessionStorage.setItem(EMAIL_KEY, email);
+    } else if (email === null) {
+      sessionStorage.removeItem(EMAIL_KEY);
+    }
+  }
 };
 
 /**
  * Connect Google Workspace OAuth to obtain active access token for Gmail API
  */
-export const connectGoogleWorkspace = async (): Promise<{ success: boolean; token: string | null; error?: string }> => {
+export const connectGoogleWorkspace = async (): Promise<{ success: boolean; token: string | null; email?: string | null; error?: string }> => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken || null;
+    const userEmail = result.user?.email || null;
     if (token) {
-      setCachedAccessToken(token);
-      return { success: true, token };
+      setCachedAccessToken(token, userEmail);
+      return { success: true, token, email: userEmail };
     }
-    return { success: false, token: null, error: 'No OAuth access token was returned.' };
+    return { success: false, token: null, error: 'No OAuth access token was returned by Google.' };
   } catch (error: any) {
     return {
       success: false,
@@ -139,7 +186,7 @@ export const signInWithGoogleAccount = async (
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken || null;
     if (token) {
-      setCachedAccessToken(token);
+      setCachedAccessToken(token, result.user?.email || null);
     }
     return {
       user: result.user,

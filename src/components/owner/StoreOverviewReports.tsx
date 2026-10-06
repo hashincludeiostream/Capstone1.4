@@ -34,6 +34,8 @@ import {
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
+import { sendEmailNotification } from '../../lib/emailService';
+import { getCachedAccessToken, connectGoogleWorkspace } from '../../lib/firebase';
 import {
   StoreReportData,
   FinancialPeriodItem,
@@ -990,6 +992,15 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
   const handleEmailReport = async () => {
     setIsEmailingReport(true);
     try {
+      let token = getCachedAccessToken();
+      if (!token) {
+        showToast('Connecting Google Workspace to send email...');
+        const conn = await connectGoogleWorkspace();
+        if (conn.success && conn.token) {
+          token = conn.token;
+        }
+      }
+
       const res = await fetch('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1002,7 +1013,16 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(`${volumeTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+        if (data.report) {
+          const sendRes = await sendEmailNotification(data.report);
+          if (sendRes.gmailSent) {
+            showToast(`✅ ${volumeTimeGrain.toUpperCase()} PDF report delivered directly to ${data.report.to} via Gmail!`);
+          } else {
+            showToast(`${volumeTimeGrain.toUpperCase()} PDF status report logged to ledger`);
+          }
+        } else {
+          showToast(`${volumeTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+        }
       } else {
         showToast(data.error || 'Failed to dispatch email report');
       }
