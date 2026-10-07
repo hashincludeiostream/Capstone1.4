@@ -106,9 +106,19 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     }
     return [];
   });
-  const [selectedSalonId, setSelectedSalonId] = useState<number | null>(null);
+  const [selectedSalonId, setSelectedSalonId] = useState<number | null>(() => {
+    if (currentUser?.id) {
+      const saved = safeLocalStorage.getJSON<number>(`nailglamhub_owner_selected_salon_${currentUser.id}`);
+      if (saved) return saved;
+    }
+    return null;
+  });
   const [services, setServices] = useState<Service[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [allOwnerServices, setAllOwnerServices] = useState<Service[]>([]);
+  const [allOwnerTechnicians, setAllOwnerTechnicians] = useState<Technician[]>([]);
+  const [serviceBranchFilter, setServiceBranchFilter] = useState<'selected' | 'all'>('selected');
+  const [staffBranchFilter, setStaffBranchFilter] = useState<'selected' | 'all'>('selected');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -254,11 +264,35 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       }
 
       if (userSalons.length > 0) {
-        const currentId = selectedSalonId && userSalons.some((s) => s.id === selectedSalonId)
+        const savedSalonId = currentUser?.id
+          ? safeLocalStorage.getJSON<number>(`nailglamhub_owner_selected_salon_${currentUser.id}`)
+          : null;
+        let currentId = (selectedSalonId && userSalons.some((s) => s.id === selectedSalonId))
           ? selectedSalonId
-          : userSalons[0].id;
+          : (savedSalonId && userSalons.some((s) => s.id === savedSalonId))
+          ? savedSalonId
+          : null;
+
+        // Fetch all owner services & technicians across all userSalons
+        const [allOwnerServs, allOwnerTechs] = await Promise.all([
+          fetchServices(undefined, currentUser.id).catch(() => []),
+          fetchTechnicians(undefined, currentUser.id).catch(() => []),
+        ]);
+
+        if (!currentId) {
+          // Prefer branch that already has services or staff, or default to the most recent branch
+          const salonWithServ = userSalons.find((s) => allOwnerServs.some((srv) => Number(srv.salon_id) === Number(s.id)));
+          const salonWithTech = userSalons.find((s) => allOwnerTechs.some((t) => Number(t.salon_id) === Number(s.id)));
+          currentId = salonWithServ?.id || salonWithTech?.id || userSalons[userSalons.length - 1]?.id || userSalons[0].id;
+        }
 
         setSelectedSalonId(currentId);
+        if (currentUser?.id) {
+          safeLocalStorage.setJSON(`nailglamhub_owner_selected_salon_${currentUser.id}`, currentId);
+        }
+
+        setAllOwnerServices(allOwnerServs);
+        setAllOwnerTechnicians(allOwnerTechs);
 
         const [servs, techs, appts, revs, hours, prods, prodOrders] = await Promise.all([
           fetchServices(currentId),
@@ -322,6 +356,9 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   // Reload branch data when selected salon changes
   const handleSelectSalon = async (salonId: number) => {
     setSelectedSalonId(salonId);
+    if (currentUser?.id) {
+      safeLocalStorage.setJSON(`nailglamhub_owner_selected_salon_${currentUser.id}`, salonId);
+    }
     setLoading(true);
     const [servs, techs, appts, revs, prods, prodOrders] = await Promise.all([
       fetchServices(salonId),
@@ -347,6 +384,84 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       setSettingsDesc(s.description || '');
     }
     setLoading(false);
+  };
+
+  const handleCopyServicesFromBranch = async (sourceSalonId: number) => {
+    if (!selectedSalonId || sourceSalonId === selectedSalonId) return;
+    try {
+      setLoading(true);
+      const sourceServices = await fetchServices(sourceSalonId);
+      if (sourceServices.length === 0) {
+        showToast('No treatments found in source branch to copy.');
+        setLoading(false);
+        return;
+      }
+      for (const srv of sourceServices) {
+        await fetch(`${API_BASE}/services`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            salon_id: selectedSalonId,
+            service_name: srv.service_name,
+            category_name: srv.category || srv.category_name || 'Nail Services',
+            price: Number(srv.price) || 0,
+            duration_minutes: Number(srv.duration || srv.duration_minutes || 45),
+            description: srv.description || '',
+            image: srv.image_url || srv.image || null,
+          }),
+        }).catch((e) => console.warn('Copy service error:', e));
+      }
+      const updatedServs = await fetchServices(selectedSalonId);
+      setServices(updatedServs);
+      const allServs = await fetchServices(undefined, currentUser.id).catch(() => []);
+      setAllOwnerServices(allServs);
+      showToast(`Copied ${sourceServices.length} treatments to active branch.`);
+    } catch (err) {
+      console.error('Error copying treatments:', err);
+      showToast('Failed to copy treatments.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyStaffFromBranch = async (sourceSalonId: number) => {
+    if (!selectedSalonId || sourceSalonId === selectedSalonId) return;
+    try {
+      setLoading(true);
+      const sourceStaff = await fetchTechnicians(sourceSalonId);
+      if (sourceStaff.length === 0) {
+        showToast('No specialists found in source branch to copy.');
+        setLoading(false);
+        return;
+      }
+      for (const stf of sourceStaff) {
+        await fetch(`${API_BASE}/technicians`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            salon_id: selectedSalonId,
+            fullname: stf.fullname || stf.name,
+            email: stf.email || '',
+            phone: stf.phone || '',
+            specialties: stf.specialties || 'Nail Specialist',
+            experience_years: Number(stf.experience_years || 2),
+            avatar: stf.avatar || null,
+            rating: Number(stf.rating || 5),
+            is_available: true,
+          }),
+        }).catch((e) => console.warn('Copy staff error:', e));
+      }
+      const updatedStaff = await fetchTechnicians(selectedSalonId);
+      setTechnicians(updatedStaff);
+      const allTechs = await fetchTechnicians(undefined, currentUser.id).catch(() => []);
+      setAllOwnerTechnicians(allTechs);
+      showToast(`Assigned ${sourceStaff.length} specialists to active branch.`);
+    } catch (err) {
+      console.error('Error copying specialists:', err);
+      showToast('Failed to assign specialists.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStatusChange = async (appointmentId: number, newStatus: AppointmentStatus) => {
@@ -584,6 +699,22 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   };
 
   const activeSalon = salons.find((s) => s.id === selectedSalonId) || salons[0];
+  const displayedServices = serviceBranchFilter === 'all' && allOwnerServices.length > 0
+    ? allOwnerServices
+    : services;
+
+  const displayedStaff = staffBranchFilter === 'all' && allOwnerTechnicians.length > 0
+    ? allOwnerTechnicians
+    : technicians;
+
+  const otherBranchesWithServices = useMemo(() => {
+    return salons.filter((s) => s.id !== selectedSalonId && allOwnerServices.some((srv) => Number(srv.salon_id) === Number(s.id)));
+  }, [salons, selectedSalonId, allOwnerServices]);
+
+  const otherBranchesWithStaff = useMemo(() => {
+    return salons.filter((s) => s.id !== selectedSalonId && allOwnerTechnicians.some((t) => Number(t.salon_id) === Number(s.id)));
+  }, [salons, selectedSalonId, allOwnerTechnicians]);
+
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
   const lowStockProductCount = useMemo(
     () => products.filter((p) => p.stock_quantity <= (p.low_stock_threshold || 5)).length,
@@ -778,7 +909,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
             }`}
           >
             <Scissors className="w-4 h-4 text-purple-700" />
-            <span>Treatments Menu ({services.length})</span>
+            <span>Treatments Menu ({displayedServices.length})</span>
           </button>
 
           {/* Tab 4: Staff Roster */}
@@ -792,7 +923,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
             }`}
           >
             <Users className="w-4 h-4 text-blue-600" />
-            <span>Staff Roster ({technicians.length})</span>
+            <span>Staff Roster ({displayedStaff.length})</span>
           </button>
 
           {/* Tab 5: Products & Stock Inventory */}
@@ -1200,23 +1331,43 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* TAB 4: SERVICES MANAGEMENT */}
           {activeTab === 'services' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-serif font-bold text-gray-900 flex items-center gap-2">
                     <Scissors className="w-4 h-4 text-purple-700" />
-                    Salon Treatment Catalog & Menu
+                    Salon Treatment Catalog &amp; Menu
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Configure your treatments, duration, and descriptions for client browsing & in-salon bookings.
+                    Configure treatments, duration, and descriptions for client browsing &amp; in-salon bookings.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowAddService(!showAddService)}
-                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{editingServiceId ? 'Edit Treatment' : 'Add New Treatment'}</span>
                 </button>
+              </div>
+
+              {/* Branch Filter & View Control */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-purple-50/70 border border-purple-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-purple-900">Branch View:</span>
+                  <select
+                    value={serviceBranchFilter}
+                    onChange={(e) => setServiceBranchFilter(e.target.value as 'selected' | 'all')}
+                    className="bg-white text-purple-950 text-xs font-semibold px-3 py-1.5 rounded-xl border border-purple-200 shadow-2xs cursor-pointer focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="selected">Active Branch: {activeSalon?.salon_name || 'Selected'} ({services.length})</option>
+                    {salons.length > 1 && (
+                      <option value="all">All Branches Combined ({allOwnerServices.length > 0 ? allOwnerServices.length : services.length})</option>
+                    )}
+                  </select>
+                </div>
+                <div className="text-xs text-purple-800 font-medium">
+                  Showing <strong className="font-bold">{displayedServices.length}</strong> treatment{displayedServices.length !== 1 ? 's' : ''}
+                </div>
               </div>
 
               {/* Add Service Modal/Form */}
@@ -1267,10 +1418,10 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                         <input
                           type="number"
                           min="0"
-                          step="10"
+                          step="any"
                           value={newServicePrice}
                           onChange={(e) => setNewServicePrice(e.target.value)}
-                          placeholder="500"
+                          placeholder="e.g. 500"
                           className="w-full pl-7 pr-2 py-2 rounded-xl bg-white border border-purple-200 text-xs focus:outline-none focus:border-purple-500 font-semibold"
                           required
                         />
@@ -1278,7 +1429,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Duration & Skill Level
+                        Duration &amp; Skill Level
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -1366,53 +1517,92 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 </form>
               )}
 
+              {/* Empty state when 0 treatments */}
+              {displayedServices.length === 0 && (
+                <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-purple-200 bg-white">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto mb-3">
+                    <Scissors className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-purple-950">No treatments listed for this branch yet</h4>
+                  <p className="text-xs text-gray-500 max-w-md mx-auto mt-1 mb-4">
+                    Add treatments to {activeSalon?.salon_name || 'this branch'} so clients can browse treatments and book appointment slots.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={() => setShowAddService(true)}
+                      className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Treatment</span>
+                    </button>
+                    {otherBranchesWithServices.length > 0 && (
+                      <button
+                        onClick={() => handleCopyServicesFromBranch(otherBranchesWithServices[0].id)}
+                        className="px-4 py-2 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-pink-600" />
+                        <span>Copy treatments from {otherBranchesWithServices[0].salon_name}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Service List */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {services.map((s) => (
-                  <div
-                    key={s.id}
-                    className="p-4 rounded-2xl border border-pink-100 bg-white flex items-start justify-between gap-3 shadow-xs hover:border-purple-200 transition-all"
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.2 rounded-md">
-                          {s.category}
-                        </span>
-                        {s.difficulty_level && (
-                          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-md">
-                            {s.difficulty_level}
+                {displayedServices.map((s) => {
+                  const branchName = salons.find((sl) => sl.id === s.salon_id)?.salon_name;
+                  return (
+                    <div
+                      key={s.id}
+                      className="p-4 rounded-2xl border border-pink-100 bg-white flex items-start justify-between gap-3 shadow-xs hover:border-purple-200 transition-all"
+                    >
+                      <div>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.2 rounded-md">
+                            {s.category}
                           </span>
-                        )}
-                        <span className="text-xs font-bold text-gray-900">{s.service_name}</span>
+                          {s.difficulty_level && (
+                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-md">
+                              {s.difficulty_level}
+                            </span>
+                          )}
+                          {serviceBranchFilter === 'all' && branchName && (
+                            <span className="text-[10px] text-pink-700 bg-pink-50 px-2 py-0.2 rounded-md border border-pink-100 font-semibold">
+                              {branchName}
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-gray-900">{s.service_name}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 line-clamp-2">{s.description}</p>
+                        <div className="flex items-center gap-3 mt-2 text-xs font-medium text-gray-700">
+                          <span className="text-purple-800 font-bold bg-purple-100 px-2.5 py-0.5 rounded-md border border-purple-200">
+                            {Number(s.price) > 0 ? `₱${Number(s.price).toLocaleString()}` : 'Free / In-Store Settlement'}
+                          </span>
+                          <span>•</span>
+                          <span>{s.duration || s.duration_minutes || 45} mins</span>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500 line-clamp-2">{s.description}</p>
-                      <div className="flex items-center gap-3 mt-2 text-xs font-medium text-gray-700">
-                        <span className="text-purple-800 font-bold bg-purple-100 px-2.5 py-0.5 rounded-md border border-purple-200">
-                          {Number(s.price) > 0 ? `₱${Number(s.price).toLocaleString()}` : 'Free / In-Store Settlement'}
-                        </span>
-                        <span>•</span>
-                        <span>{s.duration || s.duration_minutes || 45} mins</span>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => startEditingService(s)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
-                        title="Edit service"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteService(s.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Delete service"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => startEditingService(s)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                          title="Edit service"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteService(s.id)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete service"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1420,11 +1610,11 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           {/* TAB 5: STAFF MANAGEMENT */}
           {activeTab === 'staff' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-serif font-bold text-gray-900 flex items-center gap-2">
                     <Users className="w-4 h-4 text-purple-700" />
-                    Salon Technicians & Specialist Artists
+                    Salon Technicians &amp; Specialist Artists
                   </h3>
                   <p className="text-xs text-gray-500">
                     Manage artists assigned to client booking slots and their specialties.
@@ -1432,11 +1622,31 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 </div>
                 <button
                   onClick={() => setShowAddTech(!showAddTech)}
-                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Specialist</span>
                 </button>
+              </div>
+
+              {/* Branch Filter & View Control */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-blue-50/70 border border-blue-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-blue-900">Branch View:</span>
+                  <select
+                    value={staffBranchFilter}
+                    onChange={(e) => setStaffBranchFilter(e.target.value as 'selected' | 'all')}
+                    className="bg-white text-blue-950 text-xs font-semibold px-3 py-1.5 rounded-xl border border-blue-200 shadow-2xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="selected">Active Branch: {activeSalon?.salon_name || 'Selected'} ({technicians.length})</option>
+                    {salons.length > 1 && (
+                      <option value="all">All Branches Combined ({allOwnerTechnicians.length > 0 ? allOwnerTechnicians.length : technicians.length})</option>
+                    )}
+                  </select>
+                </div>
+                <div className="text-xs text-blue-800 font-medium">
+                  Showing <strong className="font-bold">{displayedStaff.length}</strong> specialist{displayedStaff.length !== 1 ? 's' : ''}
+                </div>
               </div>
 
               {/* Add Tech Form */}
@@ -1552,50 +1762,91 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 </form>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {technicians.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-4 rounded-2xl border border-pink-100 bg-white flex items-center gap-3.5 shadow-xs hover:border-purple-200 transition-all"
-                  >
-                    {t.avatar ? (
-                      <img
-                        src={t.avatar}
-                        alt={t.name}
-                        className="w-12 h-12 rounded-full object-cover border border-pink-200 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center border border-pink-200 shrink-0">
-                        <span className="text-white text-sm font-bold">
-                          {t.name?.charAt(0).toUpperCase() || '?'}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <h5 className="text-sm font-bold text-gray-900">{t.name}</h5>
-                      <p className="text-xs text-purple-800 font-medium">
-                        {t.experience_years} Years Experience
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{t.specialties}</p>
-                    </div>
-                    <div className="ml-auto flex items-center gap-1">
-                      <button
-                        onClick={() => startEditingTechnician(t)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
-                        title="Edit technician"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTechnician(t.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="Delete technician"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {/* Empty state when 0 staff */}
+              {displayedStaff.length === 0 && (
+                <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-blue-200 bg-white">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+                    <Users className="w-6 h-6" />
                   </div>
-                ))}
+                  <h4 className="text-sm font-bold text-blue-950">No specialists found for this branch</h4>
+                  <p className="text-xs text-gray-500 max-w-md mx-auto mt-1 mb-4">
+                    Register nail artists and beauty specialists for {activeSalon?.salon_name || 'this branch'} to handle client appointments.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={() => setShowAddTech(true)}
+                      className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Specialist</span>
+                    </button>
+                    {otherBranchesWithStaff.length > 0 && (
+                      <button
+                        onClick={() => handleCopyStaffFromBranch(otherBranchesWithStaff[0].id)}
+                        className="px-4 py-2 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-blue-600" />
+                        <span>Assign specialists from {otherBranchesWithStaff[0].salon_name}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {displayedStaff.map((t) => {
+                  const branchName = salons.find((sl) => sl.id === t.salon_id)?.salon_name;
+                  return (
+                    <div
+                      key={t.id}
+                      className="p-4 rounded-2xl border border-pink-100 bg-white flex items-center gap-3.5 shadow-xs hover:border-purple-200 transition-all"
+                    >
+                      {t.avatar ? (
+                        <img
+                          src={t.avatar}
+                          alt={t.name}
+                          className="w-12 h-12 rounded-full object-cover border border-pink-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center border border-pink-200 shrink-0">
+                          <span className="text-white text-sm font-bold">
+                            {t.name?.charAt(0).toUpperCase() || '?'}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h5 className="text-sm font-bold text-gray-900">{t.name}</h5>
+                          {staffBranchFilter === 'all' && branchName && (
+                            <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.2 rounded-md border border-blue-100 font-semibold">
+                              {branchName}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-purple-800 font-medium">
+                          {t.experience_years} Years Experience
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">{t.specialties}</p>
+                      </div>
+                      <div className="ml-auto flex items-center gap-1">
+                        <button
+                          onClick={() => startEditingTechnician(t)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                          title="Edit technician"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTechnician(t.id)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Delete technician"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

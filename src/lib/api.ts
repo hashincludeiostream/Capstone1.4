@@ -249,9 +249,12 @@ export async function fetchSalonDetails(id: number): Promise<{
   }
 }
 
-export async function fetchServices(salonId?: number): Promise<Service[]> {
+export async function fetchServices(salonId?: number, ownerId?: number): Promise<Service[]> {
   try {
-    const url = salonId ? `${API_BASE}/services?salon_id=${salonId}` : `${API_BASE}/services`;
+    const params = new URLSearchParams();
+    if (salonId) params.append('salon_id', String(salonId));
+    if (ownerId) params.append('owner_id', String(ownerId));
+    const url = params.toString() ? `${API_BASE}/services?${params.toString()}` : `${API_BASE}/services`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch services');
     const services = await res.json();
@@ -277,9 +280,12 @@ export async function fetchServices(salonId?: number): Promise<Service[]> {
   }
 }
 
-export async function fetchTechnicians(salonId?: number): Promise<Technician[]> {
+export async function fetchTechnicians(salonId?: number, ownerId?: number): Promise<Technician[]> {
   try {
-    const url = salonId ? `${API_BASE}/technicians?salon_id=${salonId}` : `${API_BASE}/technicians`;
+    const params = new URLSearchParams();
+    if (salonId) params.append('salon_id', String(salonId));
+    if (ownerId) params.append('owner_id', String(ownerId));
+    const url = params.toString() ? `${API_BASE}/technicians?${params.toString()}` : `${API_BASE}/technicians`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch technicians');
     return await res.json();

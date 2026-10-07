@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Appointment, Salon, User } from '../types';
 import { fetchAppointments, cancelAppointment, rescheduleAppointment } from '../lib/api';
+import { subscribeToAppointments } from '../lib/firestoreService';
 import { scrollToElement } from '../utils/scrollHelper';
 import { AppointmentCancellationModal } from './cancellation/AppointmentCancellationModal';
 import { RescheduleAppointmentModal } from './cancellation/RescheduleAppointmentModal';
@@ -78,6 +79,16 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       onRefreshAppointments?.();
     }
     load();
+
+    // Subscribe to live appointment updates (owner confirmation, cancellation, etc.)
+    const unsubscribe = subscribeToAppointments({ customer_id: currentUser.id }, (liveAppts) => {
+      if (liveAppts) {
+        setAppointments(liveAppts);
+        onRefreshAppointments?.();
+      }
+    });
+
+    return () => unsubscribe();
   }, [currentUser.id]);
 
   // Synchronize when owner confirms or cancels appointments

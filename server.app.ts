@@ -1776,27 +1776,44 @@ async function startServer() {
 
   // Services List
   app.get('/api/services', async (req, res) => {
-    const { salon_id } = req.query;
+    const { salon_id, owner_id } = req.query;
     try {
       if (salon_id) {
         const [rows] = await db.execute('SELECT * FROM services WHERE salon_id = ?', [Number(salon_id)]);
         return res.json((rows as any[]).map((service) => ({
           ...service,
           salon_id: Number(service.salon_id),
-          category: service.category_name,
-          duration: Number(service.duration_minutes),
-          price: Number(service.price),
-          is_active: Boolean(service.is_active),
+          category: service.category_name || service.category || 'Nail Services',
+          duration: Number(service.duration_minutes || service.duration || 45),
+          price: Number(service.price) || 0,
+          is_active: service.is_active === undefined ? true : Boolean(service.is_active),
         })));
+      }
+      if (owner_id) {
+        const [salonRows] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(owner_id)]);
+        const salonIds = (salonRows as any[]).map((s) => Number(s.id));
+        if (salonIds.length > 0) {
+          const placeholders = salonIds.map(() => '?').join(',');
+          const [rows] = await db.execute(`SELECT * FROM services WHERE salon_id IN (${placeholders})`, salonIds);
+          return res.json((rows as any[]).map((service) => ({
+            ...service,
+            salon_id: Number(service.salon_id),
+            category: service.category_name || service.category || 'Nail Services',
+            duration: Number(service.duration_minutes || service.duration || 45),
+            price: Number(service.price) || 0,
+            is_active: service.is_active === undefined ? true : Boolean(service.is_active),
+          })));
+        }
+        return res.json([]);
       }
       const [rows] = await db.execute('SELECT * FROM services');
       res.json((rows as any[]).map((service) => ({
         ...service,
         salon_id: Number(service.salon_id),
-        category: service.category_name,
-        duration: Number(service.duration_minutes),
-        price: Number(service.price),
-        is_active: Boolean(service.is_active),
+        category: service.category_name || service.category || 'Nail Services',
+        duration: Number(service.duration_minutes || service.duration || 45),
+        price: Number(service.price) || 0,
+        is_active: service.is_active === undefined ? true : Boolean(service.is_active),
       })));
     } catch (error) {
       console.error('Services list error:', error);
@@ -1814,8 +1831,8 @@ async function startServer() {
     try {
       const sanitizedPrice = price !== undefined && price !== null ? Math.max(0, Number(price)) : 0;
       const [result] = await db.execute(
-        `INSERT INTO services (salon_id, service_name, description, price, duration_minutes, category_name, image)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO services (salon_id, service_name, description, price, duration_minutes, category_name, image, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           Number(salon_id) || 1,
           service_name,
@@ -2706,30 +2723,48 @@ async function startServer() {
 
   // Technicians List
   app.get('/api/technicians', async (req, res) => {
-    const { salon_id } = req.query;
+    const { salon_id, owner_id } = req.query;
     try {
       if (salon_id) {
         const [rows] = await db.execute('SELECT * FROM technicians WHERE salon_id = ?', [Number(salon_id)]);
         // Format data properly
         const technicians = (rows as any[]).map((tech: any) => ({
           ...tech,
-          name: tech.fullname,
+          name: tech.fullname || tech.name,
           salon_id: Number(tech.salon_id),
           rating: Number(tech.rating) || 0,
           experience_years: Number(tech.experience_years) || 0,
-          is_available: Boolean(tech.is_available),
+          is_available: tech.is_available === undefined ? true : Boolean(tech.is_available),
         }));
         return res.json(technicians);
+      }
+      if (owner_id) {
+        const [salonRows] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(owner_id)]);
+        const salonIds = (salonRows as any[]).map((s) => Number(s.id));
+        if (salonIds.length > 0) {
+          const placeholders = salonIds.map(() => '?').join(',');
+          const [rows] = await db.execute(`SELECT * FROM technicians WHERE salon_id IN (${placeholders})`, salonIds);
+          const technicians = (rows as any[]).map((tech: any) => ({
+            ...tech,
+            name: tech.fullname || tech.name,
+            salon_id: Number(tech.salon_id),
+            rating: Number(tech.rating) || 0,
+            experience_years: Number(tech.experience_years) || 0,
+            is_available: tech.is_available === undefined ? true : Boolean(tech.is_available),
+          }));
+          return res.json(technicians);
+        }
+        return res.json([]);
       }
       const [rows] = await db.execute('SELECT * FROM technicians');
       // Format data properly
       const technicians = (rows as any[]).map((tech: any) => ({
         ...tech,
-        name: tech.fullname,
+        name: tech.fullname || tech.name,
         salon_id: Number(tech.salon_id),
         rating: Number(tech.rating) || 0,
         experience_years: Number(tech.experience_years) || 0,
-        is_available: Boolean(tech.is_available),
+        is_available: tech.is_available === undefined ? true : Boolean(tech.is_available),
       }));
       res.json(technicians);
     } catch (error) {

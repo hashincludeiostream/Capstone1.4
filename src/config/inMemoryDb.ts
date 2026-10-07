@@ -58,6 +58,10 @@ class InMemoryDatabase {
     this.loadFromDisk();
   }
 
+  public reloadFromDisk(): boolean {
+    return this.loadFromDisk();
+  }
+
   private loadFromDisk(): boolean {
     try {
       if (fs.existsSync(DB_FILE)) {
@@ -310,15 +314,19 @@ class InMemoryDatabase {
       if (/WHERE id\s*=\s*\?\s+AND\s+salon_id\s*=\s*\?/i.test(sql)) {
         const id = Number(params[0]);
         const salonId = Number(params[1]);
-        return [table.filter((s) => s.id === id && s.salon_id === salonId), null];
+        return [table.filter((s) => Number(s.id) === id && Number(s.salon_id) === salonId), null];
       }
       if (/WHERE id\s*=\s*\?/i.test(sql)) {
         const id = Number(params[0]);
-        return [table.filter((s) => s.id === id), null];
+        return [table.filter((s) => Number(s.id) === id), null];
       }
       if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
         const salonId = Number(params[0]);
-        return [table.filter((s) => s.salon_id === salonId), null];
+        return [table.filter((s) => Number(s.salon_id) === salonId), null];
+      }
+      if (/WHERE salon_id\s+IN\s*\(([^)]+)\)/i.test(sql)) {
+        const ids = params.map((p) => Number(p));
+        return [table.filter((s) => ids.includes(Number(s.salon_id))), null];
       }
     }
 
@@ -327,15 +335,19 @@ class InMemoryDatabase {
       if (/WHERE id\s*=\s*\?\s+AND\s+salon_id\s*=\s*\?/i.test(sql)) {
         const id = Number(params[0]);
         const salonId = Number(params[1]);
-        return [table.filter((t) => t.id === id && t.salon_id === salonId), null];
+        return [table.filter((t) => Number(t.id) === id && Number(t.salon_id) === salonId), null];
       }
       if (/WHERE id\s*=\s*\?/i.test(sql)) {
         const id = Number(params[0]);
-        return [table.filter((t) => t.id === id), null];
+        return [table.filter((t) => Number(t.id) === id), null];
       }
       if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
         const salonId = Number(params[0]);
-        return [table.filter((t) => t.salon_id === salonId), null];
+        return [table.filter((t) => Number(t.salon_id) === salonId), null];
+      }
+      if (/WHERE salon_id\s+IN\s*\(([^)]+)\)/i.test(sql)) {
+        const ids = params.map((p) => Number(p));
+        return [table.filter((t) => ids.includes(Number(t.salon_id))), null];
       }
     }
 
@@ -537,6 +549,8 @@ class InMemoryDatabase {
       id: this.getNextId(tableName),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      ...(tableName === 'services' ? { is_active: true } : {}),
+      ...(tableName === 'technicians' ? { is_available: true } : {}),
     };
 
     if (colMatch) {

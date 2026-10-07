@@ -719,6 +719,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Services &amp; Treatments</span>
               </div>
+              <NotificationBadge
+                id="sidebar-owner-services-badge"
+                count={ownerServicesCount}
+                variant={isPathActive('owner-services') ? 'white' : 'purple'}
+                size="sm"
+              />
             </button>
 
             {/* Staff & Artists Roster */}
@@ -737,8 +743,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="relative flex items-center justify-center shrink-0">
                   <Users className={`w-4 h-4 shrink-0 ${isPathActive('owner-staff') ? 'text-white' : 'text-purple-600'}`} />
                 </div>
-                <span className="truncate">Staff & Artists Roster</span>
+                <span className="truncate">Staff &amp; Artists Roster</span>
               </div>
+              <NotificationBadge
+                id="sidebar-owner-staff-badge"
+                count={ownerStaffCount}
+                variant={isPathActive('owner-staff') ? 'white' : 'purple'}
+                size="sm"
+              />
             </button>
 
             {/* Products & Stock */}

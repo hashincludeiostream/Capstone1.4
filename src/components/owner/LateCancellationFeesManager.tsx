@@ -474,13 +474,13 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
                   <label className="block font-semibold text-stone-700 mb-1">Minimum (₱)</label>
                   <input
                     type="number"
-                    min="50"
-                    step="50"
+                    min="0"
+                    step="any"
                     value={policyConfig.min_late_fee}
                     onChange={(e) =>
                       setPolicyConfig({
                         ...policyConfig,
-                        min_late_fee: Number(e.target.value) || 150,
+                        min_late_fee: Number(e.target.value) || 0,
                       })
                     }
                     className="w-full p-2 rounded-xl border border-stone-300 font-bold bg-white text-stone-900"
@@ -505,13 +505,14 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
                   <div className="relative">
                     <input
                       type="number"
-                      min="20"
+                      min="0"
                       max="100"
+                      step="any"
                       value={policyConfig.critical_fee_percentage}
                       onChange={(e) =>
                         setPolicyConfig({
                           ...policyConfig,
-                          critical_fee_percentage: Number(e.target.value) || 50,
+                          critical_fee_percentage: Number(e.target.value) || 0,
                         })
                       }
                       className="w-full p-2 rounded-xl border border-stone-300 font-bold bg-white text-stone-900"
@@ -523,13 +524,13 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
                   <label className="block font-semibold text-stone-700 mb-1">Minimum (₱)</label>
                   <input
                     type="number"
-                    min="100"
-                    step="50"
+                    min="0"
+                    step="any"
                     value={policyConfig.min_critical_fee}
                     onChange={(e) =>
                       setPolicyConfig({
                         ...policyConfig,
-                        min_critical_fee: Number(e.target.value) || 250,
+                        min_critical_fee: Number(e.target.value) || 0,
                       })
                     }
                     className="w-full p-2 rounded-xl border border-stone-300 font-bold bg-white text-stone-900"

@@ -1184,7 +1184,7 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="any"
                     required
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
