@@ -17,8 +17,10 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ salons, onOpenLeaveRev
     async function load() {
       setLoading(true);
       const list = await fetchReviews(selectedSalonId || undefined);
-      console.log('Fetched reviews:', list);
-      setReviews(list);
+      // Ensure only public reviews are shown on the community feed
+      const publicOnly = list.filter((r) => !r.is_private);
+      console.log('Fetched public reviews:', publicOnly);
+      setReviews(publicOnly);
       setLoading(false);
     }
     load();

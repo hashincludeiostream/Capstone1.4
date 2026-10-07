@@ -96,6 +96,7 @@ export interface Service {
   duration: number; // in minutes
   duration_minutes?: number;
   is_active: boolean;
+  is_available?: boolean;
   image_url?: string;
   image?: string;
   difficulty_level?: 'Beginner' | 'Intermediate' | 'Advanced';
@@ -207,6 +208,10 @@ export interface Review {
   rating: number;
   comment: string;
   service_name?: string;
+  is_private?: boolean;
+  feedback_type?: 'public' | 'private' | 'both';
+  private_feedback?: string;
+  appointment_id?: number;
   created_at: string;
   // Backend compatibility fields
   customer_id?: number;

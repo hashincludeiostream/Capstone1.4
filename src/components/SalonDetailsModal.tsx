@@ -60,7 +60,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
         setSalonData({
           services: res.services || [],
           technicians: res.technicians || [],
-          reviews: res.reviews || [],
+          reviews: (res.reviews || []).filter((r: any) => !r.is_private),
           working_hours: res.working_hours || [],
         });
       }
@@ -601,7 +601,17 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                       <div className="space-y-2 text-xs text-gray-700">
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-pink-600" />
-                          <span>{salon.phone || 'N/A'}</span>
+                          {salon.phone ? (
+                            <a
+                              href={`tel:${salon.phone.replace(/[^0-9+]/g, '') || salon.phone}`}
+                              className="text-pink-700 hover:text-pink-900 font-semibold underline decoration-pink-300 hover:decoration-pink-600 transition-colors"
+                              title={`Direct dial: ${salon.phone}`}
+                            >
+                              {salon.phone}
+                            </a>
+                          ) : (
+                            <span>N/A</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4 text-pink-600" />

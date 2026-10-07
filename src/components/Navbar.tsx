@@ -23,6 +23,7 @@ import {
   Package,
   Compass,
   ExternalLink,
+  Mail,
 } from 'lucide-react';
 import {
   User,
@@ -365,17 +366,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              {/* Unified Dropdown Menu (Available on all viewports, replacing the triple line menu) */}
+              {/* Clean, Non-Redundant Profile / Account Dropdown Menu */}
               {userDropdownOpen && (
                 <div
                   id="user-menu-dropdown"
-                  className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-5.5rem)] overflow-y-auto bg-white rounded-2xl shadow-xl border border-pink-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 divide-y divide-gray-100"
+                  className="absolute right-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-xl border border-pink-100 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 divide-y divide-gray-100"
                 >
                   {/* 1. HEADER */}
                   {currentUser ? (
-                    <div className="px-4 py-3 bg-gradient-to-r from-pink-50/60 to-rose-50/30">
+                    <div className="px-4 py-3 bg-gradient-to-r from-pink-50/70 to-rose-50/40">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Signed in</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Signed In As</p>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
                           currentUser.user_type === 'salon_owner'
                             ? 'bg-purple-100 text-purple-800'
@@ -383,7 +384,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                             ? 'bg-rose-100 text-rose-800'
                             : 'bg-pink-100 text-pink-700'
                         }`}>
-                          {currentUser.user_type.replace('_', ' ')}
+                          {currentUser.user_type === 'salon_owner'
+                            ? 'Partner'
+                            : currentUser.user_type === 'admin'
+                            ? 'Administrator'
+                            : 'Client'}
                         </span>
                       </div>
                       <p className="text-sm font-bold text-gray-900 truncate mt-1">
@@ -399,597 +404,143 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="px-4 py-3 bg-gradient-to-r from-pink-50/60 to-rose-50/30">
                       <p className="text-sm font-bold text-gray-900">Welcome to Nail Glam Hub</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Sign in to reserve services and in-store products
+                        Davao City Centralized Salon Portal
                       </p>
                     </div>
                   )}
 
-                  {/* 2. BODY ITEMS ACCORDING TO ROLE / VISITOR */}
+                  {/* 2. STREAMLINED ROLE NAVIGATION (NO REDUNDANT SUB-TABS) */}
                   {currentUser?.user_type === 'customer' && (
-                    <>
-                      {/* Customer Bookings & Personal Activity */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                          My Activity
-                        </p>
-                        <button
-                          onClick={() => {
-                            handleNavigation('customer-dashboard');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Calendar className="w-4 h-4 text-pink-600" />
-                            <span>My Bookings</span>
+                    <div className="py-1.5 space-y-0.5">
+                      <button
+                        onClick={() => {
+                          handleNavigation('customer-dashboard');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm text-gray-800 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer transition-colors font-medium"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <LayoutDashboard className="w-4 h-4 text-pink-600" />
+                          <span>Client Dashboard & Bookings</span>
+                        </span>
+                        {customerAppointments.length > 0 && (
+                          <span className="text-[11px] font-semibold bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">
+                            {customerAppointments.length}
                           </span>
-                          {customerAppointments.length > 0 && (
-                            <span className="text-[11px] font-semibold bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">
-                              {customerAppointments.length}
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('favorites');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Heart className="w-4 h-4 text-rose-500" />
-                            <span>Favorite Salons</span>
-                          </span>
-                          {favoritesCount > 0 && (
-                            <span className="text-[11px] font-semibold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">
-                              {favoritesCount}
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('customer-orders');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                            <span>Reserved Orders</span>
-                          </span>
-                          {customerOrders.length > 0 && (
-                            <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
-                              {customerOrders.length}
-                            </span>
-                          )}
-                        </button>
-
-                        {onOpenCart && (
-                          <button
-                            onClick={() => {
-                              onOpenCart();
-                              setUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-pink-700 bg-pink-50/50 hover:bg-pink-100 flex items-center justify-between cursor-pointer"
-                          >
-                            <span className="flex items-center gap-2.5 font-medium">
-                              <ShoppingBag className="w-4 h-4 text-pink-600" />
-                              <span>In-Store Reservation Cart</span>
-                            </span>
-                            {cartItemCount > 0 && (
-                              <NotificationBadge
-                                count={cartItemCount}
-                                variant="pink"
-                                size="sm"
-                                isUnread={categoryUnread.cart}
-                                showPing={false}
-                              />
-                            )}
-                          </button>
                         )}
+                      </button>
 
-                        {onOpenEmailHistory && (
-                          <button
-                            onClick={() => {
-                              onOpenEmailHistory();
-                              setUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                          >
-                            <span>Email Receipts & Notifications</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Customer Discovery & Platform Exploration */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                          Explore & Boutique
-                        </p>
+                      {onOpenEmailHistory && (
                         <button
                           onClick={() => {
-                            handleNavigation('explore');
+                            onOpenEmailHistory();
                             setUserDropdownOpen(false);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
+                          className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer transition-colors"
                         >
-                          <Compass className="w-4 h-4 text-pink-600" />
-                          <span>Explore Salons</span>
+                          <Mail className="w-4 h-4 text-gray-500" />
+                          <span>Email Receipts & Logs</span>
                         </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('map');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <MapPin className="w-4 h-4 text-pink-600" />
-                          <span>Store Locations Map</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('services');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Sparkles className="w-4 h-4 text-pink-600" />
-                          <span>Services & Treatments</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('products');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Package className="w-4 h-4 text-pink-600" />
-                            <span>Products & Care</span>
-                          </span>
-                          <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full">
-                            BOUTIQUE
-                          </span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('reels');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Flame className="w-4 h-4 text-rose-500" />
-                          <span>Nail Reels & Inspiration</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('reviews');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Star className="w-4 h-4 text-amber-500" />
-                          <span>Customer Reviews</span>
-                        </button>
-                      </div>
-                    </>
+                      )}
+                    </div>
                   )}
 
                   {currentUser?.user_type === 'salon_owner' && (
-                    <>
-                      {/* Salon Owner Management Suite */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-purple-700 tracking-wider">
-                          Partner Suite
-                        </p>
-                        <button
-                          onClick={() => {
-                            handleNavigation('owner-dashboard');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm font-semibold text-purple-900 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <BarChart3 className="w-4 h-4 text-purple-600" />
-                          <span>Store Reports & CRM</span>
-                        </button>
+                    <div className="py-1.5 space-y-0.5">
+                      <button
+                        onClick={() => {
+                          handleNavigation('owner-dashboard');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-semibold text-purple-900 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer transition-colors"
+                      >
+                        <BarChart3 className="w-4 h-4 text-purple-600" />
+                        <span>Salon Partner Dashboard</span>
+                      </button>
 
+                      {onOpenEmailHistory && (
                         <button
                           onClick={() => {
-                            handleNavigation('owner-appointments');
+                            onOpenEmailHistory();
                             setUserDropdownOpen(false);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
+                          className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer transition-colors"
                         >
-                          <Calendar className="w-4 h-4 text-purple-600" />
-                          <span>Appointments & Schedule</span>
+                          <Mail className="w-4 h-4 text-purple-500" />
+                          <span>Business Email Reports</span>
                         </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('owner-services');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Scissors className="w-4 h-4 text-purple-600" />
-                          <span>Services & Treatments</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('owner-staff');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <UserIcon className="w-4 h-4 text-purple-600" />
-                          <span>Staff & Artists</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('owner-inventory');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Package className="w-4 h-4 text-emerald-600" />
-                          <span>Products & Inventory</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('owner-location');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <MapPin className="w-4 h-4 text-purple-600" />
-                          <span>Store Location & Map</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('owner-settings');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <LayoutDashboard className="w-4 h-4 text-purple-600" />
-                          <span>Salon Settings & Hours</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            onOpenRegisterSalon();
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm font-semibold text-purple-700 bg-purple-50/70 hover:bg-purple-100 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Store className="w-4 h-4 text-purple-600" />
-                          <span>+ Register New Branch</span>
-                        </button>
-
-                        {onOpenEmailHistory && (
-                          <button
-                            onClick={() => {
-                              onOpenEmailHistory();
-                              setUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                          >
-                            <span>Email Reports & PDF Dossiers</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Explore Platform */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                          Explore Platform
-                        </p>
-                        <button
-                          onClick={() => {
-                            handleNavigation('salons');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Store className="w-4 h-4 text-purple-600" />
-                          <span>Browse Salons Directory</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleNavigation('products');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Package className="w-4 h-4 text-purple-600" />
-                          <span>Explore Marketplace</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleNavigation('map');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <MapPin className="w-4 h-4 text-purple-600" />
-                          <span>Store Locations Map</span>
-                        </button>
-                      </div>
-                    </>
+                      )}
+                    </div>
                   )}
 
                   {currentUser?.user_type === 'admin' && (
-                    <>
-                      {/* Super Admin Governance */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-rose-800 tracking-wider">
-                          Super Admin Governance
-                        </p>
-                        <button
-                          onClick={() => {
-                            handleNavigation('admin-dashboard');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm font-semibold text-rose-950 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Shield className="w-4 h-4 text-rose-600" />
-                          <span>System Overview & KPIs</span>
-                        </button>
+                    <div className="py-1.5 space-y-0.5">
+                      <button
+                        onClick={() => {
+                          handleNavigation('admin-dashboard');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-semibold text-rose-950 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer transition-colors"
+                      >
+                        <Shield className="w-4 h-4 text-rose-600" />
+                        <span>Master Governance Console</span>
+                      </button>
 
+                      {onOpenEmailHistory && (
                         <button
                           onClick={() => {
-                            handleNavigation('admin-salons');
+                            onOpenEmailHistory();
                             setUserDropdownOpen(false);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer"
+                          className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer transition-colors"
                         >
-                          <Store className="w-4 h-4 text-rose-600" />
-                          <span>Salon Approvals & Directory</span>
+                          <Mail className="w-4 h-4 text-rose-500" />
+                          <span>System Logs & Audit Trail</span>
                         </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('admin-users');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Users className="w-4 h-4 text-rose-600" />
-                          <span>User Accounts Management</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('admin-content');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Flame className="w-4 h-4 text-rose-600" />
-                          <span>Content Moderation</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('admin-announcements');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Radio className="w-4 h-4 text-rose-600" />
-                          <span>Broadcast Announcements</span>
-                        </button>
-
-                        {onOpenEmailHistory && (
-                          <button
-                            onClick={() => {
-                              onOpenEmailHistory();
-                              setUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-950 flex items-center gap-2.5 cursor-pointer"
-                          >
-                            <span>Email Logs & System Reports</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Admin Explore Public Site */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                          Explore Public Site
-                        </p>
-                        <button
-                          onClick={() => {
-                            handleNavigation('salons');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Store className="w-4 h-4 text-rose-600" />
-                          <span>Browse Salons Directory</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleNavigation('products');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Package className="w-4 h-4 text-rose-600" />
-                          <span>Explore Marketplace</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleNavigation('map');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <MapPin className="w-4 h-4 text-rose-600" />
-                          <span>Store Locations Map</span>
-                        </button>
-                      </div>
-                    </>
+                      )}
+                    </div>
                   )}
 
                   {!currentUser && (
-                    <>
-                      {/* Guest Authentication Portals */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                          Sign In / Register
-                        </p>
+                    <div className="py-1.5 space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setActiveTab('login-customer');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-semibold text-pink-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer transition-colors"
+                      >
+                        <LogIn className="w-4 h-4 text-pink-600" />
+                        <span>Client Login / Register</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveTab('login-owner');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer transition-colors"
+                      >
+                        <Store className="w-4 h-4 text-purple-600" />
+                        <span>Salon Partner Login</span>
+                      </button>
+
+                      {onOpenAdminGate && (
                         <button
                           onClick={() => {
-                            setActiveTab('login-customer');
+                            onOpenAdminGate();
                             setUserDropdownOpen(false);
                           }}
-                          className="w-full text-left px-4 py-2.5 text-sm font-semibold text-pink-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                          className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-rose-50 hover:text-rose-900 flex items-center gap-2.5 cursor-pointer transition-colors"
                         >
-                          <LogIn className="w-4 h-4 text-pink-600" />
-                          <span>Client Login / Register</span>
+                          <Shield className="w-4 h-4 text-rose-600" />
+                          <span>Administrative Gate</span>
                         </button>
-
-                        <button
-                          onClick={() => {
-                            setActiveTab('login-owner');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Store className="w-4 h-4 text-purple-600" />
-                          <span>Salon Owner Partner Login</span>
-                        </button>
-
-                        {onOpenAdminGate && (
-                          <button
-                            onClick={() => {
-                              onOpenAdminGate();
-                              setUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-rose-50 hover:text-rose-900 flex items-center gap-2.5 cursor-pointer"
-                          >
-                            <Shield className="w-4 h-4 text-rose-600" />
-                            <span>Administrative Access Gate</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Guest Platform Exploration */}
-                      <div className="py-1.5">
-                        <p className="px-4 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                          Explore Platform
-                        </p>
-                        <button
-                          onClick={() => {
-                            handleNavigation('explore');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Compass className="w-4 h-4 text-pink-600" />
-                          <span>Explore Salons</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('map');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <MapPin className="w-4 h-4 text-pink-600" />
-                          <span>Store Locations Map</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('services');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Sparkles className="w-4 h-4 text-pink-600" />
-                          <span>Services & Treatments</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('products');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Package className="w-4 h-4 text-pink-600" />
-                            <span>Products & Care</span>
-                          </span>
-                          <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full">
-                            BOUTIQUE
-                          </span>
-                        </button>
-
-                        {onOpenCart && (
-                          <button
-                            onClick={() => {
-                              onOpenCart();
-                              setUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-pink-700 bg-pink-50/50 hover:bg-pink-100 flex items-center justify-between cursor-pointer"
-                          >
-                            <span className="flex items-center gap-2.5 font-medium">
-                              <ShoppingBag className="w-4 h-4 text-pink-600" />
-                              <span>In-Store Reservation Cart</span>
-                            </span>
-                            {cartItemCount > 0 && (
-                              <NotificationBadge
-                                count={cartItemCount}
-                                variant="pink"
-                                size="sm"
-                                isUnread={categoryUnread.cart}
-                                showPing={false}
-                              />
-                            )}
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('reels');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Flame className="w-4 h-4 text-rose-500" />
-                          <span>Nail Reels & Inspiration</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handleNavigation('reviews');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <Star className="w-4 h-4 text-amber-500" />
-                          <span>Customer Reviews</span>
-                        </button>
-                      </div>
-                    </>
+                      )}
+                    </div>
                   )}
 
-                  {/* 3. UNIVERSAL FOOTER */}
+                  {/* 3. UNIVERSAL ACCOUNT SETTINGS & SIGN OUT */}
                   {currentUser && (
                     <div className="py-1.5 space-y-0.5">
                       <button
@@ -997,10 +548,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                           handleNavigation('profile');
                           setUserDropdownOpen(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer"
+                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2.5 cursor-pointer transition-colors"
                       >
                         <UserIcon className="w-4 h-4 text-gray-500" />
-                        <span>Profile & Settings</span>
+                        <span>Account Profile & Settings</span>
                       </button>
 
                       <button
@@ -1008,7 +559,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           onLogout();
                           setUserDropdownOpen(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2.5 cursor-pointer"
+                        className="w-full text-left px-4 py-2 text-xs sm:text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2.5 cursor-pointer transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>Sign Out</span>

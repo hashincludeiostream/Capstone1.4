@@ -485,9 +485,13 @@ export async function updateAppointmentTechnician(id: number, technicianId: numb
   }
 }
 
-export async function fetchReviews(salonId?: number): Promise<Review[]> {
+export async function fetchReviews(salonId?: number, includePrivate: boolean = false): Promise<Review[]> {
   try {
-    const url = salonId ? `${API_BASE}/reviews?salon_id=${salonId}` : `${API_BASE}/reviews`;
+    const params = new URLSearchParams();
+    if (salonId) params.append('salon_id', String(salonId));
+    if (includePrivate) params.append('include_private', 'true');
+    const queryString = params.toString();
+    const url = queryString ? `${API_BASE}/reviews?${queryString}` : `${API_BASE}/reviews`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch reviews');
     return await res.json();
@@ -496,6 +500,9 @@ export async function fetchReviews(salonId?: number): Promise<Review[]> {
     let revs = seedReviews as Review[];
     if (salonId) {
       revs = revs.filter((r) => r.salon_id === Number(salonId));
+    }
+    if (!includePrivate) {
+      revs = revs.filter((r) => !r.is_private);
     }
     return revs;
   }

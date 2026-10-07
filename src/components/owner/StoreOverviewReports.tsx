@@ -30,6 +30,8 @@ import {
   ArrowRight,
   FileSpreadsheet,
   Mail,
+  Lock,
+  Globe,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
@@ -2012,6 +2014,15 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-gray-900">{rev.customer_name || rev.user_name || `Customer #${rev.customer_id || rev.user_id}`}</span>
+                    {rev.is_private ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" /> Confidential Private Feedback
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700 flex items-center gap-1">
+                        <Globe className="w-2.5 h-2.5" /> Public Review
+                      </span>
+                    )}
                     <div className="flex text-amber-400 text-xs">
                       {Array.from({ length: rev.rating }).map((_, i) => (
                         <Star key={i} className="w-3 h-3 fill-amber-400" />
@@ -2026,6 +2037,15 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
                 <p className="text-xs text-gray-700 leading-relaxed italic">
                   "{rev.review_text || rev.comment || 'No review text provided'}"
                 </p>
+
+                {rev.private_feedback && !rev.is_private && (
+                  <div className="p-2.5 bg-purple-50/70 rounded-xl border border-purple-200 text-xs space-y-1">
+                    <span className="font-bold text-purple-950 flex items-center gap-1 text-[11px]">
+                      <Lock className="w-3 h-3 text-purple-700" /> Additional Private Note to Management:
+                    </span>
+                    <p className="text-purple-900 text-xs italic">{rev.private_feedback}</p>
+                  </div>
+                )}
 
                 {/* Owner Reply Box */}
                 {hasReply && (

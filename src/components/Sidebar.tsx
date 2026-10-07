@@ -39,6 +39,7 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   onOpenBooking: () => void;
   onOpenAbout: () => void;
+  onOpenObjectives?: () => void;
   onOpenContact: () => void;
   isAdminMode: boolean;
   onNavigate?: (tab: string) => void;
@@ -79,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   onOpenBooking,
   onOpenAbout,
+  onOpenObjectives,
   onOpenContact,
   isAdminMode,
   onNavigate,
@@ -625,13 +627,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Branch Overview</span>
               </div>
-              {ownerSalonsCount > 0 && (
+              {ownerPendingSalonsCount > 0 && (
                 <NotificationBadge
                   id="sidebar-owner-branches-badge"
-                  count={ownerSalonsCount}
+                  count={ownerPendingSalonsCount}
                   variant={isPathActive('owner-branches') ? 'white' : 'amber'}
-                  priority={ownerPendingSalonsCount > 0 ? 'urgent' : 'normal'}
-                  isUnread={ownerPendingSalonsCount > 0 && categoryUnread.alerts}
+                  priority="urgent"
+                  isUnread={categoryUnread.alerts}
                   showPing={true}
                   size="sm"
                 />
@@ -656,22 +658,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Store Reports & CRM</span>
               </div>
-              {ownerReviewsCount > 0 && (
-                <NotificationBadge
-                  id="sidebar-owner-crm-badge"
-                  count={ownerReviewsCount}
-                  variant={isPathActive('owner-dashboard') ? 'white' : 'purple'}
-                  size="sm"
-                />
-              )}
             </button>
 
-            {/* Bookings & Schedule with pulsing pending notification */}
+            {/* Bookings & Schedule with clean pending action badge */}
             {(() => {
               const hasPendingAppts = ownerPendingAppointmentsCount > 0;
-              const countToShow = hasPendingAppts
-                ? ownerPendingAppointmentsCount
-                : ownerActiveAppointmentsCount || ownerAppointmentsCount;
               const isActive = isPathActive('owner-appointments');
               return (
                 <button
@@ -684,7 +675,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       : 'text-purple-950 hover:bg-purple-50'
                   }`}
                   title={
-                    countToShow > 0
+                    hasPendingAppts
                       ? `${ownerPendingAppointmentsCount} pending approval • ${ownerActiveAppointmentsCount} scheduled bookings`
                       : 'Bookings & Schedule'
                   }
@@ -695,14 +686,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                     <span className="truncate">Bookings & Schedule</span>
                   </div>
-                  {countToShow > 0 && (
+                  {hasPendingAppts && (
                     <NotificationBadge
                       id="sidebar-owner-appointments-badge"
-                      count={hasPendingAppts ? `${countToShow} new` : countToShow}
-                      variant={isActive ? 'white' : 'purple'}
-                      priority={hasPendingAppts ? 'urgent' : 'normal'}
-                      isUnread={hasPendingAppts && categoryUnread.bookings}
-                      showPing={true}
+                      count={`${ownerPendingAppointmentsCount} new`}
+                      variant={isActive ? 'white' : 'amber'}
+                      priority="urgent"
+                      isUnread={categoryUnread.bookings}
+                      showPing={false}
                       size="sm"
                     />
                   )}
@@ -728,14 +719,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Services &amp; Treatments</span>
               </div>
-              {ownerServicesCount > 0 && (
-                <NotificationBadge
-                  id="sidebar-owner-services-badge"
-                  count={ownerServicesCount}
-                  variant={isPathActive('owner-services') ? 'white' : 'purple'}
-                  size="sm"
-                />
-              )}
             </button>
 
             {/* Staff & Artists Roster */}
@@ -756,22 +739,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Staff & Artists Roster</span>
               </div>
-              {ownerStaffCount > 0 && (
-                <NotificationBadge
-                  id="sidebar-owner-staff-badge"
-                  count={ownerStaffCount}
-                  variant={isPathActive('owner-staff') ? 'white' : 'purple'}
-                  size="sm"
-                />
-              )}
             </button>
 
             {/* Products & Stock */}
             {(() => {
               const hasPendingOrders = ownerPendingOrdersCount > 0;
-              const countToShow = hasPendingOrders
-                ? ownerPendingOrdersCount
-                : ownerInventoryCount;
               const isActive = isPathActive('owner-inventory');
               return (
                 <button
@@ -785,7 +757,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                   title={
                     hasPendingOrders
-                      ? `${ownerPendingOrdersCount} client pickup reservation${ownerPendingOrdersCount !== 1 ? 's' : ''} awaiting fulfillment • ${ownerInventoryCount} products in catalog`
+                      ? `${ownerPendingOrdersCount} client pickup reservation${ownerPendingOrdersCount !== 1 ? 's' : ''} awaiting fulfillment`
                       : `${ownerInventoryCount} retail product${ownerInventoryCount !== 1 ? 's' : ''}`
                   }
                 >
@@ -795,14 +767,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                     <span className="truncate">Products & Stock</span>
                   </div>
-                  {countToShow > 0 && (
+                  {hasPendingOrders && (
                     <NotificationBadge
                       id="sidebar-owner-inventory-badge"
-                      count={hasPendingOrders ? `${countToShow} orders` : countToShow}
-                      variant={isActive ? 'white' : 'emerald'}
-                      priority={hasPendingOrders ? 'urgent' : 'normal'}
-                      isUnread={hasPendingOrders && categoryUnread.cart}
-                      showPing={true}
+                      count={`${ownerPendingOrdersCount} new`}
+                      variant={isActive ? 'white' : 'amber'}
+                      priority="urgent"
+                      isUnread={categoryUnread.cart}
+                      showPing={false}
                       size="sm"
                     />
                   )}
@@ -828,14 +800,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Store Location & Map</span>
               </div>
-              {ownerSalonsCount > 0 && (
-                <NotificationBadge
-                  id="sidebar-owner-location-badge"
-                  label="GPS"
-                  variant={isPathActive('owner-location') ? 'white' : 'purple'}
-                  size="sm"
-                />
-              )}
             </button>
 
             {/* Salon Profile & Hours */}
@@ -856,12 +820,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Salon Profile & Hours</span>
               </div>
-              <NotificationBadge
-                id="sidebar-owner-hours-badge"
-                label="7D"
-                variant={isPathActive('owner-settings') ? 'white' : 'emerald'}
-                size="sm"
-              />
             </button>
 
             {/* My Account Profile */}
@@ -881,12 +839,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">My Account Profile</span>
               </div>
-              <NotificationBadge
-                id="sidebar-owner-profile-badge"
-                label="OWNER"
-                variant={isPathActive('profile') ? 'white' : 'purple'}
-                size="sm"
-              />
             </button>
           </div>
         </div>
@@ -1282,12 +1234,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer Info Links */}
       <div className="px-3 pt-2 text-xs text-gray-500 space-y-2 border-t border-pink-100">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
           <button
             onClick={onOpenAbout}
             className="hover:text-pink-700 transition-colors cursor-pointer flex items-center gap-1"
           >
-            <HelpCircle className="w-3 h-3" /> About Us
+            <HelpCircle className="w-3 h-3" /> About
+          </button>
+          <span>•</span>
+          <button
+            onClick={onOpenObjectives || onOpenAbout}
+            className="text-pink-600 hover:text-pink-800 font-semibold transition-colors cursor-pointer flex items-center gap-1"
+            title="Davao City Portal Research Objectives Verification"
+          >
+            <Sparkles className="w-3 h-3 text-pink-500" /> Objectives
           </button>
           <span>•</span>
           <button

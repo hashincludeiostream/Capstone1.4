@@ -493,51 +493,72 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {services.map((service) => (
-                      <div
-                        key={service.id}
-                        onClick={() => setSelectedServiceId(service.id)}
-                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 sm:gap-3 min-w-0 max-w-full ${
-                          selectedServiceId === service.id
-                            ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20'
-                            : 'border-pink-100 hover:border-pink-300 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                          <div
-                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                              selectedServiceId === service.id
-                                ? 'border-pink-600 bg-pink-600 text-white'
-                                : 'border-gray-300'
-                            }`}
-                          >
-                            {selectedServiceId === service.id && (
-                              <div className="w-2 h-2 bg-white rounded-full" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                              <p className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
-                                {service.service_name}
-                              </p>
-                              <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded-md shrink-0">
-                                {service.category}
-                              </span>
-                            </div>
-                            <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5 break-words">
-                              {service.description}
-                            </p>
-                          </div>
-                        </div>
+                    {services.map((service) => {
+                      const isUnavailable = service.is_active === false || service.is_available === false;
+                      const isSelected = selectedServiceId === service.id;
 
-                        <div className="text-right shrink-0">
-                          <span className="block text-xs sm:text-sm font-bold text-pink-700 whitespace-nowrap">
-                            ₱{Number(service.price).toLocaleString()}
-                          </span>
-                          <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{service.duration} mins</p>
+                      return (
+                        <div
+                          key={service.id}
+                          onClick={() => {
+                            if (isUnavailable) {
+                              setValidationError(`"${service.service_name}" is temporarily unavailable. Please choose another service.`);
+                              return;
+                            }
+                            setValidationError(null);
+                            setSelectedServiceId(service.id);
+                          }}
+                          className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-2.5 sm:gap-3 min-w-0 max-w-full ${
+                            isUnavailable
+                              ? 'opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed'
+                              : isSelected
+                              ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20 cursor-pointer'
+                              : 'border-pink-100 hover:border-pink-300 bg-white cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                            <div
+                              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                                isUnavailable
+                                  ? 'border-gray-200 bg-gray-100 text-gray-400'
+                                  : isSelected
+                                  ? 'border-pink-600 bg-pink-600 text-white'
+                                  : 'border-gray-300'
+                              }`}
+                            >
+                              {isSelected && !isUnavailable && (
+                                <div className="w-2 h-2 bg-white rounded-full" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                                <p className={`text-xs sm:text-sm font-semibold break-words ${isUnavailable ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                                  {service.service_name}
+                                </p>
+                                <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded-md shrink-0">
+                                  {service.category}
+                                </span>
+                                {isUnavailable && (
+                                  <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
+                                    Temporarily Unavailable
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5 break-words">
+                                {service.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="block text-xs sm:text-sm font-bold text-pink-700 whitespace-nowrap">
+                              ₱{Number(service.price).toLocaleString()}
+                            </span>
+                            <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{service.duration} mins</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

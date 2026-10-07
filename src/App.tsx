@@ -175,7 +175,7 @@ const AppContent: React.FC = () => {
   const [registerSalonModalOpen, setRegisterSalonModalOpen] = useState(false);
   const [branchRegistrationOpen, setBranchRegistrationOpen] = useState(false);
   const [ownerBranchRefreshKey, setOwnerBranchRefreshKey] = useState(0);
-  const [aboutContactModal, setAboutContactModal] = useState<{ open: boolean; tab: 'about' | 'contact' }>({
+  const [aboutContactModal, setAboutContactModal] = useState<{ open: boolean; tab: 'about' | 'objectives' | 'contact' }>({
     open: false,
     tab: 'about',
   });
@@ -1166,6 +1166,7 @@ const AppContent: React.FC = () => {
             setBookingModalOpen(true);
           }}
           onOpenAbout={() => setAboutContactModal({ open: true, tab: 'about' })}
+          onOpenObjectives={() => setAboutContactModal({ open: true, tab: 'objectives' })}
           onOpenContact={() => setAboutContactModal({ open: true, tab: 'contact' })}
           onNavigate={handleNavigate}
           onLogout={handleLogout}

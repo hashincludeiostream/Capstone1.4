@@ -174,17 +174,28 @@ export const SalonCard: React.FC<SalonCardProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-3 border-t border-pink-50 flex items-center gap-2">
+        <div className="pt-3 border-t border-pink-50 flex items-center gap-1.5 sm:gap-2">
+          {salon.phone && (
+            <a
+              href={`tel:${salon.phone.replace(/[^0-9+]/g, '') || salon.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="py-2 px-2.5 min-h-[40px] sm:min-h-[42px] rounded-xl border border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100/80 text-xs xl:text-sm font-semibold transition-colors text-center cursor-pointer flex items-center justify-center gap-1 shrink-0 shadow-2xs"
+              title={`Call ${salon.salon_name}: ${salon.phone}`}
+            >
+              <Phone className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+              <span className="hidden sm:inline">Call</span>
+            </a>
+          )}
           <button
             onClick={() => onSelect(salon)}
-            className="flex-1 min-w-0 py-2 px-2.5 sm:px-3 min-h-[40px] sm:min-h-[42px] rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs xl:text-sm font-semibold transition-colors text-center cursor-pointer flex items-center justify-center truncate"
+            className="flex-1 min-w-0 py-2 px-2 sm:px-2.5 min-h-[40px] sm:min-h-[42px] rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs xl:text-sm font-semibold transition-colors text-center cursor-pointer flex items-center justify-center truncate"
           >
             <span className="hidden xs:inline truncate">View Details</span>
             <span className="xs:hidden truncate">Details</span>
           </button>
           <button
             onClick={() => onBook(salon)}
-            className="flex-1 min-w-0 py-2 px-2.5 sm:px-3 min-h-[40px] sm:min-h-[42px] rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs xl:text-sm font-semibold transition-all shadow-sm shadow-pink-500/20 text-center flex items-center justify-center gap-1.5 cursor-pointer truncate"
+            className="flex-1 min-w-0 py-2 px-2 sm:px-2.5 min-h-[40px] sm:min-h-[42px] rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs xl:text-sm font-semibold transition-all shadow-sm shadow-pink-500/20 text-center flex items-center justify-center gap-1 cursor-pointer truncate"
           >
             <Calendar className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Book Now</span>

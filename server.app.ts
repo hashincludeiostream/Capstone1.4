@@ -3573,26 +3573,32 @@ async function startServer() {
 
   // Reviews List
   app.get('/api/reviews', async (req, res) => {
-    const { salon_id } = req.query;
+    const { salon_id, include_private } = req.query;
     try {
+      let rows: any[] = [];
       if (salon_id) {
-        const [rows] = await db.execute('SELECT * FROM reviews WHERE salon_id = ?', [Number(salon_id)]);
-        // Map database field names to frontend expected names
-        const mappedRows = (rows as any[]).map((r: any) => ({
-          ...r,
-          customer_id: r.user_id,
-          customer_name: r.user_name,
-          review_text: r.comment
-        }));
-        return res.json(mappedRows);
+        const [queryRows] = await db.execute('SELECT * FROM reviews WHERE salon_id = ?', [Number(salon_id)]);
+        rows = queryRows as any[];
+      } else {
+        const [queryRows] = await db.execute('SELECT * FROM reviews');
+        rows = queryRows as any[];
       }
-      const [rows] = await db.execute('SELECT * FROM reviews');
+
+      // If include_private is not requested, filter out strictly private reviews
+      const shouldIncludePrivate = include_private === 'true' || include_private === '1';
+      if (!shouldIncludePrivate) {
+        rows = rows.filter((r) => !r.is_private);
+      }
+
       // Map database field names to frontend expected names
-      const mappedRows = (rows as any[]).map((r: any) => ({
+      const mappedRows = rows.map((r: any) => ({
         ...r,
         customer_id: r.user_id,
         customer_name: r.user_name,
-        review_text: r.comment
+        review_text: r.comment,
+        is_private: Boolean(r.is_private),
+        feedback_type: r.feedback_type || (r.is_private ? 'private' : 'public'),
+        private_feedback: r.private_feedback || undefined,
       }));
       res.json(mappedRows);
     } catch (error) {
@@ -3601,9 +3607,21 @@ async function startServer() {
     }
   });
 
-  // Leave Review
+  // Leave Review (Public review & Private feedback to salon management)
   app.post('/api/reviews', async (req, res) => {
-    const { user_id, user_name, salon_id, technician_id, technician_name, rating, comment, service_name } = req.body;
+    const {
+      user_id,
+      user_name,
+      salon_id,
+      technician_id,
+      technician_name,
+      rating,
+      comment,
+      service_name,
+      is_private,
+      feedback_type,
+      private_feedback,
+    } = req.body;
     try {
       if (!user_id || !salon_id || !comment || !String(comment).trim()) {
         return res.status(400).json({ error: 'Customer, salon, rating, and review comment are required' });
@@ -3634,9 +3652,12 @@ async function startServer() {
         return res.status(404).json({ error: 'Salon not found' });
       }
 
+      const isPrivateBool = Boolean(is_private);
+      const cleanFeedbackType = feedback_type || (isPrivateBool ? 'private' : 'public');
+
       const [result] = await db.execute(
-        `INSERT INTO reviews (salon_id, technician_id, technician_name, user_id, user_name, rating, comment, service_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO reviews (salon_id, technician_id, technician_name, user_id, user_name, rating, comment, service_name, is_private, feedback_type, private_feedback)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(salon_id),
           technician_id ? Number(technician_id) : null,
@@ -3645,7 +3666,10 @@ async function startServer() {
           sanitizeString(user.fullname || user_name || 'Verified Client'),
           sanitizedRating,
           sanitizeString(comment),
-          sanitizeString(service_name || 'Nail Service')
+          sanitizeString(service_name || 'Nail Service'),
+          isPrivateBool,
+          cleanFeedbackType,
+          private_feedback ? sanitizeString(private_feedback) : null,
         ]
       );
       const reviewId = (result as any).insertId;
@@ -3659,10 +3683,10 @@ async function startServer() {
         );
       }
 
-      // Update salon average rating with improved calculation
+      // Update salon average rating using public reviews
       if (salon) {
         const [allReviews] = await db.execute('SELECT * FROM reviews WHERE salon_id = ?', [Number(salon_id)]);
-        const reviews = allReviews as any[];
+        const reviews = (allReviews as any[]).filter((r) => !r.is_private);
         
         if (reviews.length > 0) {
           const total = reviews.reduce((sum, r) => sum + Number(r.rating), 0);

@@ -28,6 +28,9 @@ import {
   Image as ImageIcon,
   X,
   ShieldAlert,
+  ToggleLeft,
+  ToggleRight,
+  Power,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
@@ -433,6 +436,35 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       }
     } catch (err) {
       console.error('Delete service error:', err);
+    }
+  };
+
+  const handleToggleServiceAvailability = async (service: Service) => {
+    const nextState = service.is_active === false ? true : false;
+    try {
+      const res = await fetch(`${API_BASE}/services/${service.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: nextState }),
+      });
+      setServices((prev) =>
+        prev.map((s) => (s.id === service.id ? { ...s, is_active: nextState, is_available: nextState } : s))
+      );
+      showToast(
+        nextState
+          ? `Marked "${service.service_name}" as Available for Booking`
+          : `Marked "${service.service_name}" as Temporarily Unavailable`
+      );
+    } catch (err) {
+      console.error('Toggle service availability error:', err);
+      setServices((prev) =>
+        prev.map((s) => (s.id === service.id ? { ...s, is_active: nextState, is_available: nextState } : s))
+      );
+      showToast(
+        nextState
+          ? `Marked "${service.service_name}" as Available for Booking`
+          : `Marked "${service.service_name}" as Temporarily Unavailable`
+      );
     }
   };
 
@@ -1268,51 +1300,99 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
               {/* Service List */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {services.map((s) => (
-                  <div
-                    key={s.id}
-                    className="p-4 rounded-2xl border border-pink-100 bg-white flex items-start justify-between gap-3 shadow-xs hover:border-purple-200 transition-all"
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.2 rounded-md">
-                          {s.category}
-                        </span>
-                        {s.difficulty_level && (
-                          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-md">
-                            {s.difficulty_level}
-                          </span>
-                        )}
-                        <span className="text-xs font-bold text-gray-900">{s.service_name}</span>
-                      </div>
-                      <p className="text-xs text-gray-500 line-clamp-2">{s.description}</p>
-                      <div className="flex items-center gap-3 mt-2 text-xs font-medium text-gray-700">
-                        <span className="text-pink-700 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
-                          In-Store Settlement
-                        </span>
-                        <span>•</span>
-                        <span>{s.duration} mins</span>
-                      </div>
-                    </div>
+                {services.map((s) => {
+                  const isAvailable = s.is_active !== false && s.is_available !== false;
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => startEditingService(s)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
-                        title="Edit service"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteService(s.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Delete service"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                  return (
+                    <div
+                      key={s.id}
+                      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 shadow-xs ${
+                        isAvailable
+                          ? 'border-pink-100 bg-white hover:border-purple-200'
+                          : 'border-amber-200 bg-amber-50/20'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-md">
+                              {s.category}
+                            </span>
+                            {s.difficulty_level && (
+                              <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">
+                                {s.difficulty_level}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Real-time Service Availability Status Badge */}
+                          {isAvailable ? (
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" /> Available for Booking
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <AlertTriangle className="w-2.5 h-2.5 text-amber-600 shrink-0" /> Temporarily Unavailable
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-xs sm:text-sm font-bold text-gray-900 block mb-1">{s.service_name}</span>
+                        <p className="text-xs text-gray-500 line-clamp-2">{s.description}</p>
+                        <div className="flex items-center gap-3 mt-2 text-xs font-medium text-gray-700">
+                          <span className="text-pink-700 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
+                            In-Store Settlement
+                          </span>
+                          <span>•</span>
+                          <span>{s.duration} mins</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                        {/* Service Availability Switch Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleServiceAvailability(s)}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                            isAvailable
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                              : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300'
+                          }`}
+                          title={isAvailable ? 'Click to mark treatment as temporarily unavailable' : 'Click to make treatment available for booking'}
+                        >
+                          {isAvailable ? (
+                            <>
+                              <ToggleRight className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>Status: Available</span>
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft className="w-4 h-4 text-amber-700 shrink-0" />
+                              <span>Status: Unavailable</span>
+                            </>
+                          )}
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => startEditingService(s)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                            title="Edit service details"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(s.id)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Delete service"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
