@@ -640,11 +640,6 @@ export function generateStoreVisualHtmlReport(data: StoreReportData): string {
       <span style="font-size: 13px; font-weight: 600; color: #64748b;">
         Nail Glam Hub • Executive Decision-Making Dossier
       </span>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn" onclick="window.print()">
-          🖨️ Print / Save as PDF
-        </button>
-      </div>
     </div>
 
     <!-- Header -->
@@ -1060,7 +1055,6 @@ export function generateAdminVisualHtmlReport(data: AdminReportData): string {
   <div class="report-container">
     <div class="no-print" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
       <span style="font-weight: 700; color: #475569;">Nail Glam Hub • Administrative Intelligence Report</span>
-      <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
     </div>
 
     <div class="header">
@@ -1315,11 +1309,6 @@ export function generateProfitRevenueVisualHtmlReport(data: ProfitRevenueReportD
       <span style="font-size: 13px; font-weight: 600; color: #64748b;">
         Nail Glam Hub • Financial Operations & Profit Ledger
       </span>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn" onclick="window.print()">
-          🖨️ Print / Save as PDF
-        </button>
-      </div>
     </div>
 
     <!-- Header -->

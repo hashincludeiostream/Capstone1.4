@@ -34,7 +34,12 @@ import {
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
-import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
+import {
+  sendEmailNotification,
+  downloadCertifiedPdfFile,
+  downloadAllInOneMasterPdf,
+  generateAllInOneMasterPdfBase64,
+} from '../../lib/emailService';
 import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 import {
@@ -984,12 +989,6 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
   const [isEmailingReport, setIsEmailingReport] = useState(false);
 
-  const handlePrintReport = () => {
-    const html = generateStoreVisualHtmlReport(storeReportData);
-    openPrintableReport(html);
-    showToast('Opening print preview for PDF report');
-  };
-
   const handleEmailReport = async () => {
     setIsEmailingReport(true);
     try {
@@ -1006,6 +1005,9 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
       const savedUser = safeLocalStorage.getJSON<any>('nailglamhub_user');
       const emailToUse = (connectedEmail || savedUser?.email || salon.email || 'salon@nailglamhub.com').trim();
+      const masterPdfBase64 = generateAllInOneMasterPdfBase64(storeReportData);
+      const masterHtml = generateStoreVisualHtmlReport(storeReportData);
+      const attachmentFilename = `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report_${volumeTimeGrain}.pdf`;
 
       const res = await fetch('/api/email/reports/monthly', {
         method: 'POST',
@@ -1015,24 +1017,40 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
           owner_email: emailToUse,
           owner_name: salon.salon_name,
           time_grain: volumeTimeGrain,
+          pdf_base64: masterPdfBase64,
+          pdf_html: masterHtml,
+          attachment_name: attachmentFilename,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.report) {
-          const sendRes = await sendEmailNotification({
-            ...data.report,
-            to: emailToUse,
-          });
-          if (sendRes.gmailSent) {
-            showToast(`✅ ${volumeTimeGrain.toUpperCase()} PDF report delivered directly to ${emailToUse} via Gmail!`);
-          } else if (sendRes.error) {
-            showToast(`Report logged to ledger. Note: ${sendRes.error}`);
-          } else {
-            showToast(`${volumeTimeGrain.toUpperCase()} PDF status report logged to ledger`);
-          }
+        const reportPayload = data.report || {
+          to: emailToUse,
+          toName: salon.salon_name,
+          role: 'salon_owner',
+          subject: `All-in-One Master Report (PDF) - ${salon.salon_name} (${volumeTimeGrain.toUpperCase()})`,
+          category: 'report',
+          htmlBody: masterHtml,
+          hasPdfAttachment: true,
+          attachmentName: attachmentFilename,
+          pdfHtml: masterHtml,
+        };
+
+        const sendRes = await sendEmailNotification({
+          ...reportPayload,
+          to: emailToUse,
+          pdfBase64: masterPdfBase64,
+          storeReportData,
+          hasPdfAttachment: true,
+          attachmentName: attachmentFilename,
+        });
+
+        if (sendRes.gmailSent) {
+          showToast(`✅ ${volumeTimeGrain.toUpperCase()} All-in-One Master PDF delivered to ${emailToUse} via Gmail!`);
+        } else if (sendRes.error) {
+          showToast(`Report logged to ledger. Note: ${sendRes.error}`);
         } else {
-          showToast(`${volumeTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+          showToast(`${volumeTimeGrain.toUpperCase()} All-in-One Master PDF status report logged to ledger`);
         }
       } else {
         showToast(data.error || 'Failed to dispatch email report');
@@ -1046,19 +1064,8 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
   const handleDownloadDirectPdf = () => {
     try {
-      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_${volumeTimeGrain}_Report.pdf`;
-      const ok = downloadCertifiedPdfFile(filename, {
-        title: `${salon.salon_name} ${volumeTimeGrain.toUpperCase()} Store Overview Audit`,
-        salonName: salon.salon_name,
-        salonAddress: salon.address,
-        periodLabel: volumeTimeGrain.toUpperCase(),
-        metrics: {
-          grossRevenue: pnlData.summary.totalGrossRevenue,
-          netProfit: pnlData.summary.netProfit,
-          profitMargin: pnlData.summary.profitMargin,
-          appointmentCount: reportData.stats.completedCount,
-        },
-      });
+      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report_${volumeTimeGrain}.pdf`;
+      const ok = downloadAllInOneMasterPdf(storeReportData, filename);
       if (ok) {
         showToast(`Downloaded ${filename} successfully!`);
       } else {
@@ -1175,16 +1182,6 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download PDF</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handlePrintReport}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/80 text-xs font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
-              title="Print or preview store report PDF"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print PDF</span>
             </button>
 
             <button

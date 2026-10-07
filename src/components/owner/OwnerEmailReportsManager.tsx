@@ -787,13 +787,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                           <Download className="w-3.5 h-3.5 mr-1.5" />
                           Download PDF
                         </button>
-                        <button
-                          onClick={() => handlePrintLog(selectedLog)}
-                          className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5 mr-1.5" />
-                          Print / PDF
-                        </button>
                       </>
                     )}
                   </div>
@@ -941,15 +934,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                   <Download className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Download HTML</span>
                 </a>
-
-                {/* Print button */}
-                <button
-                  onClick={() => handlePrintLog(previewLog)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Print / PDF</span>
-                </button>
 
                 <button
                   onClick={() => setPreviewLog(null)}

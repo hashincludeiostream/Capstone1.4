@@ -37,7 +37,12 @@ import {
   openPrintableReport,
 } from '../../utils/reportGenerators';
 import { Salon, Service, Technician, Appointment, Product, ProductOrder } from '../../types';
-import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
+import {
+  sendEmailNotification,
+  downloadCertifiedPdfFile,
+  downloadAllInOneMasterPdf,
+  generateAllInOneMasterPdfBase64,
+} from '../../lib/emailService';
 import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 
@@ -115,86 +120,6 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
   const [suppliesPercent, setSuppliesPercent] = useState(15);
   const [overheadPercent, setOverheadPercent] = useState(8);
   const [isEmailing, setIsEmailing] = useState(false);
-
-  const handleEmailReport = async () => {
-    const targetSalonId = salon?.id || 1;
-    setIsEmailing(true);
-    try {
-      let token = getCachedAccessToken();
-      let connectedEmail = getCachedGmailUserEmail();
-      if (!token) {
-        showToast('Connecting Google Workspace to send email...');
-        const conn = await connectGoogleWorkspace();
-        if (conn.success && conn.token) {
-          token = conn.token;
-          if (conn.email) connectedEmail = conn.email;
-        }
-      }
-
-      const savedUser = safeLocalStorage.getJSON<any>('nailglamhub_user');
-      const emailToUse = (connectedEmail || savedUser?.email || salon?.email || 'salon@nailglamhub.com').trim();
-
-      const res = await fetch('/api/email/reports/monthly', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          salon_id: targetSalonId,
-          owner_email: emailToUse,
-          owner_name: salon?.salon_name,
-          time_grain: selectedTimeGrain,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.report) {
-          const sendRes = await sendEmailNotification({
-            ...data.report,
-            to: emailToUse,
-          });
-          if (sendRes.gmailSent) {
-            showToast(`✅ ${selectedTimeGrain.toUpperCase()} PDF report delivered directly to ${emailToUse} via Gmail!`);
-          } else if (sendRes.error) {
-            showToast(`Report logged to ledger. Note: ${sendRes.error}`);
-          } else {
-            showToast(`${selectedTimeGrain.toUpperCase()} PDF status report logged to audit ledger`);
-          }
-        } else {
-          showToast(`${selectedTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
-        }
-      } else {
-        showToast(data.error || 'Failed to email report');
-      }
-    } catch (e: any) {
-      showToast('Error sending email report');
-    } finally {
-      setIsEmailing(false);
-    }
-  };
-
-  const handleDownloadDirectPdf = () => {
-    try {
-      const filename = `${(salon?.salon_name || 'Salon').replace(/\s+/g, '_')}_${selectedTimeGrain}_Performance_Report.pdf`;
-      const ok = downloadCertifiedPdfFile(filename, {
-        title: `${salon?.salon_name || 'Salon'} ${selectedTimeGrain.toUpperCase()} Performance Audit`,
-        salonName: salon?.salon_name,
-        salonAddress: salon?.address,
-        periodLabel: selectedTimeGrain.toUpperCase(),
-        metrics: {
-          grossRevenue: pnlData.summary.totalGrossRevenue,
-          netProfit: pnlData.summary.netProfit,
-          profitMargin: pnlData.summary.profitMargin,
-          appointmentCount: reportData.stats.completedCount,
-        },
-      });
-      if (ok) {
-        showToast(`Downloaded ${filename} successfully!`);
-      } else {
-        showToast('Failed to download PDF report');
-      }
-    } catch (err: any) {
-      showToast('Error downloading PDF');
-    }
-  };
 
   const timeGrainDescription: Record<'daily' | 'weekly' | 'monthly' | 'yearly', string> = {
     daily: 'Daily Velocity (Past 7 Days & Today)',
@@ -632,29 +557,112 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
     }));
   }, [pnlData.periods]);
 
-  const handlePrint = () => {
-    const enrichedData: StoreReportData = {
-      ...reportData,
-      timeRange: selectedTimeGrain === 'yearly' ? `${selectedYearRange} (5-Year Range)` : timeGrainDescription[selectedTimeGrain],
-      stats: {
-        ...reportData.stats,
-        totalAppointments: pnlData.summary.totalAppointments,
-        completedCount: pnlData.summary.totalAppointments,
-        totalRevenue: pnlData.summary.totalServicesRevenue,
-      },
-      volumeSummary: {
-        grain: selectedTimeGrain,
-        metric: 'bookings',
-        totalVolume: pnlData.summary.totalAppointments,
-        totalIncome: pnlData.summary.totalServicesRevenue,
-        peakPeriod: pnlData.summary.peakPeriod,
-        trend: volumeTrend,
-      },
-      profitRevenueSummary: pnlData,
-    };
-    const html = generateStoreVisualHtmlReport(enrichedData);
-    openPrintableReport(html);
-    showToast(`Opening printable ${selectedTimeGrain.toUpperCase()} Master PDF Report`);
+  const enrichedStoreReportData: StoreReportData = useMemo(() => ({
+    ...reportData,
+    timeRange: selectedTimeGrain === 'yearly' ? `${selectedYearRange} (5-Year Range)` : timeGrainDescription[selectedTimeGrain],
+    stats: {
+      ...reportData.stats,
+      totalAppointments: pnlData.summary.totalAppointments,
+      completedCount: pnlData.summary.totalAppointments,
+      totalRevenue: pnlData.summary.totalServicesRevenue,
+    },
+    volumeSummary: {
+      grain: selectedTimeGrain,
+      metric: 'bookings',
+      totalVolume: pnlData.summary.totalAppointments,
+      totalIncome: pnlData.summary.totalServicesRevenue,
+      peakPeriod: pnlData.summary.peakPeriod,
+      trend: volumeTrend,
+    },
+    profitRevenueSummary: pnlData,
+  }), [reportData, selectedTimeGrain, selectedYearRange, timeGrainDescription, pnlData, volumeTrend]);
+
+  const handleDownloadDirectPdf = () => {
+    try {
+      const filename = `${(salon?.salon_name || reportData.salonName || 'Salon').replace(/\s+/g, '_')}_All_In_One_Master_Report_${selectedTimeGrain}.pdf`;
+      const ok = downloadAllInOneMasterPdf(enrichedStoreReportData, filename);
+      if (ok) {
+        showToast(`Downloaded ${filename} successfully!`);
+      } else {
+        showToast('Failed to download Master PDF report');
+      }
+    } catch (err: any) {
+      showToast('Error downloading PDF');
+    }
+  };
+
+  const handleEmailReport = async () => {
+    const targetSalonId = salon?.id || 1;
+    setIsEmailing(true);
+    try {
+      let token = getCachedAccessToken();
+      let connectedEmail = getCachedGmailUserEmail();
+      if (!token) {
+        showToast('Connecting Google Workspace to send email...');
+        const conn = await connectGoogleWorkspace();
+        if (conn.success && conn.token) {
+          token = conn.token;
+          if (conn.email) connectedEmail = conn.email;
+        }
+      }
+
+      const savedUser = safeLocalStorage.getJSON<any>('nailglamhub_user');
+      const emailToUse = (connectedEmail || savedUser?.email || salon?.email || 'salon@nailglamhub.com').trim();
+      const masterPdfBase64 = generateAllInOneMasterPdfBase64(enrichedStoreReportData);
+      const masterHtml = generateStoreVisualHtmlReport(enrichedStoreReportData);
+      const attachmentFilename = `${(salon?.salon_name || reportData.salonName || 'Salon').replace(/\s+/g, '_')}_All_In_One_Master_Report_${selectedTimeGrain}.pdf`;
+
+      const res = await fetch('/api/email/reports/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          salon_id: targetSalonId,
+          owner_email: emailToUse,
+          owner_name: salon?.salon_name || reportData.salonName,
+          time_grain: selectedTimeGrain,
+          pdf_base64: masterPdfBase64,
+          pdf_html: masterHtml,
+          attachment_name: attachmentFilename,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const reportPayload = data.report || {
+          to: emailToUse,
+          toName: salon?.salon_name || reportData.salonName,
+          role: 'salon_owner',
+          subject: `All-in-One Master Report (PDF) - ${salon?.salon_name || reportData.salonName} (${selectedTimeGrain.toUpperCase()})`,
+          category: 'report',
+          htmlBody: masterHtml,
+          hasPdfAttachment: true,
+          attachmentName: attachmentFilename,
+          pdfHtml: masterHtml,
+        };
+
+        const sendRes = await sendEmailNotification({
+          ...reportPayload,
+          to: emailToUse,
+          pdfBase64: masterPdfBase64,
+          storeReportData: enrichedStoreReportData,
+          hasPdfAttachment: true,
+          attachmentName: attachmentFilename,
+        });
+
+        if (sendRes.gmailSent) {
+          showToast(`✅ ${selectedTimeGrain.toUpperCase()} All-in-One Master PDF delivered to ${emailToUse} via Gmail!`);
+        } else if (sendRes.error) {
+          showToast(`Master report logged to ledger. Note: ${sendRes.error}`);
+        } else {
+          showToast(`${selectedTimeGrain.toUpperCase()} All-in-One Master PDF status report logged to audit ledger`);
+        }
+      } else {
+        showToast(data.error || 'Failed to email report');
+      }
+    } catch (e: any) {
+      showToast('Error sending email report');
+    } finally {
+      setIsEmailing(false);
+    }
   };
 
   const handleExportCsvInternal = () => {
@@ -879,14 +887,6 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download PDF</span>
-            </button>
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              title="Print or Save Master PDF"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Master PDF</span>
             </button>
           </div>
         </div>
@@ -1864,24 +1864,24 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Option 1: Print / Save Master PDF Report */}
+                {/* Option 1: Download Master PDF Report */}
                 <div className="p-5 rounded-2xl border border-purple-200 bg-purple-50/50 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
                     <div className="w-10 h-10 rounded-xl bg-purple-700 text-white flex items-center justify-center font-bold">
-                      <Printer className="w-5 h-5" />
+                      <Download className="w-5 h-5" />
                     </div>
-                    <h5 className="text-sm font-bold text-purple-950">Print Master PDF Report</h5>
+                    <h5 className="text-sm font-bold text-purple-950">Download All-in-One Master PDF</h5>
                     <p className="text-xs text-gray-600">
-                      Standard print-ready executive master report with complete operating P&amp;L ledger, performance trajectory charts, staff scorecards, inventory valuation, and strategic action matrix.
+                      Standard executive master report with complete operating P&amp;L ledger, performance trajectory charts, staff scorecards, inventory valuation, and strategic action matrix.
                     </p>
                   </div>
                   <div className="pt-2">
                     <button
-                      onClick={handlePrint}
+                      onClick={handleDownloadDirectPdf}
                       className="w-full py-2.5 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Print / Save Master PDF</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download All-in-One Master PDF</span>
                     </button>
                   </div>
                 </div>
