@@ -6,7 +6,6 @@
 import { EmailLog, User, Salon, Appointment, ProductOrder, UserRole, PlatformStats } from '../types';
 import { getCachedAccessToken, getCachedGmailUserEmail } from './firebase';
 import { jsPDF } from 'jspdf';
-import { StoreReportData, AdminReportData } from '../utils/reportGenerators';
 
 export interface EmailDispatchOptions {
   to: string;
@@ -19,9 +18,6 @@ export interface EmailDispatchOptions {
   pdfHtml?: string;
   attachmentName?: string;
   senderEmail?: string;
-  pdfBase64?: string;
-  storeReportData?: StoreReportData;
-  adminReportData?: AdminReportData;
 }
 
 const BRAND_NAME = 'Nail Glam Hub';
@@ -77,782 +73,7 @@ export function wrapBase64(b64: string): string {
 }
 
 /**
- * Builds an authentic, executive multi-page All-in-One Master Report PDF document
- * containing the complete salon dossier: Executive KPIs, Financial Profit & Loss (P&L),
- * Strategic Decisions, Appointment Volume, Treatment Mix, Product Inventory,
- * Specialist Team Scorecard, and CRM Client Retention Directory.
- */
-export function buildAllInOneMasterReportPdf(
-  data: StoreReportData,
-  options?: {
-    recipientName?: string;
-    recipientEmail?: string;
-    title?: string;
-  }
-): jsPDF {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const cleanSalonName = sanitizePdfText(data.salonName || 'Salon');
-  const cleanAddress = sanitizePdfText(data.salonAddress || '');
-  const cleanPhone = sanitizePdfText(data.contactNumber || '');
-  const cleanScope = sanitizePdfText(data.timeRange || 'All Time');
-  const cleanDate = sanitizePdfText(data.generatedDate || new Date().toLocaleDateString('en-US', { dateStyle: 'full' }));
-  const cleanRecipientName = sanitizePdfText(options?.recipientName || 'Salon Executive');
-  const cleanRecipientEmail = sanitizePdfText(options?.recipientEmail || '');
-
-  const pageWidth = 210;
-  const leftMargin = 14;
-  const rightMargin = 196;
-  const contentWidth = 182;
-  const bottomMargin = 275;
-  let currentY = 16;
-  let pageCount = 1;
-
-  const addPageIfNeeded = (neededHeight: number, sectionTitle?: string) => {
-    if (currentY + neededHeight > bottomMargin) {
-      doc.addPage();
-      pageCount++;
-      // Running Sub-Header
-      doc.setFillColor(253, 242, 248);
-      doc.rect(0, 0, pageWidth, 10, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(157, 23, 77); // #9D174D
-      doc.text(`NAIL GLAM HUB - ALL-IN-ONE MASTER DOSSIER | ${cleanSalonName}`, leftMargin, 6.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(107, 114, 128);
-      doc.text(`Scope: ${cleanScope}`, rightMargin, 6.5, { align: 'right' });
-
-      // Running Footer
-      doc.setDrawColor(243, 244, 246);
-      doc.line(leftMargin, 287, rightMargin, 287);
-      doc.setFontSize(7);
-      doc.setTextColor(156, 163, 175);
-      doc.text(`Page ${pageCount} | All-in-One Master Salon Operations & Financial Dossier`, leftMargin, 292);
-      doc.text('Confidential Executive Report', rightMargin, 292, { align: 'right' });
-
-      currentY = 18;
-      if (sectionTitle) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(131, 24, 67);
-        doc.text(sanitizePdfText(sectionTitle), leftMargin, currentY);
-        currentY += 6;
-      }
-    }
-  };
-
-  // ==========================================
-  // PAGE 1: COVER HEADER & EXECUTIVE DOSSIER
-  // ==========================================
-  // Top Wine Banner
-  doc.setFillColor(131, 24, 67); // Wine #831843
-  doc.rect(0, 0, pageWidth, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11.5);
-  doc.text('NAIL GLAM HUB - ALL-IN-ONE MASTER REPORT', leftMargin, 11);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(252, 231, 243);
-  doc.text('EXECUTIVE STORE DOSSIER, FINANCIAL P&L & STRATEGIC DECISION-MAKING SUITE', leftMargin, 16.5);
-
-  currentY = 32;
-
-  // Salon Title & Meta
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(17);
-  doc.setTextColor(157, 23, 77); // #9D174D
-  doc.text(cleanSalonName, leftMargin, currentY);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(100, 116, 139);
-  currentY += 5.5;
-  const locationLine = [cleanAddress, cleanPhone ? `Phone: ${cleanPhone}` : ''].filter(Boolean).join('  |  ');
-  doc.text(locationLine || 'Physical Salon Premises', leftMargin, currentY);
-
-  currentY += 5;
-  doc.text(`Reporting Scope: ${cleanScope}   |   Reconciled: ${cleanDate}`, leftMargin, currentY);
-  if (cleanRecipientEmail) {
-    currentY += 4.5;
-    doc.text(`Authorized Recipient: ${cleanRecipientName} (${cleanRecipientEmail})`, leftMargin, currentY);
-  }
-
-  // Divider
-  currentY += 4;
-  doc.setDrawColor(241, 245, 249);
-  doc.setLineWidth(0.6);
-  doc.line(leftMargin, currentY, rightMargin, currentY);
-  currentY += 7;
-
-  // ------------------------------------------
-  // SECTION 1: EXECUTIVE KPI SCORECARDS
-  // ------------------------------------------
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(131, 24, 67);
-  doc.text('1. EXECUTIVE PERFORMANCE SCORECARD (CORE KPIS)', leftMargin, currentY);
-  currentY += 6;
-
-  const pnl = data.profitRevenueSummary;
-  const grossRev = Math.round(pnl?.summary.totalGrossRevenue ?? data.stats.totalRevenue ?? 45000);
-  const netProf = Math.round(pnl?.summary.netProfit ?? Math.round(grossRev * 0.78));
-  const netMargin = pnl?.summary.profitMargin ?? 78;
-  const completedVisits = data.stats.completedCount ?? 0;
-  const upcomingVisits = data.stats.confirmedCount ?? 0;
-  const fulfillmentRate = data.stats.completionRate ?? 95;
-  const avgDuration = data.stats.avgDuration ?? 45;
-  const retentionRate = data.crmSummary?.retentionRate ?? 88;
-  const repeatClients = (data.crmSummary?.vipCount ?? 0) + (data.crmSummary?.regularCount ?? 0);
-  const inventoryVal = data.inventorySummary?.totalInventoryValue ?? 0;
-  const inventoryUnits = data.inventorySummary?.totalUnitsInStock ?? 0;
-
-  const kpis = [
-    { label: 'GROSS REVENUE', value: `PHP ${grossRev.toLocaleString()}`, sub: 'Services + Retail Intake', color: [131, 24, 67] },
-    { label: 'NET PROFIT', value: `PHP ${netProf.toLocaleString()}`, sub: `${netMargin.toFixed(1)}% Operating Margin`, color: [6, 95, 70] },
-    { label: 'COMPLETED VISITS', value: `${completedVisits}`, sub: `+${upcomingVisits} upcoming confirmed`, color: [30, 41, 59] },
-    { label: 'FULFILLMENT RATE', value: `${fulfillmentRate}%`, sub: 'Target: >90% benchmark', color: [107, 33, 168] },
-    { label: 'CLIENT RETENTION', value: `${retentionRate}%`, sub: `${repeatClients} repeat clientele`, color: [6, 95, 70] },
-    { label: 'STOCK VALUATION', value: `PHP ${inventoryVal.toLocaleString()}`, sub: `${inventoryUnits} units in salon shelf`, color: [131, 24, 67] },
-  ];
-
-  const colWidth = (contentWidth - 8) / 3;
-  const cardHeight = 18;
-  kpis.forEach((kpi, idx) => {
-    const col = idx % 3;
-    const row = Math.floor(idx / 3);
-    const x = leftMargin + col * (colWidth + 4);
-    const y = currentY + row * (cardHeight + 3.5);
-
-    doc.setFillColor(255, 249, 251);
-    doc.setDrawColor(252, 231, 243);
-    doc.roundedRect(x, y, colWidth, cardHeight, 1.8, 1.8, 'FD');
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(157, 23, 77);
-    doc.text(kpi.label, x + 4, y + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
-    doc.text(kpi.value, x + 4, y + 11.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(kpi.sub, x + 4, y + 15.5);
-  });
-
-  currentY += (cardHeight + 3.5) * 2 + 5;
-
-  // ----------------------------------------------------
-  // SECTION 2: FINANCIAL PROFIT & LOSS (P&L) STATEMENT
-  // ----------------------------------------------------
-  addPageIfNeeded(60, '2. FINANCIAL PROFIT & LOSS (P&L) STATEMENT');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(131, 24, 67);
-  doc.text('2. FINANCIAL PROFIT & LOSS (P&L) OPERATING STATEMENT', leftMargin, currentY);
-  currentY += 6;
-
-  if (pnl && pnl.periods && pnl.periods.length > 0) {
-    // P&L Table Header
-    doc.setFillColor(255, 241, 247);
-    doc.rect(leftMargin, currentY, contentWidth, 7, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(131, 24, 67);
-    doc.text('Period', leftMargin + 2, currentY + 4.8);
-    doc.text('Visits/Orders', leftMargin + 32, currentY + 4.8);
-    doc.text('Services Rev', leftMargin + 60, currentY + 4.8, { align: 'right' });
-    doc.text('Retail Rev', leftMargin + 82, currentY + 4.8, { align: 'right' });
-    doc.text('Gross Revenue', leftMargin + 107, currentY + 4.8, { align: 'right' });
-    doc.text('Labor Costs', leftMargin + 128, currentY + 4.8, { align: 'right' });
-    doc.text('Supplies/Overhead', leftMargin + 152, currentY + 4.8, { align: 'right' });
-    doc.text('Net Profit', leftMargin + 172, currentY + 4.8, { align: 'right' });
-    doc.text('Margin', rightMargin - 2, currentY + 4.8, { align: 'right' });
-    currentY += 7.2;
-
-    pnl.periods.forEach((p, pIdx) => {
-      addPageIfNeeded(7, '2. FINANCIAL PROFIT & LOSS (P&L) STATEMENT (CONTINUED)');
-      if (pIdx % 2 === 1) {
-        doc.setFillColor(254, 250, 252);
-        doc.rect(leftMargin, currentY - 1, contentWidth, 6.2, 'F');
-      }
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.8);
-      doc.setTextColor(30, 41, 59);
-      doc.text(sanitizePdfText(p.shortLabel || p.periodLabel), leftMargin + 2, currentY + 3.5);
-      doc.text(`${p.appointmentCount} appts | ${p.orderCount} ord`, leftMargin + 32, currentY + 3.5);
-
-      doc.text(`PHP ${p.servicesRevenue.toLocaleString()}`, leftMargin + 60, currentY + 3.5, { align: 'right' });
-      doc.text(`PHP ${p.retailRevenue.toLocaleString()}`, leftMargin + 82, currentY + 3.5, { align: 'right' });
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(131, 24, 67);
-      doc.text(`PHP ${p.totalRevenue.toLocaleString()}`, leftMargin + 107, currentY + 3.5, { align: 'right' });
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(220, 38, 38);
-      doc.text(`-PHP ${p.laborExpense.toLocaleString()}`, leftMargin + 128, currentY + 3.5, { align: 'right' });
-      doc.text(`-PHP ${(p.suppliesExpense + p.overheadExpense).toLocaleString()}`, leftMargin + 152, currentY + 3.5, { align: 'right' });
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(6, 95, 70);
-      doc.text(`PHP ${p.netProfit.toLocaleString()}`, leftMargin + 172, currentY + 3.5, { align: 'right' });
-      doc.text(`${p.profitMargin.toFixed(1)}%`, rightMargin - 2, currentY + 3.5, { align: 'right' });
-
-      doc.setDrawColor(241, 245, 249);
-      doc.line(leftMargin, currentY + 4.8, rightMargin, currentY + 4.8);
-      currentY += 6;
-    });
-
-    // P&L Totals Row
-    addPageIfNeeded(8);
-    doc.setFillColor(253, 242, 248);
-    doc.rect(leftMargin, currentY, contentWidth, 7, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.2);
-    doc.setTextColor(131, 24, 67);
-    doc.text('TOTAL AUDITED RECONCILIATION', leftMargin + 2, currentY + 4.8);
-    doc.text(`PHP ${pnl.summary.totalGrossRevenue.toLocaleString()}`, leftMargin + 107, currentY + 4.8, { align: 'right' });
-    doc.setTextColor(220, 38, 38);
-    doc.text(`-PHP ${pnl.summary.totalExpenses.toLocaleString()}`, leftMargin + 152, currentY + 4.8, { align: 'right' });
-    doc.setTextColor(6, 95, 70);
-    doc.text(`PHP ${pnl.summary.netProfit.toLocaleString()}`, leftMargin + 172, currentY + 4.8, { align: 'right' });
-    doc.text(`${pnl.summary.profitMargin.toFixed(1)}%`, rightMargin - 2, currentY + 4.8, { align: 'right' });
-    currentY += 11;
-  }
-
-  // ----------------------------------------------------
-  // SECTION 3: STRATEGIC DECISION MATRIX & ACTION PLAN
-  // ----------------------------------------------------
-  addPageIfNeeded(55, '3. STRATEGIC DECISION MATRIX & MANAGEMENT ACTION PLAN');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(131, 24, 67);
-  doc.text('3. STRATEGIC DECISION MATRIX & MANAGEMENT ACTION PLAN', leftMargin, currentY);
-  currentY += 6;
-
-  const directives = [
-    {
-      title: 'Peak Weekend Capacity Re-allocation',
-      cat: 'OPERATIONS & STAFFING',
-      urgency: 'IMMEDIATE',
-      desc: `Align technician shifts and preparation buffers to handle peak booking velocity (${data.volumeSummary?.peakPeriod || 'recorded peak period'}).`,
-      impact: 'Eliminates client wait times and maximizes technician utilization.',
-    },
-    {
-      title: 'High-Margin Japanese & Russian Gel Bundling',
-      cat: 'TREATMENT MIX',
-      urgency: 'HIGH IMPACT',
-      desc: 'Pair Russian manicures with nail strengthening and builder gel packages yielding >65% operating margin.',
-      impact: 'Lifts average customer ticket value with zero chair idle time.',
-    },
-    {
-      title: `Automated Retention for ${data.crmSummary?.atRiskCount ?? 0} Inactive Clients`,
-      cat: 'CRM & CLIENT RETENTION',
-      urgency: 'ACTION REQUIRED',
-      desc: 'Clients with >30 days inactivity are flagged for automated VIP re-engagement SMS & email promotional vouchers.',
-      impact: 'Restores lost repeat revenue and lifts lifetime client retention.',
-    },
-    {
-      title: 'Technician 3D Art Cross-Training & Quality Standard',
-      cat: 'TALENT & SERVICE QUALITY',
-      urgency: 'MEDIUM TERM',
-      desc: 'Pair senior nail technicians with apprentices for advanced Japanese 3D sculpting and ombre techniques.',
-      impact: 'Evenly distributes premium nail art bookings across salon stations.',
-    },
-  ];
-
-  directives.forEach((d) => {
-    addPageIfNeeded(16);
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(241, 245, 249);
-    doc.roundedRect(leftMargin, currentY, contentWidth, 14, 1.5, 1.5, 'FD');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(131, 24, 67);
-    doc.text(sanitizePdfText(d.title), leftMargin + 3, currentY + 4.5);
-
-    doc.setFontSize(6.5);
-    doc.setTextColor(157, 23, 77);
-    doc.text(`[${sanitizePdfText(d.cat)} - ${sanitizePdfText(d.urgency)}]`, rightMargin - 3, currentY + 4.5, { align: 'right' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(71, 85, 105);
-    doc.text(sanitizePdfText(d.desc), leftMargin + 3, currentY + 8.5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(6, 95, 70);
-    doc.text(`Expected Impact: ${sanitizePdfText(d.impact)}`, leftMargin + 3, currentY + 12);
-
-    currentY += 15.5;
-  });
-
-  currentY += 3;
-
-  // ----------------------------------------------------
-  // SECTION 4: TREATMENT MIX & CATEGORY POPULARITY
-  // ----------------------------------------------------
-  addPageIfNeeded(40, '4. TREATMENT MIX & SERVICE CATEGORY BREAKDOWN');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(131, 24, 67);
-  doc.text('4. TREATMENT MIX & SERVICE CATEGORY POPULARITY', leftMargin, currentY);
-  currentY += 6;
-
-  const categories = data.treatmentMix?.categories || data.categoryBreakdown || [];
-  if (categories.length > 0) {
-    doc.setFillColor(255, 241, 247);
-    doc.rect(leftMargin, currentY, contentWidth, 6.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.2);
-    doc.setTextColor(131, 24, 67);
-    doc.text('Category Treatment Name', leftMargin + 3, currentY + 4.5);
-    doc.text('Booking Volume', leftMargin + 85, currentY + 4.5);
-    doc.text('Share of Demand (%)', leftMargin + 130, currentY + 4.5);
-    doc.text('Category Turnover', rightMargin - 3, currentY + 4.5, { align: 'right' });
-    currentY += 6.8;
-
-    categories.forEach((cat, cIdx) => {
-      addPageIfNeeded(6.5);
-      if (cIdx % 2 === 1) {
-        doc.setFillColor(254, 250, 252);
-        doc.rect(leftMargin, currentY - 1, contentWidth, 5.8, 'F');
-      }
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(30, 41, 59);
-      doc.text(sanitizePdfText(cat.name), leftMargin + 3, currentY + 3.5);
-      doc.text(`${cat.count} completed bookings`, leftMargin + 85, currentY + 3.5);
-      doc.text(`${cat.percentage}%`, leftMargin + 130, currentY + 3.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(131, 24, 67);
-      doc.text(cat.income ? `PHP ${cat.income.toLocaleString()}` : '—', rightMargin - 3, currentY + 3.5, { align: 'right' });
-
-      doc.setDrawColor(241, 245, 249);
-      doc.line(leftMargin, currentY + 4.5, rightMargin, currentY + 4.5);
-      currentY += 5.8;
-    });
-    currentY += 4;
-  }
-
-  // ----------------------------------------------------
-  // SECTION 5: PRODUCT INVENTORY & PICKUP RESERVATIONS
-  // ----------------------------------------------------
-  if (data.inventoryItems && data.inventoryItems.length > 0) {
-    addPageIfNeeded(45, '5. PRODUCT INVENTORY & STOCK VALUATION LEDGER');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(131, 24, 67);
-    doc.text('5. PRODUCT INVENTORY & ON-HAND STOCK VALUATION', leftMargin, currentY);
-    currentY += 6;
-
-    doc.setFillColor(255, 241, 247);
-    doc.rect(leftMargin, currentY, contentWidth, 6.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.2);
-    doc.setTextColor(131, 24, 67);
-    doc.text('Product Name & SKU', leftMargin + 3, currentY + 4.5);
-    doc.text('Category', leftMargin + 70, currentY + 4.5);
-    doc.text('Unit Price', leftMargin + 105, currentY + 4.5, { align: 'right' });
-    doc.text('Stock On Hand', leftMargin + 135, currentY + 4.5, { align: 'center' });
-    doc.text('Status', leftMargin + 158, currentY + 4.5);
-    doc.text('Total Valuation', rightMargin - 3, currentY + 4.5, { align: 'right' });
-    currentY += 6.8;
-
-    data.inventoryItems.slice(0, 15).forEach((item, iIdx) => {
-      addPageIfNeeded(6.5);
-      if (iIdx % 2 === 1) {
-        doc.setFillColor(254, 250, 252);
-        doc.rect(leftMargin, currentY - 1, contentWidth, 5.8, 'F');
-      }
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.8);
-      doc.setTextColor(30, 41, 59);
-      doc.text(sanitizePdfText(item.name).slice(0, 32), leftMargin + 3, currentY + 3.5);
-      doc.text(sanitizePdfText(item.category), leftMargin + 70, currentY + 3.5);
-      doc.text(`PHP ${item.price.toLocaleString()}`, leftMargin + 105, currentY + 3.5, { align: 'right' });
-      doc.text(`${item.stock_quantity}`, leftMargin + 135, currentY + 3.5, { align: 'center' });
-
-      doc.setFont('helvetica', 'bold');
-      if (item.status === 'Out of Stock') {
-        doc.setTextColor(220, 38, 38);
-      } else if (item.status === 'Low Stock') {
-        doc.setTextColor(217, 119, 6);
-      } else {
-        doc.setTextColor(6, 95, 70);
-      }
-      doc.text(sanitizePdfText(item.status), leftMargin + 158, currentY + 3.5);
-
-      doc.setTextColor(30, 41, 59);
-      doc.text(`PHP ${item.inventoryValue.toLocaleString()}`, rightMargin - 3, currentY + 3.5, { align: 'right' });
-
-      doc.setDrawColor(241, 245, 249);
-      doc.line(leftMargin, currentY + 4.5, rightMargin, currentY + 4.5);
-      currentY += 5.8;
-    });
-    currentY += 4;
-  }
-
-  // ----------------------------------------------------
-  // SECTION 6: SPECIALIST TEAM PRODUCTIVITY SCORECARD
-  // ----------------------------------------------------
-  if (data.staffScorecard && data.staffScorecard.length > 0) {
-    addPageIfNeeded(40, '6. SPECIALIST TEAM TALENT & PRODUCTIVITY SCORECARD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(131, 24, 67);
-    doc.text('6. SPECIALIST TEAM TALENT & PRODUCTIVITY SCORECARD', leftMargin, currentY);
-    currentY += 6;
-
-    doc.setFillColor(255, 241, 247);
-    doc.rect(leftMargin, currentY, contentWidth, 6.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.2);
-    doc.setTextColor(131, 24, 67);
-    doc.text('Technician Specialist', leftMargin + 3, currentY + 4.5);
-    doc.text('Specialties & Technique', leftMargin + 50, currentY + 4.5);
-    doc.text('Experience', leftMargin + 115, currentY + 4.5);
-    doc.text('Completed Sessions', leftMargin + 150, currentY + 4.5, { align: 'center' });
-    doc.text('Serviced Hrs', leftMargin + 172, currentY + 4.5, { align: 'center' });
-    doc.text('Rating', rightMargin - 3, currentY + 4.5, { align: 'right' });
-    currentY += 6.8;
-
-    data.staffScorecard.forEach((staff, sIdx) => {
-      addPageIfNeeded(6.5);
-      if (sIdx % 2 === 1) {
-        doc.setFillColor(254, 250, 252);
-        doc.rect(leftMargin, currentY - 1, contentWidth, 5.8, 'F');
-      }
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(30, 41, 59);
-      doc.text(sanitizePdfText(staff.name), leftMargin + 3, currentY + 3.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(71, 85, 105);
-      doc.text(sanitizePdfText(staff.specialties).slice(0, 36), leftMargin + 50, currentY + 3.5);
-      doc.text(`${staff.experience_years} yrs exp`, leftMargin + 115, currentY + 3.5);
-      doc.text(`${staff.completedCount} / ${staff.totalBookings}`, leftMargin + 150, currentY + 3.5, { align: 'center' });
-      doc.text(`${staff.hoursServiced}h`, leftMargin + 172, currentY + 3.5, { align: 'center' });
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(217, 119, 6);
-      doc.text(`★ ${staff.rating}`, rightMargin - 3, currentY + 3.5, { align: 'right' });
-
-      doc.setDrawColor(241, 245, 249);
-      doc.line(leftMargin, currentY + 4.5, rightMargin, currentY + 4.5);
-      currentY += 5.8;
-    });
-    currentY += 4;
-  }
-
-  // ----------------------------------------------------
-  // SECTION 7: CLIENT CRM DIRECTORY & RETENTION PROFILES
-  // ----------------------------------------------------
-  if (data.clientList && data.clientList.length > 0) {
-    addPageIfNeeded(40, '7. CLIENT CRM DIRECTORY & RETENTION PROFILES');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(131, 24, 67);
-    doc.text('7. CLIENT CRM DIRECTORY & RETENTION PROFILES', leftMargin, currentY);
-    currentY += 6;
-
-    doc.setFillColor(255, 241, 247);
-    doc.rect(leftMargin, currentY, contentWidth, 6.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.2);
-    doc.setTextColor(131, 24, 67);
-    doc.text('Client Name', leftMargin + 3, currentY + 4.5);
-    doc.text('Loyalty Tier', leftMargin + 48, currentY + 4.5);
-    doc.text('Completed Visits', leftMargin + 85, currentY + 4.5, { align: 'center' });
-    doc.text('Last Visit Date', leftMargin + 120, currentY + 4.5);
-    doc.text('Preferred Treatment', leftMargin + 150, currentY + 4.5);
-    doc.text('Status Note', rightMargin - 3, currentY + 4.5, { align: 'right' });
-    currentY += 6.8;
-
-    data.clientList.slice(0, 12).forEach((c, cIdx) => {
-      addPageIfNeeded(6.5);
-      if (cIdx % 2 === 1) {
-        doc.setFillColor(254, 250, 252);
-        doc.rect(leftMargin, currentY - 1, contentWidth, 5.8, 'F');
-      }
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(30, 41, 59);
-      doc.text(sanitizePdfText(c.name), leftMargin + 3, currentY + 3.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(157, 23, 77);
-      doc.text(sanitizePdfText(c.tier), leftMargin + 48, currentY + 3.5);
-
-      doc.setTextColor(30, 41, 59);
-      doc.text(`${c.completedVisits}`, leftMargin + 85, currentY + 3.5, { align: 'center' });
-      doc.text(sanitizePdfText(c.lastVisitDate), leftMargin + 120, currentY + 3.5);
-      doc.text(sanitizePdfText(c.favoriteService).slice(0, 22), leftMargin + 150, currentY + 3.5);
-      doc.text(sanitizePdfText(c.note || 'Active VIP').slice(0, 16), rightMargin - 3, currentY + 3.5, { align: 'right' });
-
-      doc.setDrawColor(241, 245, 249);
-      doc.line(leftMargin, currentY + 4.5, rightMargin, currentY + 4.5);
-      currentY += 5.8;
-    });
-    currentY += 4;
-  }
-
-  // ----------------------------------------------------
-  // SECTION 8: CERTIFICATION & AUDIT INTEGRITY SEAL
-  // ----------------------------------------------------
-  addPageIfNeeded(24);
-  currentY += 3;
-  doc.setFillColor(255, 249, 251);
-  doc.setDrawColor(252, 231, 243);
-  doc.roundedRect(leftMargin, currentY, contentWidth, 16, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(131, 24, 67);
-  doc.text('OFFICIAL CERTIFICATE OF RECONCILIATION & AUDIT INTEGRITY', leftMargin + 4, currentY + 5.5);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.2);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`This document is the official All-in-One Master Report certified by the Nail Glam Hub Intelligence Engine.`, leftMargin + 4, currentY + 9.5);
-  doc.text(`Audit Hash: NGH-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)} | Delivered securely to verified recipient.`, leftMargin + 4, currentY + 13.5);
-
-  return doc;
-}
-
-/**
- * Builds an authentic Admin Master Platform Growth & Governance PDF document
- */
-export function buildAdminMasterReportPdf(data: AdminReportData): jsPDF {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const pageWidth = 210;
-  const leftMargin = 14;
-  const rightMargin = 196;
-  const contentWidth = 182;
-  let currentY = 16;
-
-  // Header Bar
-  doc.setFillColor(131, 24, 67);
-  doc.rect(0, 0, pageWidth, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('NAIL GLAM HUB - PLATFORM EXECUTIVE GOVERNANCE DOSSIER', leftMargin, 11);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(252, 231, 243);
-  doc.text('ECOSYSTEM METRICS, DIRECTORY PARTNERS & MARKETPLACE AUDIT', leftMargin, 16.5);
-
-  currentY = 32;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(157, 23, 77);
-  doc.text('Platform Strategic Growth & Governance Audit', leftMargin, currentY);
-
-  currentY += 5.5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Generated: ${data.generatedDate || new Date().toLocaleString()}   |   Status: Operational 100%`, leftMargin, currentY);
-
-  currentY += 8;
-  // KPI Cards
-  const kpis = [
-    { label: 'ACTIVE SALONS', value: `${data.totalSalons}`, sub: `${data.verifiedSalons} Verified Partners` },
-    { label: 'TOTAL BOOKINGS', value: `${data.totalAppointments}`, sub: 'Across platform network' },
-    { label: 'REGISTERED USERS', value: `${data.totalUsers}`, sub: 'Clients, Staff & Owners' },
-    { label: 'CUSTOMER SENTIMENT', value: `★ ${data.avgRating}`, sub: `${data.totalReviews} Total Reviews` },
-  ];
-
-  const colWidth = (contentWidth - 6) / 4;
-  kpis.forEach((kpi, idx) => {
-    const x = leftMargin + idx * (colWidth + 2);
-    doc.setFillColor(255, 249, 251);
-    doc.setDrawColor(252, 231, 243);
-    doc.roundedRect(x, currentY, colWidth, 18, 2, 2, 'FD');
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(157, 23, 77);
-    doc.text(kpi.label, x + 3, currentY + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(131, 24, 67);
-    doc.text(kpi.value, x + 3, currentY + 11.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(100, 116, 139);
-    doc.text(kpi.sub, x + 3, currentY + 15.5);
-  });
-
-  currentY += 26;
-
-  // Partner Salons Table
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(131, 24, 67);
-  doc.text('DIRECTORY PARTNERS & VERIFICATION STATUS', leftMargin, currentY);
-  currentY += 6;
-
-  doc.setFillColor(255, 241, 247);
-  doc.rect(leftMargin, currentY, contentWidth, 6.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.2);
-  doc.setTextColor(131, 24, 67);
-  doc.text('Salon Brand Name', leftMargin + 3, currentY + 4.5);
-  doc.text('City Location', leftMargin + 75, currentY + 4.5);
-  doc.text('Status', leftMargin + 120, currentY + 4.5);
-  doc.text('Services', leftMargin + 150, currentY + 4.5, { align: 'center' });
-  doc.text('Technicians', rightMargin - 3, currentY + 4.5, { align: 'right' });
-  currentY += 6.8;
-
-  data.salonsList.forEach((s, idx) => {
-    if (idx % 2 === 1) {
-      doc.setFillColor(254, 250, 252);
-      doc.rect(leftMargin, currentY - 1, contentWidth, 5.8, 'F');
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(30, 41, 59);
-    doc.text(sanitizePdfText(s.name), leftMargin + 3, currentY + 3.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(sanitizePdfText(s.city), leftMargin + 75, currentY + 3.5);
-    doc.text(sanitizePdfText(s.status.toUpperCase()), leftMargin + 120, currentY + 3.5);
-    doc.text(`${s.servicesCount}`, leftMargin + 150, currentY + 3.5, { align: 'center' });
-    doc.text(`${s.staffCount}`, rightMargin - 3, currentY + 3.5, { align: 'right' });
-
-    doc.setDrawColor(241, 245, 249);
-    doc.line(leftMargin, currentY + 4.5, rightMargin, currentY + 4.5);
-    currentY += 5.8;
-  });
-
-  return doc;
-}
-
-/**
- * Returns raw base64 data for the All-in-One Master Report PDF
- */
-export function generateAllInOneMasterPdfBase64(data: StoreReportData): string {
-  try {
-    const doc = buildAllInOneMasterReportPdf(data);
-    const dataUri = doc.output('datauristring');
-    return dataUri.split(',')[1] || '';
-  } catch (err) {
-    console.warn('generateAllInOneMasterPdfBase64 warning:', err);
-    return '';
-  }
-}
-
-/**
- * Downloads the certified All-in-One Master Report PDF directly to customer's machine
- */
-export function downloadAllInOneMasterPdf(data: StoreReportData, filename?: string): boolean {
-  try {
-    const doc = buildAllInOneMasterReportPdf(data);
-    const rawName = filename || `${data.salonName || 'Salon'}_All_In_One_Master_Report_${data.volumeSummary?.grain || 'monthly'}.pdf`;
-    const safeName = sanitizePdfText(rawName).replace(/[^a-zA-Z0-9_.-]/g, '_') || 'All_In_One_Master_Report.pdf';
-    doc.save(safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`);
-    return true;
-  } catch (err) {
-    console.error('downloadAllInOneMasterPdf error:', err);
-    return false;
-  }
-}
-
-/**
- * Generates an official, certified binary PDF report for email attachments using jsPDF
- */
-export function generateCertifiedPdfDocument(options: {
-  title: string;
-  recipientName?: string;
-  recipientEmail?: string;
-  periodLabel?: string;
-  salonName?: string;
-  salonAddress?: string;
-  storeReportData?: StoreReportData;
-  adminReportData?: AdminReportData;
-  metrics?: {
-    grossRevenue?: number;
-    netProfit?: number;
-    profitMargin?: number;
-    appointmentCount?: number;
-    orderCount?: number;
-    averageTicket?: number;
-  };
-  summaryText?: string;
-}): string {
-  try {
-    if (options.storeReportData) {
-      return generateAllInOneMasterPdfBase64(options.storeReportData);
-    }
-    if (options.adminReportData) {
-      const doc = buildAdminMasterReportPdf(options.adminReportData);
-      const dataUri = doc.output('datauristring');
-      return dataUri.split(',')[1] || '';
-    }
-    const doc = buildPdfDocument(options);
-    const dataUri = doc.output('datauristring');
-    const base64Data = dataUri.split(',')[1] || '';
-    return base64Data;
-  } catch (err) {
-    console.warn('jsPDF generation warning:', err);
-    return '';
-  }
-}
-
-/**
- * Triggers instant direct download of certified PDF performance report file
- */
-export function downloadCertifiedPdfFile(filename: string, options: Parameters<typeof generateCertifiedPdfDocument>[0]): boolean {
-  try {
-    if (options.storeReportData) {
-      return downloadAllInOneMasterPdf(options.storeReportData, filename);
-    }
-    if (options.adminReportData) {
-      const doc = buildAdminMasterReportPdf(options.adminReportData);
-      const safeName = sanitizePdfText(filename).replace(/[^a-zA-Z0-9_-]/g, '_') || 'Admin_Master_Report';
-      doc.save(safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`);
-      return true;
-    }
-    const doc = buildPdfDocument(options);
-    const safeName = sanitizePdfText(filename).replace(/[^a-zA-Z0-9_-]/g, '_') || 'Performance_Report';
-    const finalFilename = safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`;
-    doc.save(finalFilename);
-    return true;
-  } catch (err) {
-    console.error('Failed to download PDF:', err);
-    return false;
-  }
-}
-
-/**
- * Builds a certified jsPDF instance for fallback performance audits
+ * Builds a certified jsPDF instance for performance audits
  */
 export function buildPdfDocument(options: {
   title: string;
@@ -861,7 +82,6 @@ export function buildPdfDocument(options: {
   periodLabel?: string;
   salonName?: string;
   salonAddress?: string;
-  storeReportData?: StoreReportData;
   metrics?: {
     grossRevenue?: number;
     netProfit?: number;
@@ -872,10 +92,6 @@ export function buildPdfDocument(options: {
   };
   summaryText?: string;
 }): jsPDF {
-  if (options.storeReportData) {
-    return buildAllInOneMasterReportPdf(options.storeReportData, options);
-  }
-
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -890,13 +106,13 @@ export function buildPdfDocument(options: {
   const cleanPeriod = sanitizePdfText(options.periodLabel || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
 
   // Brand Header Bar
-  doc.setFillColor(131, 24, 67); // Wine #831843
+  doc.setFillColor(219, 39, 119); // #DB2777 Rose Pink
   doc.rect(0, 0, 210, 22, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text('NAIL GLAM HUB - ALL-IN-ONE MASTER REPORT', 14, 14);
+  doc.text('NAIL GLAM HUB - OFFICIAL PERFORMANCE AUDIT', 14, 14);
 
   // Document Title & Metadata
   doc.setTextColor(157, 23, 77); // #9D174D
@@ -1049,9 +265,56 @@ export function buildPdfDocument(options: {
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(156, 163, 175);
-  doc.text('Nail Glam Hub - All-in-One Master Performance Dossier', 105, 285, { align: 'center' });
+  doc.text('Nail Glam Hub - Confidential Business Performance Dossier', 105, 285, { align: 'center' });
 
   return doc;
+}
+
+/**
+ * Generates an official, certified binary PDF report for email attachments using jsPDF
+ */
+export function generateCertifiedPdfDocument(options: {
+  title: string;
+  recipientName?: string;
+  recipientEmail?: string;
+  periodLabel?: string;
+  salonName?: string;
+  salonAddress?: string;
+  metrics?: {
+    grossRevenue?: number;
+    netProfit?: number;
+    profitMargin?: number;
+    appointmentCount?: number;
+    orderCount?: number;
+    averageTicket?: number;
+  };
+  summaryText?: string;
+}): string {
+  try {
+    const doc = buildPdfDocument(options);
+    const dataUri = doc.output('datauristring');
+    const base64Data = dataUri.split(',')[1] || '';
+    return base64Data;
+  } catch (err) {
+    console.warn('jsPDF generation warning:', err);
+    return '';
+  }
+}
+
+/**
+ * Triggers instant direct download of certified PDF performance report file
+ */
+export function downloadCertifiedPdfFile(filename: string, options: Parameters<typeof buildPdfDocument>[0]): boolean {
+  try {
+    const doc = buildPdfDocument(options);
+    const safeName = sanitizePdfText(filename).replace(/[^a-zA-Z0-9_-]/g, '_') || 'Performance_Report';
+    const finalFilename = safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`;
+    doc.save(finalFilename);
+    return true;
+  } catch (err) {
+    console.error('Failed to download PDF:', err);
+    return false;
+  }
 }
 
 /**
@@ -1130,23 +393,13 @@ function createRawEmail(options: EmailDispatchOptions, senderEmail?: string): st
     const rawAttachmentName = options.attachmentName || 'Performance_Report.pdf';
     const attachmentFilename = rawAttachmentName.endsWith('.pdf') ? rawAttachmentName : `${rawAttachmentName}.pdf`;
 
-    // Generate true binary PDF base64 using All-in-One Master Report jsPDF engine
-    let pdfBase64 = options.pdfBase64;
-    if (!pdfBase64 && options.storeReportData) {
-      pdfBase64 = generateAllInOneMasterPdfBase64(options.storeReportData);
-    }
-    if (!pdfBase64 && options.adminReportData) {
-      const doc = buildAdminMasterReportPdf(options.adminReportData);
-      pdfBase64 = doc.output('datauristring').split(',')[1] || '';
-    }
-    if (!pdfBase64) {
-      pdfBase64 = generateCertifiedPdfDocument({
-        title: options.subject,
-        recipientName: options.toName,
-        recipientEmail: options.to,
-        summaryText: options.htmlBody ? options.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300) : undefined,
-      });
-    }
+    // Generate true binary PDF base64 using jsPDF
+    const pdfBase64 = generateCertifiedPdfDocument({
+      title: options.subject,
+      recipientName: options.toName,
+      recipientEmail: options.to,
+      summaryText: options.htmlBody ? options.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300) : undefined,
+    });
 
     const isRealPdf = Boolean(pdfBase64 && pdfBase64.length > 50);
     const mimeType = isRealPdf ? 'application/pdf' : 'text/html';
