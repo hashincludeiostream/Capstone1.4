@@ -401,7 +401,13 @@ const AppContent: React.FC = () => {
     setCustomerAppointmentsLoading(true);
     try {
       const appts = await fetchAppointments({ customer_id: currentUser.id });
-      setCustomerAppointments(appts);
+      const sortedAppts = (Array.isArray(appts) ? appts : []).sort((a, b) => {
+        const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
+        const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
+        if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
+      setCustomerAppointments(sortedAppts);
     } catch (err) {
       console.error('Failed to load customer appointments:', err);
     } finally {
@@ -474,6 +480,13 @@ const AppContent: React.FC = () => {
           })
         );
 
+        apptsAcc.sort((a, b) => {
+          const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
+          const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
+          if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
+
         setOwnerAppointments(apptsAcc);
         setOwnerProductOrders(ordersAcc);
         setOwnerServices(servsAcc);
@@ -522,7 +535,13 @@ const AppContent: React.FC = () => {
           if (liveAppts && liveAppts.length > 0) {
             setOwnerAppointments((prev) => {
               const otherSalonAppts = prev.filter((a) => a.salon_id !== s.id);
-              return [...otherSalonAppts, ...liveAppts];
+              const merged = [...otherSalonAppts, ...liveAppts];
+              return merged.sort((a, b) => {
+                const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
+                const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
+                if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+                return Number(b.id || 0) - Number(a.id || 0);
+              });
             });
           }
         })

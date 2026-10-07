@@ -160,11 +160,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     }
   };
 
-  const filteredAppointments = appointments.filter((a) => {
-    if (filterStatus === 'upcoming') return a.status === 'pending' || a.status === 'confirmed';
-    if (filterStatus === 'past') return a.status === 'completed' || a.status === 'cancelled';
-    return true;
-  });
+  const filteredAppointments = appointments
+    .filter((a) => {
+      if (filterStatus === 'upcoming') return a.status === 'pending' || a.status === 'confirmed';
+      if (filterStatus === 'past') return a.status === 'completed' || a.status === 'cancelled';
+      return true;
+    })
+    .sort((a, b) => {
+      const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
+      const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
+      if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
   const getStatusBadge = (status: string) => {
     switch (status) {

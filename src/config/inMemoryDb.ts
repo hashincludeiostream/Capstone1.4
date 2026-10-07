@@ -432,8 +432,27 @@ class InMemoryDatabase {
         return [[{ [alias]: filtered.length, count: filtered.length, total: filtered.length, booked: filtered.length }], null];
       }
 
-      if (/ORDER BY\s+(appointment_date|created_at)\s+DESC/i.test(sql)) {
-        filtered.sort((a, b) => new Date(b.appointment_date || b.created_at).getTime() - new Date(a.appointment_date || a.created_at).getTime());
+      if (/ORDER BY\s+created_at\s+DESC/i.test(sql) || !/ORDER BY/i.test(sql)) {
+        filtered.sort((a, b) => {
+          const timeB = new Date(b.created_at || b.updated_at || b.cancelled_at || 0).getTime();
+          const timeA = new Date(a.created_at || a.updated_at || a.cancelled_at || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
+      } else if (/ORDER BY\s+appointment_date\s+DESC/i.test(sql)) {
+        filtered.sort((a, b) => {
+          const timeB = new Date(b.appointment_date || b.created_at || 0).getTime();
+          const timeA = new Date(a.appointment_date || a.created_at || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
+      } else if (/ORDER BY\s+(appointment_date|created_at)\s+DESC/i.test(sql)) {
+        filtered.sort((a, b) => {
+          const timeB = new Date(b.created_at || b.updated_at || b.appointment_date || 0).getTime();
+          const timeA = new Date(a.created_at || a.updated_at || a.appointment_date || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
       }
       return [filtered, null];
     }
@@ -597,17 +616,23 @@ class InMemoryDatabase {
     const tableName = this.getTableName(sql, /UPDATE\s+([`\w]+)/i);
     const table = this.tables[tableName] || [];
 
-    // Check if updating by ID (last parameter is usually WHERE id = ?)
-    const whereIdMatch = sql.match(/WHERE\s+id\s*=\s*\?/i);
-    const whereReelMatch = sql.match(/WHERE\s+id\s*=\s*\?/i);
+    // Check if updating by ID or transaction_reference
+    const whereIdMatch = sql.match(/WHERE\s+(?:[`\w]+\.)?id\s*=\s*\?/i);
+    const whereRefMatch = sql.match(/WHERE\s+transaction_reference\s*=\s*\?/i);
 
-    if (whereIdMatch || whereReelMatch) {
-      const id = Number(params[params.length - 1]);
-      const record = table.find((item) => item.id === id);
+    if (whereIdMatch || whereRefMatch) {
+      let record: any;
+      if (whereIdMatch) {
+        const id = Number(params[params.length - 1]);
+        record = table.find((item) => Number(item.id) === id);
+      } else if (whereRefMatch) {
+        const ref = String(params[params.length - 1]);
+        record = table.find((item) => item.transaction_reference === ref);
+      }
 
       if (record) {
         // Parse SET clause: SET col1 = ?, col2 = ? ...
-        const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/i);
+        const setMatch = sql.match(/SET\s+([\s\S]+?)\s+WHERE/i);
         if (setMatch) {
           const assignments = setMatch[1].split(',').map((s) => s.trim());
           let paramIdx = 0;

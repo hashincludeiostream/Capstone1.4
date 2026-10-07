@@ -194,6 +194,7 @@ export interface Appointment {
   rescheduled_from_id?: number;
   reschedule_count?: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Review {
@@ -387,6 +388,7 @@ export interface ProductOrder {
   unclaimed_at?: string;
   unclaimed_reason?: string;
   is_overdue_unclaimed?: boolean;
+  order_date?: string;
   created_at: string;
   updated_at?: string;
 }

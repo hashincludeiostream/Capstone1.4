@@ -190,23 +190,101 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   // Filter out trashed and deleted notifications from active lists
   const isExcluded = (id: string) => isTrashed(id) || isDeleted(id);
 
-  // Active Customer Bookings
-  const displayedCustomerBookings = customerAppointments.filter(
-    (a) => !isExcluded(`cust-appt-${a.id}`)
-  );
+  // Helper to extract recency timestamp for appointments (LIFO)
+  const getApptRecency = (a: Appointment): number => {
+    const dates = [a.updated_at, a.cancelled_at, a.created_at];
+    for (const d of dates) {
+      if (d) {
+        const parsed = new Date(d).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    }
+    if (a.appointment_date) {
+      const timeStr = a.appointment_time ? `T${a.appointment_time.length === 5 ? a.appointment_time : '00:00'}` : 'T00:00';
+      const parsed = new Date(`${a.appointment_date}${timeStr}`).getTime();
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return Number(a.id) || 0;
+  };
 
-  // Active Owner Bookings
-  const ownerPendingAppointments = ownerAppointments.filter(
-    (a) => a.status === 'pending' && !isExcluded(`owner-appt-${a.id}`)
-  );
+  // Helper to extract recency timestamp for product orders (LIFO)
+  const getOrderRecency = (o: ProductOrder): number => {
+    const dates = [o.updated_at, (o as any).cancelled_at, o.created_at, o.order_date];
+    for (const d of dates) {
+      if (d) {
+        const parsed = new Date(d).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    }
+    return Number(o.id) || 0;
+  };
 
-  const ownerConfirmedAppointments = ownerAppointments.filter(
-    (a) => a.status === 'confirmed' && !isExcluded(`owner-appt-${a.id}`)
-  );
+  // Helper to extract recency timestamp for system notifications (LIFO)
+  const getSystemNotifRecency = (s: SystemNotification): number => {
+    if (s.timestamp) {
+      const parsed = new Date(s.timestamp).getTime();
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 0;
+  };
 
-  const ownerCancelledAppointments = ownerAppointments.filter(
-    (a) => a.status === 'cancelled' && !isExcluded(`owner-appt-${a.id}`)
-  );
+  // Helper to extract recency timestamp for announcements (LIFO)
+  const getAnnouncementRecency = (ann: any): number => {
+    const dates = [ann.updated_at, ann.created_at];
+    for (const d of dates) {
+      if (d) {
+        const parsed = new Date(d).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    }
+    return Number(ann.id) || 0;
+  };
+
+  // Helper to extract recency timestamp for salons (LIFO)
+  const getSalonRecency = (s: any): number => {
+    const dates = [s.updated_at, s.created_at];
+    for (const d of dates) {
+      if (d) {
+        const parsed = new Date(d).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    }
+    return Number(s.id) || 0;
+  };
+
+  // Active Customer Bookings arranged in LIFO order
+  const displayedCustomerBookings = customerAppointments
+    .filter((a) => !isExcluded(`cust-appt-${a.id}`))
+    .sort((a, b) => {
+      const diff = getApptRecency(b) - getApptRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+
+  // Active Owner Bookings arranged in LIFO order
+  const ownerPendingAppointments = ownerAppointments
+    .filter((a) => a.status === 'pending' && !isExcluded(`owner-appt-${a.id}`))
+    .sort((a, b) => {
+      const diff = getApptRecency(b) - getApptRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+
+  const ownerConfirmedAppointments = ownerAppointments
+    .filter((a) => a.status === 'confirmed' && !isExcluded(`owner-appt-${a.id}`))
+    .sort((a, b) => {
+      const diff = getApptRecency(b) - getApptRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+
+  const ownerCancelledAppointments = ownerAppointments
+    .filter((a) => a.status === 'cancelled' && !isExcluded(`owner-appt-${a.id}`))
+    .sort((a, b) => {
+      const diff = getApptRecency(b) - getApptRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
   // In-Store Cart & Orders
   const effectiveCartCount =
@@ -219,42 +297,68 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
     0
   );
 
-  const activeCustomerOrders = customerOrders.filter(
-    (o) =>
-      (o.status === 'pending_pickup' || o.status === 'ready_for_pickup') &&
-      !isExcluded(`cust-order-${o.id}`)
-  );
+  const activeCustomerOrders = customerOrders
+    .filter(
+      (o) =>
+        (o.status === 'pending_pickup' || o.status === 'ready_for_pickup') &&
+        !isExcluded(`cust-order-${o.id}`)
+    )
+    .sort((a, b) => {
+      const diff = getOrderRecency(b) - getOrderRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
-  const ownerPendingOrders = ownerProductOrders.filter(
-    (o) => o.status === 'pending_pickup' && !isExcluded(`owner-order-${o.id}`)
-  );
+  const ownerPendingOrders = ownerProductOrders
+    .filter((o) => o.status === 'pending_pickup' && !isExcluded(`owner-order-${o.id}`))
+    .sort((a, b) => {
+      const diff = getOrderRecency(b) - getOrderRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
-  // Alerts & Governance
-  const activeAnnouncements = announcements.filter(
-    (a) =>
-      a.is_active &&
-      !isAnnouncementViewed(a.id) &&
-      !dismissedAnnouncements.includes(a.id) &&
-      !isExcluded(`announcement-${a.id}`)
-  );
+  // Alerts & Governance arranged in LIFO order
+  const activeAnnouncements = announcements
+    .filter(
+      (a) =>
+        a.is_active &&
+        !isAnnouncementViewed(a.id) &&
+        !dismissedAnnouncements.includes(a.id) &&
+        !isExcluded(`announcement-${a.id}`)
+    )
+    .sort((a, b) => {
+      const diff = getAnnouncementRecency(b) - getAnnouncementRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
-  const ownerPendingSalons = ownerSalons.filter(
-    (s) => s.verification_status === 'pending' && !isExcluded(`owner-branch-${s.id}`)
-  );
+  const ownerPendingSalons = ownerSalons
+    .filter((s) => s.verification_status === 'pending' && !isExcluded(`owner-branch-${s.id}`))
+    .sort((a, b) => {
+      const diff = getSalonRecency(b) - getSalonRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
-  const activeAdminPendingSalons = adminPendingSalons.filter(
-    (s) => !isExcluded(`admin-salon-${s.id}`)
-  );
+  const activeAdminPendingSalons = adminPendingSalons
+    .filter((s) => !isExcluded(`admin-salon-${s.id}`))
+    .sort((a, b) => {
+      const diff = getSalonRecency(b) - getSalonRecency(a);
+      if (diff !== 0) return diff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
-  // System Notifications for the current user role
-  const roleSystemNotifs = systemNotifications.filter(
-    (s) =>
-      !isExcluded(s.id) &&
-      (!s.recipient_role ||
-        s.recipient_role === 'all' ||
-        s.recipient_role === currentUser?.user_type) &&
-      (!s.recipient_user_id || s.recipient_user_id === currentUser?.id)
-  );
+  // System Notifications for the current user role arranged in LIFO order
+  const roleSystemNotifs = systemNotifications
+    .filter(
+      (s) =>
+        !isExcluded(s.id) &&
+        (!s.recipient_role ||
+          s.recipient_role === 'all' ||
+          s.recipient_role === currentUser?.user_type) &&
+        (!s.recipient_user_id || s.recipient_user_id === currentUser?.id)
+    )
+    .sort((a, b) => getSystemNotifRecency(b) - getSystemNotifRecency(a));
 
   const bookingSystemNotifs = roleSystemNotifs.filter((s) => s.category === 'bookings');
   const alertSystemNotifs = roleSystemNotifs.filter((s) => s.category === 'alerts');
@@ -291,12 +395,13 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   const unreadCount = globalUnreadCount;
   const urgentCount = globalUrgentCount;
 
-  // Build the list of trashed items to display in the Trash tab
+  // Build the list of trashed items to display in the Trash tab (arranged in LIFO order)
   interface TrashedItemSummary {
     id: string;
     title: string;
     subtitle: string;
     category: string;
+    timestamp: number;
   }
 
   const trashedItems: TrashedItemSummary[] = [];
@@ -310,6 +415,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         title: a.service_name || 'Appointment',
         subtitle: `${a.appointment_date} at ${a.appointment_time} (${a.salon_name})`,
         category: 'Booking',
+        timestamp: getApptRecency(a),
       });
     }
   });
@@ -323,6 +429,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         title: `${a.customer_name || 'Client'} - ${a.service_name}`,
         subtitle: `${a.appointment_date} at ${a.appointment_time}`,
         category: 'Booking',
+        timestamp: getApptRecency(a),
       });
     }
   });
@@ -336,6 +443,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         title: `Order #${o.order_number || o.id}`,
         subtitle: `Pickup on ${o.pickup_date} • ₱${o.total_amount.toLocaleString()}`,
         category: 'In-Store Cart',
+        timestamp: getOrderRecency(o),
       });
     }
   });
@@ -349,6 +457,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         title: `Fulfill Order #${o.order_number || o.id}`,
         subtitle: `${o.customer_name} • ₱${o.total_amount.toLocaleString()}`,
         category: 'In-Store Cart',
+        timestamp: getOrderRecency(o),
       });
     }
   });
@@ -361,6 +470,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         title: s.title,
         subtitle: s.message,
         category: s.category === 'bookings' ? 'Booking' : s.category === 'alerts' ? 'Alert' : 'Order',
+        timestamp: getSystemNotifRecency(s),
       });
     }
   });
@@ -374,6 +484,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         title: a.title,
         subtitle: a.message || '',
         category: 'Alert',
+        timestamp: getAnnouncementRecency(a),
       });
     }
   });
@@ -384,8 +495,12 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
       title: 'In-Store Reservation Cart',
       subtitle: `${effectiveCartCount} item(s) pending in cart`,
       category: 'In-Store Cart',
+      timestamp: Date.now(),
     });
   }
+
+  // Sort trashed items in LIFO order (most recent first)
+  trashedItems.sort((a, b) => b.timestamp - a.timestamp);
 
   // Helper to render the 3-dot options menu for each notification item
   const renderDotMenu = (itemId: string, itemTitle?: string) => (
