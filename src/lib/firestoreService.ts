@@ -161,7 +161,7 @@ export function subscribeToSalons(
 // ----------------------------------------------------------------------------
 
 export async function createFirestoreAppointment(data: Partial<Appointment>): Promise<Appointment> {
-  const newId = Date.now();
+  const newId = Number(data.id) || Date.now();
   const appointmentRecord: Appointment = {
     id: newId,
     customer_id: Number(data.customer_id || 1),
@@ -214,11 +214,16 @@ export async function updateFirestoreAppointmentStatus(
 ): Promise<boolean> {
   try {
     const ref = doc(db, 'appointments', String(id));
-    await updateDoc(ref, {
-      status,
-      ...(extraData || {}),
-      updated_at: new Date().toISOString(),
-    });
+    await setDoc(
+      ref,
+      {
+        id: Number(id),
+        status,
+        ...(extraData || {}),
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    );
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to update appointment status:', err);
@@ -234,13 +239,14 @@ export async function updateFirestoreAppointmentTechnician(
   try {
     const ref = doc(db, 'appointments', String(id));
     const updateData: Record<string, any> = {
+      id: Number(id),
       technician_id: Number(technicianId),
       updated_at: new Date().toISOString(),
     };
     if (technicianName) {
       updateData.technician_name = technicianName;
     }
-    await updateDoc(ref, updateData);
+    await setDoc(ref, updateData, { merge: true });
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to update appointment technician:', err);

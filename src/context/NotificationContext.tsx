@@ -239,8 +239,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       }
 
       if (!category || category === 'bookings' || category === 'all') {
-        customerAppointments.forEach((a) => allIdsToAdd.push(`cust-appt-${a.id}`));
-        ownerAppointments.forEach((a) => allIdsToAdd.push(`owner-appt-${a.id}`));
+        customerAppointments.forEach((a) => {
+          allIdsToAdd.push(`cust-appt-${a.id}`);
+          allIdsToAdd.push(`cust-appt-${a.id}-${a.status}`);
+        });
+        ownerAppointments.forEach((a) => {
+          allIdsToAdd.push(`owner-appt-${a.id}`);
+          allIdsToAdd.push(`owner-appt-${a.id}-${a.status}`);
+        });
       }
 
       if (!category || category === 'alerts' || category === 'all') {
@@ -319,30 +325,35 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         });
     }
 
-    // 4. Customer Bookings
+    // 4. Customer Bookings (Pending, Confirmed, Cancelled)
     if (currentUser?.user_type === 'customer') {
       customerAppointments
-        .filter((a) => a.status === 'confirmed' || a.status === 'pending')
+        .filter((a) => ['confirmed', 'pending', 'cancelled'].includes(a.status))
         .forEach((a) => {
-          if (!readItemIds.has(`cust-appt-${a.id}`)) {
+          const statusKey = `cust-appt-${a.id}-${a.status}`;
+          if (!readItemIds.has(statusKey)) {
             unread++;
             unreadBookings = true;
             bookingsUnreadCount++;
+            if (a.status === 'cancelled' || a.status === 'confirmed') {
+              urgent++;
+            }
           }
         });
     }
 
-    // 5. Owner Bookings
+    // 5. Owner Bookings (Pending requests, Confirmed schedule, Cancelled bookings)
     if (currentUser?.user_type === 'salon_owner') {
       ownerAppointments
-        .filter((a) => a.status === 'pending' || a.status === 'confirmed')
+        .filter((a) => ['pending', 'confirmed', 'cancelled'].includes(a.status))
         .forEach((a) => {
-          if (!readItemIds.has(`owner-appt-${a.id}`)) {
+          const statusKey = `owner-appt-${a.id}-${a.status}`;
+          if (!readItemIds.has(statusKey)) {
             unread++;
             unreadBookings = true;
             bookingsUnreadCount++;
-            if (a.status === 'pending') {
-              // Booking requests awaiting owner approval can be urgent
+            if (a.status === 'pending' || a.status === 'cancelled') {
+              // Booking requests awaiting owner approval or cancellations are urgent
               urgent++;
             }
           }

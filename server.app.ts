@@ -2920,6 +2920,9 @@ async function startServer() {
     }
   });
 
+  // Concurrent in-flight booking request locks to guarantee zero double-bookings
+  const pendingBookingLocks = new Set<string>();
+
   // Book Appointment
   app.post('/api/appointments', async (req, res) => {
     const {
@@ -2942,12 +2945,45 @@ async function startServer() {
       transaction_reference,
     } = req.body;
 
+    const lockKey = `${Number(customer_id)}_${Number(salon_id)}_${appointment_date}_${appointment_time}`;
+
     try {
       if (!customer_id || !salon_id || !service_id || !customer_name || !appointment_date || !appointment_time) {
         return res.status(400).json({
           error: 'Customer, salon, service, date, time, and customer name are required',
         });
       }
+
+      // Check if an identical booking is currently in-flight
+      if (pendingBookingLocks.has(lockKey)) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const [existingLocked] = await db.execute(
+          `SELECT * FROM appointments 
+           WHERE customer_id = ? AND salon_id = ? AND appointment_date = ? AND appointment_time = ?
+             AND status IN ('pending', 'confirmed')
+           LIMIT 1`,
+          [Number(customer_id), Number(salon_id), appointment_date, appointment_time]
+        );
+        if ((existingLocked as any[]).length > 0) {
+          const existing = (existingLocked as any[])[0];
+          return res.status(200).json({
+            success: true,
+            appointment: {
+              ...existing,
+              customer_id: Number(existing.customer_id),
+              salon_id: Number(existing.salon_id),
+              service_id: Number(existing.service_id),
+              technician_id: existing.technician_id ? Number(existing.technician_id) : null,
+              total_price: Number(existing.total_price) || 0,
+              paid_amount: Number(existing.paid_amount) || 0,
+              remaining_balance: Number(existing.remaining_balance) || 0,
+            },
+            duplicate_prevented: true,
+            message: 'Booking was already registered.',
+          });
+        }
+      }
+      pendingBookingLocks.add(lockKey);
 
       const [customerRows] = await db.execute(
         'SELECT id, fullname, email, phone, user_type, status FROM users WHERE id = ?',
@@ -3007,17 +3043,88 @@ async function startServer() {
         }
       }
 
-        const [conflictRows] = await db.execute(
+      // 1. Prevent duplicate booking via transaction_reference if already processed
+      if (transaction_reference && String(transaction_reference).trim() !== '') {
+        const [existingRefRows] = await db.execute(
+          'SELECT * FROM appointments WHERE transaction_reference = ? LIMIT 1',
+          [String(transaction_reference).trim()]
+        );
+        if ((existingRefRows as any[]).length > 0) {
+          const existing = (existingRefRows as any[])[0];
+          return res.status(200).json({
+            success: true,
+            appointment: {
+              ...existing,
+              customer_id: Number(existing.customer_id),
+              salon_id: Number(existing.salon_id),
+              service_id: Number(existing.service_id),
+              technician_id: existing.technician_id ? Number(existing.technician_id) : null,
+              total_price: Number(existing.total_price) || 0,
+              paid_amount: Number(existing.paid_amount) || 0,
+              remaining_balance: Number(existing.remaining_balance) || 0,
+            },
+            duplicate_prevented: true,
+            message: 'Booking was already registered.',
+          });
+        }
+      }
+
+      // 2. Prevent duplicate booking by the same customer for the same salon, date, and time slot
+      const [existingCustAppts] = await db.execute(
+        `SELECT * FROM appointments 
+         WHERE customer_id = ? AND salon_id = ? AND appointment_date = ? AND appointment_time = ?
+           AND status IN ('pending', 'confirmed')
+         LIMIT 1`,
+        [Number(customer.id), Number(salon_id), appointment_date, appointment_time]
+      );
+      if ((existingCustAppts as any[]).length > 0) {
+        const existing = (existingCustAppts as any[])[0];
+        return res.status(200).json({
+          success: true,
+          appointment: {
+            ...existing,
+            customer_id: Number(existing.customer_id),
+            salon_id: Number(existing.salon_id),
+            service_id: Number(existing.service_id),
+            technician_id: existing.technician_id ? Number(existing.technician_id) : null,
+            total_price: Number(existing.total_price) || 0,
+            paid_amount: Number(existing.paid_amount) || 0,
+            remaining_balance: Number(existing.remaining_balance) || 0,
+          },
+          duplicate_prevented: true,
+          message: 'You already have an appointment scheduled for this time slot.',
+        });
+      }
+
+      // 3. Check specialist / slot conflicts
+      if (technician_id) {
+        const [techConflictRows] = await db.execute(
           `SELECT id FROM appointments
            WHERE salon_id = ? AND appointment_date = ? AND appointment_time = ?
-             AND status IN ('pending', 'confirmed')
-             AND (? IS NULL OR technician_id = ?)
+             AND technician_id = ? AND status IN ('pending', 'confirmed')
            LIMIT 1`,
-          [Number(salon_id), appointment_date, appointment_time, technician_id ? Number(technician_id) : null, technician_id ? Number(technician_id) : null]
+          [Number(salon_id), appointment_date, appointment_time, Number(technician_id)]
         );
-        if ((conflictRows as any[]).length > 0) {
-          return res.status(409).json({ error: 'That appointment time is already reserved' });
+        if ((techConflictRows as any[]).length > 0) {
+          return res.status(409).json({ error: 'The selected specialist is already reserved for this time slot.' });
         }
+      } else {
+        const [techCountRows] = await db.execute(
+          'SELECT COUNT(*) as total FROM technicians WHERE salon_id = ? AND is_available = 1',
+          [Number(salon_id)]
+        );
+        const totalTechs = Math.max(1, Number((techCountRows as any[])[0]?.total || 1));
+        const [bookedCountRows] = await db.execute(
+          `SELECT COUNT(*) as booked FROM appointments
+           WHERE salon_id = ? AND appointment_date = ? AND appointment_time = ?
+             AND status IN ('pending', 'confirmed')`,
+          [Number(salon_id), appointment_date, appointment_time]
+        );
+        const bookedCount = Number((bookedCountRows as any[])[0]?.booked || 0);
+        if (bookedCount >= totalTechs) {
+          return res.status(409).json({ error: 'All salon specialists are booked for this time slot.' });
+        }
+      }
 
       const totalServicePrice = Number(service.price) || 0;
       const calculatedPaid = Number(paid_amount) || 0;
@@ -3139,6 +3246,8 @@ async function startServer() {
         error: 'Server error booking appointment',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
+    } finally {
+      pendingBookingLocks.delete(lockKey);
     }
   });
 
@@ -3260,6 +3369,63 @@ async function startServer() {
 
       const [updatedRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
       const updatedAppt = (updatedRows as any[])[0];
+
+      // Dispatch real-time cancellation alerts to both Customer and Salon Owner
+      try {
+        const targetCustEmail = updatedAppt.customer_email;
+        if (targetCustEmail) {
+          await logEmailRecord({
+            recipient_email: targetCustEmail,
+            recipient_name: updatedAppt.customer_name || 'Valued Client',
+            recipient_role: 'customer',
+            subject: `Appointment Cancelled: ${updatedAppt.service_name} (${updatedAppt.appointment_date})`,
+            category: 'booking',
+            content_preview: `Your appointment for ${updatedAppt.service_name} on ${updatedAppt.appointment_date} at ${updatedAppt.appointment_time} has been cancelled.`,
+            html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+              <h2 style="color: #BE185D; margin-top: 0;">Appointment Cancelled</h2>
+              <p>Hello <strong>${updatedAppt.customer_name}</strong>,</p>
+              <p>Your appointment at <strong>${updatedAppt.salon_name}</strong> has been cancelled.</p>
+              <p><strong>Reason:</strong> ${reason}</p>
+              ${cancellationFee > 0 ? `<p style="color: #991B1B;"><strong>Late Cancellation Fee:</strong> ₱${cancellationFee.toLocaleString()}</p>` : '<p><strong>Cancellation Fee:</strong> ₱0.00 (Waived / within grace window)</p>'}
+            </div>`,
+          });
+        }
+
+        // Alert Salon Owner
+        let salonOwnerEmail = salonConfig?.email;
+        if (!salonOwnerEmail && appointment.salon_id) {
+          const [salonDetailRows] = await db.execute('SELECT owner_id, email FROM salons WHERE id = ?', [Number(appointment.salon_id)]);
+          const salonRow = (salonDetailRows as any[])[0];
+          salonOwnerEmail = salonRow?.email;
+          if (!salonOwnerEmail && salonRow?.owner_id) {
+            const [ownerUserRows] = await db.execute('SELECT email FROM users WHERE id = ?', [Number(salonRow.owner_id)]);
+            salonOwnerEmail = (ownerUserRows as any[])[0]?.email;
+          }
+        }
+        if (salonOwnerEmail) {
+          await logEmailRecord({
+            recipient_email: salonOwnerEmail,
+            recipient_name: updatedAppt.salon_name || 'Salon Manager',
+            recipient_role: 'salon_owner',
+            subject: `Booking Cancelled Alert: ${updatedAppt.customer_name} for ${updatedAppt.appointment_date}`,
+            category: 'booking',
+            content_preview: `Booking for ${updatedAppt.customer_name} (${updatedAppt.service_name}) was cancelled. Reason: ${reason}.`,
+            html_body: `<div style="font-family: sans-serif; padding: 20px;">
+              <h3 style="color: #BE185D;">Appointment Cancellation Notice</h3>
+              <p>An appointment was cancelled at <strong>${updatedAppt.salon_name}</strong>:</p>
+              <ul>
+                <li><strong>Customer:</strong> ${updatedAppt.customer_name}</li>
+                <li><strong>Service:</strong> ${updatedAppt.service_name}</li>
+                <li><strong>Schedule:</strong> ${updatedAppt.appointment_date} at ${updatedAppt.appointment_time}</li>
+                <li><strong>Cancelled by:</strong> ${by === 'customer' ? 'Customer' : 'Salon'}</li>
+                <li><strong>Reason:</strong> ${reason}</li>
+              </ul>
+            </div>`,
+          });
+        }
+      } catch (cancelEmailErr) {
+        console.warn('Cancellation alert email warning:', cancelEmailErr);
+      }
 
       res.json({
         success: true,
@@ -4157,6 +4323,18 @@ async function startServer() {
           // Derive app origin for PayMongo redirect return
           const origin = req.body.origin || req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : 'http://localhost:3000');
 
+          // Extract customer billing details for PayMongo checkout session
+          const billingInfo: Record<string, string> = {};
+          if (customerName && String(customerName).trim()) {
+            billingInfo.name = String(customerName).trim();
+          }
+          if (customerEmail && String(customerEmail).trim()) {
+            billingInfo.email = String(customerEmail).trim();
+          }
+          if (customerPhone && String(customerPhone).trim()) {
+            billingInfo.phone = String(customerPhone).trim();
+          }
+
           const pmRes = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
             method: 'POST',
             headers: {
@@ -4166,11 +4344,12 @@ async function startServer() {
             body: JSON.stringify({
               data: {
                 attributes: {
-                  send_email_receipt: true,
+                  send_email_receipt: Boolean(customerEmail && String(customerEmail).trim()),
                   show_description: true,
                   show_line_items: true,
                   payment_method_types: paymongoPaymentMethods,
                   description: `${paymentType === 'deposit' ? '20% Reservation Deposit' : 'Service Booking'} for ${salonName || 'Nail Salon'}`,
+                  billing: Object.keys(billingInfo).length > 0 ? billingInfo : undefined,
                   success_url: `${origin}/?payment_status=success&ref=${txRef}`,
                   cancel_url: `${origin}/?payment_status=cancelled&ref=${txRef}`,
                   line_items: [
@@ -4179,7 +4358,7 @@ async function startServer() {
                       currency: 'PHP',
                       name: `${paymentType === 'deposit' ? 'Reservation Deposit' : 'Salon Service'} - ${salonName || 'Nail Glam Hub'}`,
                       quantity: 1,
-                      description: `Reference: ${txRef}`,
+                      description: `Client: ${customerName || 'Valued Client'}${customerEmail ? ` • ${customerEmail}` : ''}${customerPhone ? ` • ${customerPhone}` : ''} • Ref: ${txRef}`,
                     },
                   ],
                 },

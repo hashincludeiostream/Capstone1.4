@@ -552,6 +552,23 @@ const AppContent: React.FC = () => {
     }
   }, [currentUser?.id, currentUser?.user_type, salons, announcements]);
 
+  // Synchronize appointments across customer, owner, and admin accounts on any status change
+  useEffect(() => {
+    const handleGlobalApptChange = () => {
+      if (currentUser?.user_type === 'customer') {
+        loadCustomerAppointments();
+      }
+      if (currentUser?.user_type === 'salon_owner') {
+        loadOwnerData();
+      }
+      if (currentUser?.user_type === 'admin') {
+        loadAdminData();
+      }
+    };
+    window.addEventListener('appointment-status-changed', handleGlobalApptChange);
+    return () => window.removeEventListener('appointment-status-changed', handleGlobalApptChange);
+  }, [currentUser?.id, currentUser?.user_type]);
+
   // Cart Operations
   const handleAddToCart = (product: Product, quantity = 1) => {
     if (!currentUser || currentUser.user_type !== 'customer') {
@@ -1563,6 +1580,10 @@ const AppContent: React.FC = () => {
                     : 'overview'
                 }
                 onNavigateTab={(tab) => handleNavigate(tab)}
+                onRefreshAppointments={() => {
+                  loadOwnerData();
+                  loadCustomerAppointments();
+                }}
               />
             ) : currentUser ? (
               <div className="py-16 text-center bg-white rounded-3xl p-8 border border-purple-100 max-w-lg mx-auto shadow-sm">
@@ -1894,6 +1915,7 @@ const AppContent: React.FC = () => {
           onSuccess={(newAppt) => {
             showToast(`Appointment reserved with ${newAppt.salon_name}!`);
             loadCustomerAppointments();
+            loadOwnerData();
           }}
         />
       )}

@@ -78,6 +78,19 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     load();
   }, [currentUser.id]);
 
+  // Synchronize when owner confirms or cancels appointments
+  useEffect(() => {
+    const handleRemoteChange = () => {
+      fetchAppointments({ customer_id: currentUser.id }).then((list) => {
+        if (Array.isArray(list)) {
+          setAppointments(list);
+        }
+      });
+    };
+    window.addEventListener('appointment-status-changed', handleRemoteChange);
+    return () => window.removeEventListener('appointment-status-changed', handleRemoteChange);
+  }, [currentUser.id]);
+
   const handleConfirmCancel = async (
     appointmentId: number,
     data: {
@@ -93,6 +106,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       cancelled_by: 'customer',
     });
     await reloadAppointments();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('appointment-status-changed', {
+          detail: { id: appointmentId, status: 'cancelled' },
+        })
+      );
+    }
   };
 
   const handleConfirmReschedule = async (
@@ -101,6 +121,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   ) => {
     await rescheduleAppointment(appointmentId, data);
     await reloadAppointments();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('appointment-status-changed', {
+          detail: { id: appointmentId, status: 'confirmed' },
+        })
+      );
+    }
   };
 
   const filteredAppointments = appointments.filter((a) => {

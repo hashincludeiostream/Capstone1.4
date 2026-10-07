@@ -353,6 +353,10 @@ class InMemoryDatabase {
         const id = Number(params[0]);
         return [table.filter((a) => a.id === id), null];
       }
+      if (/WHERE transaction_reference\s*=\s*\?/i.test(sql)) {
+        const ref = String(params[0]);
+        return [table.filter((a) => a.transaction_reference === ref && a.transaction_reference !== ''), null];
+      }
       if (/WHERE service_id\s*=\s*\?\s+AND\s+status\s+IN/i.test(sql)) {
         const sId = Number(params[0]);
         return [table.filter((a) => a.service_id === sId && ['pending', 'confirmed'].includes(a.status)), null];
@@ -377,7 +381,7 @@ class InMemoryDatabase {
         ];
       }
 
-      // Filter by customer_id or salon_id or technician_id
+      // Filter by dynamic criteria: customer_id, salon_id, technician_id, date, time, status, reference
       let filtered = [...table];
       let pIdx = 0;
       if (/customer_id\s*=\s*\?/i.test(sql)) {
@@ -388,10 +392,34 @@ class InMemoryDatabase {
         const sId = Number(params[pIdx++]);
         filtered = filtered.filter((a) => a.salon_id === sId);
       }
-      if (/technician_id\s*=\s*\?/i.test(sql)) {
-        const tId = Number(params[pIdx++]);
-        filtered = filtered.filter((a) => a.technician_id === tId);
+      if (/appointment_date\s*=\s*\?/i.test(sql)) {
+        const aDate = String(params[pIdx++]);
+        filtered = filtered.filter((a) => a.appointment_date === aDate);
       }
+      if (/appointment_time\s*=\s*\?/i.test(sql)) {
+        const aTime = String(params[pIdx++]);
+        filtered = filtered.filter((a) => a.appointment_time === aTime);
+      }
+      if (/technician_id\s*=\s*\?/i.test(sql)) {
+        const tId = params[pIdx++];
+        if (tId !== null && tId !== undefined) {
+          filtered = filtered.filter((a) => a.technician_id === Number(tId));
+        }
+      }
+      if (/transaction_reference\s*=\s*\?/i.test(sql)) {
+        const tRef = String(params[pIdx++]);
+        filtered = filtered.filter((a) => a.transaction_reference === tRef);
+      }
+      if (/status\s+IN\s+\('pending',\s*'confirmed'\)/i.test(sql)) {
+        filtered = filtered.filter((a) => ['pending', 'confirmed'].includes(a.status));
+      }
+
+      if (/SELECT\s+COUNT\(\*\)\s+as\s+(\w+)/i.test(sql)) {
+        const aliasMatch = sql.match(/SELECT\s+COUNT\(\*\)\s+as\s+(\w+)/i);
+        const alias = aliasMatch ? aliasMatch[1] : 'count';
+        return [[{ [alias]: filtered.length, count: filtered.length, total: filtered.length, booked: filtered.length }], null];
+      }
+
       if (/ORDER BY\s+(appointment_date|created_at)\s+DESC/i.test(sql)) {
         filtered.sort((a, b) => new Date(b.appointment_date || b.created_at).getTime() - new Date(a.appointment_date || a.created_at).getTime());
       }
@@ -518,6 +546,31 @@ class InMemoryDatabase {
           record[col] = params[index];
         }
       });
+    }
+
+    // Guard against duplicate appointment insertions
+    if (tableName === 'appointments') {
+      if (record.transaction_reference && String(record.transaction_reference).trim() !== '') {
+        const existingByRef = table.find(
+          (a) => a.transaction_reference && String(a.transaction_reference).trim() === String(record.transaction_reference).trim()
+        );
+        if (existingByRef) {
+          return [{ insertId: Number(existingByRef.id), affectedRows: 0 }, null];
+        }
+      }
+
+      // Check same customer, salon, date, time slot
+      const existingSlot = table.find(
+        (a) =>
+          Number(a.customer_id) === Number(record.customer_id) &&
+          Number(a.salon_id) === Number(record.salon_id) &&
+          String(a.appointment_date) === String(record.appointment_date) &&
+          String(a.appointment_time) === String(record.appointment_time) &&
+          ['pending', 'confirmed'].includes(a.status)
+      );
+      if (existingSlot) {
+        return [{ insertId: Number(existingSlot.id), affectedRows: 0 }, null];
+      }
     }
 
     table.push(record);

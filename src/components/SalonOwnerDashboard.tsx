@@ -76,6 +76,7 @@ interface SalonOwnerDashboardProps {
   onOpenRegisterSalon?: () => void;
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
+  onRefreshAppointments?: () => void;
   refreshKey?: number;
   initialSalons?: Salon[];
   targetId?: string | null;
@@ -87,6 +88,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   onOpenRegisterSalon,
   onOpenRegisterBranch,
   onNavigateTab,
+  onRefreshAppointments,
   refreshKey = 0,
   initialSalons,
   targetId,
@@ -348,9 +350,32 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       setAppointments((prev) =>
         prev.map((a) => (a.id === appointmentId ? { ...a, status: newStatus } : a))
       );
+      onRefreshAppointments?.();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('appointment-status-changed', {
+            detail: { id: appointmentId, status: newStatus },
+          })
+        );
+      }
       showToast(`Appointment status updated to ${newStatus}`);
     }
   };
+
+  // Sync when appointments are updated externally (customer booking or cancellation)
+  useEffect(() => {
+    const handleRemoteApptChange = () => {
+      if (selectedSalonId) {
+        fetchAppointments({ salon_id: selectedSalonId }).then((list) => {
+          if (Array.isArray(list) && list.length > 0) {
+            setAppointments(list);
+          }
+        });
+      }
+    };
+    window.addEventListener('appointment-status-changed', handleRemoteApptChange);
+    return () => window.removeEventListener('appointment-status-changed', handleRemoteApptChange);
+  }, [selectedSalonId]);
 
   const handleAssignTechnician = async (appointmentId: number, techId: number, techName: string) => {
     const updated = await updateAppointmentTechnician(appointmentId, techId);

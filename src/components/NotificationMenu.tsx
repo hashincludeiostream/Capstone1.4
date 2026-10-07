@@ -8,6 +8,7 @@ import {
   Store,
   Sparkles,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Clock,
   Check,
@@ -191,6 +192,10 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
     (a) => a.status === 'confirmed'
   );
 
+  const ownerCancelledAppointments = ownerAppointments.filter(
+    (a) => a.status === 'cancelled'
+  );
+
   // Calculations for Alerts & System - Only show unviewed announcements (persistent UNLESS viewed)
   const activeAnnouncements = announcements.filter(
     (a) => a.is_active && !isAnnouncementViewed(a.id) && !dismissedAnnouncements.includes(a.id)
@@ -212,7 +217,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
     currentUser?.user_type === 'customer'
       ? displayedCustomerBookings.length
       : currentUser?.user_type === 'salon_owner'
-      ? ownerPendingAppointments.length + ownerConfirmedAppointments.length
+      ? ownerPendingAppointments.length + ownerConfirmedAppointments.length + ownerCancelledAppointments.length
       : 0;
 
   const alertsCount =
@@ -235,6 +240,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
       : currentUser?.user_type === 'salon_owner'
       ? ownerPendingOrders.length +
         ownerPendingAppointments.length +
+        ownerConfirmedAppointments.length +
+        ownerCancelledAppointments.length +
         ownerPendingSalons.length
       : currentUser?.user_type === 'admin'
       ? adminPendingSalons.length
@@ -445,7 +452,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           const isPending = appt.status === 'pending';
                           const isCompleted = appt.status === 'completed';
                           const isCancelled = appt.status === 'cancelled';
-                          const isItemRead = globalIsRead(`cust-appt-${appt.id}`);
+                          const statusKey = `cust-appt-${appt.id}-${appt.status}`;
+                          const isItemRead = globalIsRead(statusKey);
 
                           return (
                             <div
@@ -454,12 +462,16 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'customer-dashboard',
                                   `customer-appointment-${appt.id}`,
-                                  `cust-appt-${appt.id}`
+                                  statusKey
                                 )
                               }
                               className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                 isItemRead
                                   ? 'bg-white border-gray-100 hover:border-purple-200 text-gray-600'
+                                  : isCancelled
+                                  ? 'bg-rose-50/70 border-rose-200 hover:bg-rose-100/60 text-gray-900 shadow-2xs'
+                                  : isConfirmed
+                                  ? 'bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100/60 text-gray-900 shadow-2xs'
                                   : 'bg-purple-50/50 border-purple-200 hover:bg-purple-50 text-gray-900 shadow-2xs'
                               }`}
                             >
@@ -475,7 +487,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               <span
                                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                                   isConfirmed
-                                    ? 'bg-purple-100 text-purple-800'
+                                    ? 'bg-emerald-100 text-emerald-800'
                                     : isPending
                                     ? 'bg-amber-100 text-amber-800'
                                     : isCompleted
@@ -516,7 +528,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                   </>
                 )}
 
-                {/* Salon Owner Appointments: Pending Requests & Confirmed Bookings */}
+                {/* Salon Owner Appointments: Pending Requests, Confirmed Bookings & Cancelled Bookings */}
                 {currentUser?.user_type === 'salon_owner' && (
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between pb-1 border-b border-gray-100">
@@ -524,7 +536,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                         Salon Appointments
                       </span>
                       <span className="text-[10px] font-semibold text-purple-700">
-                        {ownerPendingAppointments.length + ownerConfirmedAppointments.length} scheduled
+                        {ownerPendingAppointments.length + ownerConfirmedAppointments.length + ownerCancelledAppointments.length} total activity
                       </span>
                     </div>
 
@@ -536,7 +548,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           <span>Pending ({ownerPendingAppointments.length})</span>
                         </div>
                         {ownerPendingAppointments.map((appt) => {
-                          const isItemRead = globalIsRead(`owner-appt-${appt.id}`);
+                          const statusKey = `owner-appt-${appt.id}-${appt.status}`;
+                          const isItemRead = globalIsRead(statusKey);
                           return (
                             <div
                               key={appt.id}
@@ -544,7 +557,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'owner-appointments',
                                   `owner-appointment-${appt.id}`,
-                                  `owner-appt-${appt.id}`
+                                  statusKey
                                 )
                               }
                               className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
@@ -578,7 +591,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           <span>Confirmed ({ownerConfirmedAppointments.length})</span>
                         </div>
                         {ownerConfirmedAppointments.map((appt) => {
-                          const isItemRead = globalIsRead(`owner-appt-${appt.id}`);
+                          const statusKey = `owner-appt-${appt.id}-${appt.status}`;
+                          const isItemRead = globalIsRead(statusKey);
                           return (
                             <div
                               key={appt.id}
@@ -586,7 +600,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'owner-appointments',
                                   `owner-appointment-${appt.id}`,
-                                  `owner-appt-${appt.id}`
+                                  statusKey
                                 )
                               }
                               className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
@@ -603,7 +617,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   {appt.appointment_date} at {appt.appointment_time}
                                 </p>
                               </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
                                 Confirmed
                               </span>
                             </div>
@@ -612,11 +626,57 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                       </div>
                     )}
 
-                    {ownerPendingAppointments.length === 0 && ownerConfirmedAppointments.length === 0 && (
-                      <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
-                        Appointment requests are up to date.
-                      </p>
+                    {/* Cancelled Bookings */}
+                    {ownerCancelledAppointments.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-800 pb-0.5">
+                          <AlertCircle className="w-3 h-3 text-rose-600" />
+                          <span>Cancelled ({ownerCancelledAppointments.length})</span>
+                        </div>
+                        {ownerCancelledAppointments.map((appt) => {
+                          const statusKey = `owner-appt-${appt.id}-${appt.status}`;
+                          const isItemRead = globalIsRead(statusKey);
+                          return (
+                            <div
+                              key={appt.id}
+                              onClick={() =>
+                                handleItemNavigation(
+                                  'owner-appointments',
+                                  `owner-appointment-${appt.id}`,
+                                  statusKey
+                                )
+                              }
+                              className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                                isItemRead
+                                  ? 'border-gray-100 bg-white hover:bg-rose-50/30 text-gray-700'
+                                  : 'border-rose-300 bg-rose-50/70 hover:bg-rose-100/60 text-rose-950 shadow-2xs'
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-gray-900 truncate">
+                                  {appt.customer_name || 'Client'} • {appt.service_name}
+                                </p>
+                                <p className="text-[11px] text-rose-700 truncate mt-0.5">
+                                  {appt.appointment_date} at {appt.appointment_time}
+                                  {appt.cancellation_reason ? ` • ${appt.cancellation_reason}` : ''}
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
+                                Cancelled
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
+
+                    {ownerPendingAppointments.length === 0 &&
+                      ownerConfirmedAppointments.length === 0 &&
+                      ownerCancelledAppointments.length === 0 && (
+                        <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
+                          Appointment requests are up to date.
+                        </p>
+                      )}
                   </div>
                 )}
 
