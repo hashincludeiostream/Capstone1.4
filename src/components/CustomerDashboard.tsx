@@ -25,6 +25,7 @@ import { scrollToElement } from '../utils/scrollHelper';
 import { AppointmentCancellationModal } from './cancellation/AppointmentCancellationModal';
 import { RescheduleAppointmentModal } from './cancellation/RescheduleAppointmentModal';
 import { AccountReliabilityBadge } from './cancellation/AccountReliabilityBadge';
+import { useNotifications } from '../context/NotificationContext';
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -53,6 +54,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
+  const { addNotification } = useNotifications();
 
   useEffect(() => {
     if (targetAppointmentId) {
@@ -100,11 +102,28 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       fee: number;
     }
   ) => {
+    const targetAppt = appointments.find((a) => a.id === appointmentId) || cancellingAppt;
     await cancelAppointment(appointmentId, {
       cancellation_reason: data.cancellation_reason,
       cancellation_notes: data.cancellation_notes,
       cancelled_by: 'customer',
     });
+    
+    // Dispatch in-app notification to the salon owner
+    if (targetAppt) {
+      addNotification({
+        recipient_role: 'salon_owner',
+        recipient_salon_id: targetAppt.salon_id,
+        category: 'bookings',
+        title: 'Customer Cancelled Booking ⚠️',
+        message: `${currentUser.fullname || 'Client'} cancelled appointment #${appointmentId} for ${targetAppt.service_name || 'Nail Treatment'} on ${targetAppt.appointment_date} at ${targetAppt.appointment_time}. Reason: ${data.cancellation_reason}. Station is now vacant.`,
+        type: 'booking_cancelled_by_customer',
+        priority: 'urgent',
+        linkTab: 'owner-appointments',
+        metadata: { appointmentId },
+      });
+    }
+
     await reloadAppointments();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(

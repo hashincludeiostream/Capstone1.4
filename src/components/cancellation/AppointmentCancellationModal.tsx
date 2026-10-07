@@ -160,6 +160,21 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
           {/* STEP 1: IMPACT ASSESSMENT & POLICY */}
           {step === 1 && (
             <div className="space-y-4">
+              {/* Prominent Confirmation Banner */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50 border border-rose-200/80 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 leading-snug">
+                    Are you sure you want to cancel the booking?
+                  </h4>
+                  <p className="text-xs text-rose-800 mt-0.5">
+                    Cancelling will release your reserved technician station. You can choose <strong>No</strong> below to keep your slot, or <strong>Yes</strong> to proceed.
+                  </p>
+                </div>
+              </div>
+
               {/* Appointment summary card */}
               <div className="bg-gray-50 border border-gray-200/80 rounded-xl p-4 space-y-2.5">
                 <div className="flex justify-between items-start">
@@ -426,9 +441,9 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
               type="button"
               disabled={isSubmitting}
               onClick={onClose}
-              className="py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold transition-colors cursor-pointer text-center"
+              className="py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-bold transition-colors cursor-pointer text-center"
             >
-              Keep My Booking
+              No, Keep My Booking
             </button>
           )}
 
@@ -436,9 +451,9 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
             <button
               type="button"
               onClick={handleNext}
-              className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
-              <span>Continue to Next Step</span>
+              <span>Yes, Proceed with Cancellation</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           ) : (
@@ -446,7 +461,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
               type="button"
               disabled={!acknowledgedPolicy || isSubmitting}
               onClick={handleCancelSubmit}
-              className={`py-2.5 px-5 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+              className={`py-2.5 px-5 text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 !acknowledgedPolicy || isSubmitting
                   ? 'bg-rose-300 cursor-not-allowed'
                   : 'bg-rose-700 hover:bg-rose-800'
@@ -460,7 +475,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
               ) : (
                 <>
                   <AlertTriangle className="w-4 h-4" />
-                  <span className="truncate">Confirm Cancellation &amp; Impose Sanctions</span>
+                  <span className="truncate">Yes, Confirm Cancellation</span>
                 </>
               )}
             </button>

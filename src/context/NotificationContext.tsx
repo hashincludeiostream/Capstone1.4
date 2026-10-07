@@ -4,6 +4,28 @@ import { localStorage as safeLocalStorage } from '../lib/localStorage';
 
 export type NotificationPriority = 'urgent' | 'normal' | 'low';
 
+export interface SystemNotification {
+  id: string;
+  category: 'cart' | 'bookings' | 'orders' | 'alerts' | 'system';
+  title: string;
+  message: string;
+  timestamp: string;
+  recipient_role?: 'customer' | 'salon_owner' | 'admin' | 'all';
+  recipient_user_id?: number;
+  recipient_salon_id?: number;
+  priority?: NotificationPriority;
+  type?:
+    | 'booking_confirmed'
+    | 'booking_cancelled_by_owner'
+    | 'booking_cancelled_by_customer'
+    | 'booking_new'
+    | 'order_status'
+    | 'system_alert';
+  linkTab?: string;
+  linkTargetId?: string;
+  metadata?: any;
+}
+
 export interface NotificationItem {
   id: string;
   category: 'cart' | 'bookings' | 'orders' | 'alerts' | 'system';
@@ -15,6 +37,9 @@ export interface NotificationItem {
 export interface NotificationContextType {
   readItemIds: Set<string>;
   viewedAnnouncementIds: Set<number>;
+  trashedItemIds: Set<string>;
+  deletedItemIds: Set<string>;
+  systemNotifications: SystemNotification[];
   isRead: (id: string | number) => boolean;
   markAsRead: (id: string | number) => void;
   markAsUnread: (id: string | number) => void;
@@ -23,8 +48,18 @@ export interface NotificationContextType {
   markAnnouncementViewed: (id: number) => void;
   markAllAnnouncementsViewed: (announcementIds?: number[]) => void;
   isUrgent: (typeOrCategory: string, meta?: any) => boolean;
+  isTrashed: (id: string | number) => boolean;
+  isDeleted: (id: string | number) => boolean;
+  moveToTrash: (id: string | number) => void;
+  restoreFromTrash: (id: string | number) => void;
+  deleteNotification: (id: string | number) => void;
+  emptyTrash: () => void;
+  addNotification: (
+    notif: Omit<SystemNotification, 'id' | 'timestamp'> & { id?: string; timestamp?: string }
+  ) => void;
   unreadCount: number;
   urgentCount: number;
+  trashedCount: number;
   categoryUnread: {
     cart: boolean;
     bookings: boolean;
@@ -37,6 +72,9 @@ export interface NotificationContextType {
 
 const STORAGE_KEY_READ = 'nailglamhub_read_notifications_global';
 const STORAGE_KEY_ANNOUNCEMENTS = 'nailglamhub_viewed_announcements';
+const STORAGE_KEY_TRASHED = 'nailglamhub_trashed_notifications';
+const STORAGE_KEY_DELETED = 'nailglamhub_deleted_notifications';
+const STORAGE_KEY_SYSTEM_NOTIFS = 'nailglamhub_system_notifications';
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
@@ -85,6 +123,82 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }
   });
 
+  // Trashed notification IDs (moved to trash via dot action)
+  const [trashedItemIds, setTrashedItemIds] = useState<Set<string>>(() => {
+    try {
+      const saved = safeLocalStorage.getJSON<string[]>(STORAGE_KEY_TRASHED);
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Deleted notification IDs (permanently removed via dot action)
+  const [deletedItemIds, setDeletedItemIds] = useState<Set<string>>(() => {
+    try {
+      const saved = safeLocalStorage.getJSON<string[]>(STORAGE_KEY_DELETED);
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Dynamic system-level notifications (booking completion, owner cancellation, etc.)
+  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>(() => {
+    try {
+      const saved = safeLocalStorage.getJSON<SystemNotification[]>(STORAGE_KEY_SYSTEM_NOTIFS);
+      if (Array.isArray(saved) && saved.length > 0) return saved;
+    } catch {
+      // fallback
+    }
+    return [
+      {
+        id: 'sys-booking-confirmed-welcome',
+        category: 'bookings',
+        title: 'Booking Confirmed! 🎉',
+        message: 'Your appointment for Signature Russian Manicure & Japanese Gel at Luxe Glow Nail & Spa Lounge is confirmed.',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        recipient_role: 'customer',
+        type: 'booking_confirmed',
+        priority: 'normal',
+        linkTab: 'customer-dashboard',
+      },
+      {
+        id: 'sys-booking-owner-cancelled-notice',
+        category: 'bookings',
+        title: 'Salon Cancelled Booking ⚠️',
+        message: 'Glamour Lounge Davao cancelled your booking for Gel Extensions due to salon facility maintenance. No fees charged.',
+        timestamp: new Date(Date.now() - 7200000).toISOString(),
+        recipient_role: 'customer',
+        type: 'booking_cancelled_by_owner',
+        priority: 'urgent',
+        linkTab: 'customer-dashboard',
+      },
+      {
+        id: 'sys-owner-new-booking-alert',
+        category: 'bookings',
+        title: 'New Customer Booking 📅',
+        message: 'Sophia Reyes booked Signature Russian Manicure for tomorrow at 2:00 PM.',
+        timestamp: new Date(Date.now() - 1800000).toISOString(),
+        recipient_role: 'salon_owner',
+        type: 'booking_new',
+        priority: 'urgent',
+        linkTab: 'owner-appointments',
+      },
+      {
+        id: 'sys-owner-cust-cancelled-alert',
+        category: 'bookings',
+        title: 'Customer Cancelled Booking ⚠️',
+        message: 'Maria Clara Gomez cancelled appointment for Deluxe Foot Spa. Reason: Schedule conflict.',
+        timestamp: new Date(Date.now() - 5400000).toISOString(),
+        recipient_role: 'salon_owner',
+        type: 'booking_cancelled_by_customer',
+        priority: 'normal',
+        linkTab: 'owner-appointments',
+      },
+    ];
+  });
+
   // Cross-tab and window synchronization
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -102,6 +216,33 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
             setViewedAnnouncementIds(new Set(parsed));
+          }
+        } catch {
+          // ignore
+        }
+      } else if (e.key === STORAGE_KEY_TRASHED && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setTrashedItemIds(new Set(parsed));
+          }
+        } catch {
+          // ignore
+        }
+      } else if (e.key === STORAGE_KEY_DELETED && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setDeletedItemIds(new Set(parsed));
+          }
+        } catch {
+          // ignore
+        }
+      } else if (e.key === STORAGE_KEY_SYSTEM_NOTIFS && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setSystemNotifications(parsed);
           }
         } catch {
           // ignore
@@ -239,14 +380,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       }
 
       if (!category || category === 'bookings' || category === 'all') {
-        customerAppointments.forEach((a) => {
-          allIdsToAdd.push(`cust-appt-${a.id}`);
-          allIdsToAdd.push(`cust-appt-${a.id}-${a.status}`);
-        });
-        ownerAppointments.forEach((a) => {
-          allIdsToAdd.push(`owner-appt-${a.id}`);
-          allIdsToAdd.push(`owner-appt-${a.id}-${a.status}`);
-        });
+        customerAppointments.forEach((a) => allIdsToAdd.push(`cust-appt-${a.id}`));
+        ownerAppointments.forEach((a) => allIdsToAdd.push(`owner-appt-${a.id}`));
       }
 
       if (!category || category === 'alerts' || category === 'all') {
@@ -280,7 +415,92 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     ]
   );
 
-  // Calculate unread items & urgent notifications
+  // Trash & Deletion helpers
+  const isTrashed = useCallback(
+    (id: string | number): boolean => trashedItemIds.has(String(id)),
+    [trashedItemIds]
+  );
+
+  const isDeleted = useCallback(
+    (id: string | number): boolean => deletedItemIds.has(String(id)),
+    [deletedItemIds]
+  );
+
+  const moveToTrash = useCallback((id: string | number) => {
+    const idStr = String(id);
+    setTrashedItemIds((prev) => {
+      if (prev.has(idStr)) return prev;
+      const next = new Set(prev);
+      next.add(idStr);
+      safeLocalStorage.setJSON(STORAGE_KEY_TRASHED, Array.from(next));
+      return next;
+    });
+  }, []);
+
+  const restoreFromTrash = useCallback((id: string | number) => {
+    const idStr = String(id);
+    setTrashedItemIds((prev) => {
+      if (!prev.has(idStr)) return prev;
+      const next = new Set(prev);
+      next.delete(idStr);
+      safeLocalStorage.setJSON(STORAGE_KEY_TRASHED, Array.from(next));
+      return next;
+    });
+  }, []);
+
+  const deleteNotification = useCallback((id: string | number) => {
+    const idStr = String(id);
+    setTrashedItemIds((prev) => {
+      if (!prev.has(idStr)) return prev;
+      const next = new Set(prev);
+      next.delete(idStr);
+      safeLocalStorage.setJSON(STORAGE_KEY_TRASHED, Array.from(next));
+      return next;
+    });
+    setDeletedItemIds((prev) => {
+      if (prev.has(idStr)) return prev;
+      const next = new Set(prev);
+      next.add(idStr);
+      safeLocalStorage.setJSON(STORAGE_KEY_DELETED, Array.from(next));
+      return next;
+    });
+    setSystemNotifications((prev) => {
+      const next = prev.filter((item) => item.id !== idStr);
+      safeLocalStorage.setJSON(STORAGE_KEY_SYSTEM_NOTIFS, next);
+      return next;
+    });
+  }, []);
+
+  const emptyTrash = useCallback(() => {
+    setDeletedItemIds((prev) => {
+      const next = new Set(prev);
+      trashedItemIds.forEach((id) => next.add(id));
+      safeLocalStorage.setJSON(STORAGE_KEY_DELETED, Array.from(next));
+      return next;
+    });
+    setTrashedItemIds(() => {
+      safeLocalStorage.setJSON(STORAGE_KEY_TRASHED, []);
+      return new Set();
+    });
+  }, [trashedItemIds]);
+
+  const addNotification = useCallback(
+    (notif: Omit<SystemNotification, 'id' | 'timestamp'> & { id?: string; timestamp?: string }) => {
+      const fullNotif: SystemNotification = {
+        ...notif,
+        id: notif.id || `sys-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: notif.timestamp || new Date().toISOString(),
+      };
+      setSystemNotifications((prev) => {
+        const next = [fullNotif, ...prev];
+        safeLocalStorage.setJSON(STORAGE_KEY_SYSTEM_NOTIFS, next);
+        return next;
+      });
+    },
+    []
+  );
+
+  // Calculate unread items & urgent notifications (excluding trashed or deleted items)
   const { unreadCount, urgentCount, categoryUnread, unreadBookingsCount, unreadOrdersCount, unreadAlertsCount } = useMemo(() => {
     let unread = 0;
     let urgent = 0;
@@ -291,8 +511,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     let ordersUnreadCount = 0;
     let alertsUnreadCount = 0;
 
+    const isExcluded = (id: string) => trashedItemIds.has(id) || deletedItemIds.has(id);
+
     // 1. Cart
-    if (cartItemCount > 0 && !readItemIds.has('cart-active')) {
+    if (cartItemCount > 0 && !readItemIds.has('cart-active') && !isExcluded('cart-active')) {
       unread++;
       unreadCart = true;
       ordersUnreadCount++;
@@ -303,7 +525,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       customerOrders
         .filter((o) => o.status === 'pending_pickup' || o.status === 'ready_for_pickup')
         .forEach((o) => {
-          if (!readItemIds.has(`cust-order-${o.id}`)) {
+          const key = `cust-order-${o.id}`;
+          if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadCart = true;
             ordersUnreadCount++;
@@ -317,7 +540,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       ownerProductOrders
         .filter((o) => o.status === 'pending_pickup')
         .forEach((o) => {
-          if (!readItemIds.has(`owner-order-${o.id}`)) {
+          const key = `owner-order-${o.id}`;
+          if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadCart = true;
             ordersUnreadCount++;
@@ -325,35 +549,34 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         });
     }
 
-    // 4. Customer Bookings (Pending, Confirmed, Cancelled)
+    // 4. Customer Bookings
     if (currentUser?.user_type === 'customer') {
       customerAppointments
-        .filter((a) => ['confirmed', 'pending', 'cancelled'].includes(a.status))
+        .filter((a) => a.status === 'confirmed' || a.status === 'pending' || a.status === 'cancelled')
         .forEach((a) => {
-          const statusKey = `cust-appt-${a.id}-${a.status}`;
-          if (!readItemIds.has(statusKey)) {
+          const key = `cust-appt-${a.id}`;
+          if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadBookings = true;
             bookingsUnreadCount++;
-            if (a.status === 'cancelled' || a.status === 'confirmed') {
+            if (a.status === 'cancelled' && a.cancelled_by === 'salon_owner') {
               urgent++;
             }
           }
         });
     }
 
-    // 5. Owner Bookings (Pending requests, Confirmed schedule, Cancelled bookings)
+    // 5. Owner Bookings
     if (currentUser?.user_type === 'salon_owner') {
       ownerAppointments
-        .filter((a) => ['pending', 'confirmed', 'cancelled'].includes(a.status))
+        .filter((a) => a.status === 'pending' || a.status === 'confirmed' || a.status === 'cancelled')
         .forEach((a) => {
-          const statusKey = `owner-appt-${a.id}-${a.status}`;
-          if (!readItemIds.has(statusKey)) {
+          const key = `owner-appt-${a.id}`;
+          if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadBookings = true;
             bookingsUnreadCount++;
-            if (a.status === 'pending' || a.status === 'cancelled') {
-              // Booking requests awaiting owner approval or cancellations are urgent
+            if (a.status === 'pending') {
               urgent++;
             }
           }
@@ -363,7 +586,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     // 6. Admin pending salons
     if (currentUser?.user_type === 'admin') {
       adminPendingSalons.forEach((s) => {
-        if (!readItemIds.has(`admin-salon-${s.id}`)) {
+        const key = `admin-salon-${s.id}`;
+        if (!readItemIds.has(key) && !isExcluded(key)) {
           unread++;
           unreadAlerts = true;
           alertsUnreadCount++;
@@ -376,7 +600,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       ownerSalons
         .filter((s) => s.verification_status === 'pending')
         .forEach((s) => {
-          if (!readItemIds.has(`owner-branch-${s.id}`)) {
+          const key = `owner-branch-${s.id}`;
+          if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadAlerts = true;
             alertsUnreadCount++;
@@ -388,13 +613,40 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     announcements
       .filter((a) => a.is_active && !viewedAnnouncementIds.has(a.id) && !readItemIds.has(`announcement-${a.id}`))
       .forEach((a) => {
-        unread++;
-        unreadAlerts = true;
-        alertsUnreadCount++;
-        if (a.type === 'alert') {
-          urgent++;
+        const key = `announcement-${a.id}`;
+        if (!isExcluded(key)) {
+          unread++;
+          unreadAlerts = true;
+          alertsUnreadCount++;
+          if (a.type === 'alert') {
+            urgent++;
+          }
         }
       });
+
+    // 9. System notifications
+    systemNotifications.forEach((s) => {
+      if (
+        !readItemIds.has(s.id) &&
+        !isExcluded(s.id) &&
+        (!s.recipient_role ||
+          s.recipient_role === 'all' ||
+          s.recipient_role === currentUser?.user_type)
+      ) {
+        unread++;
+        if (s.category === 'bookings') {
+          unreadBookings = true;
+          bookingsUnreadCount++;
+        } else if (s.category === 'alerts') {
+          unreadAlerts = true;
+          alertsUnreadCount++;
+        } else {
+          unreadCart = true;
+          ordersUnreadCount++;
+        }
+        if (s.priority === 'urgent') urgent++;
+      }
+    });
 
     return {
       unreadCount: unread,
@@ -411,6 +663,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   }, [
     cartItemCount,
     readItemIds,
+    trashedItemIds,
+    deletedItemIds,
+    systemNotifications,
     currentUser,
     customerOrders,
     ownerProductOrders,
@@ -426,6 +681,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     () => ({
       readItemIds,
       viewedAnnouncementIds,
+      trashedItemIds,
+      deletedItemIds,
+      systemNotifications,
       isRead,
       markAsRead,
       markAsUnread,
@@ -434,8 +692,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       markAnnouncementViewed,
       markAllAnnouncementsViewed,
       isUrgent,
+      isTrashed,
+      isDeleted,
+      moveToTrash,
+      restoreFromTrash,
+      deleteNotification,
+      emptyTrash,
+      addNotification,
       unreadCount,
       urgentCount,
+      trashedCount: trashedItemIds.size,
       categoryUnread,
       unreadBookingsCount,
       unreadOrdersCount,
@@ -444,6 +710,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     [
       readItemIds,
       viewedAnnouncementIds,
+      trashedItemIds,
+      deletedItemIds,
+      systemNotifications,
       isRead,
       markAsRead,
       markAsUnread,
@@ -452,6 +721,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       markAnnouncementViewed,
       markAllAnnouncementsViewed,
       isUrgent,
+      isTrashed,
+      isDeleted,
+      moveToTrash,
+      restoreFromTrash,
+      deleteNotification,
+      emptyTrash,
+      addNotification,
       unreadCount,
       urgentCount,
       categoryUnread,

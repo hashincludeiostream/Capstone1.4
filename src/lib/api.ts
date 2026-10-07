@@ -355,7 +355,9 @@ export async function updateAppointmentStatus(
   status: AppointmentStatus,
   cancellationData?: {
     reason?: string;
+    cancellation_reason?: string;
     notes?: string;
+    cancellation_notes?: string;
     fee?: number;
     tier?: string;
     cancelled_by?: string;
@@ -364,8 +366,10 @@ export async function updateAppointmentStatus(
   try {
     const payload: Record<string, any> = { status };
     if (cancellationData) {
-      if (cancellationData.reason) payload.cancellation_reason = cancellationData.reason;
-      if (cancellationData.notes) payload.cancellation_notes = cancellationData.notes;
+      const reasonVal = cancellationData.cancellation_reason || cancellationData.reason;
+      const notesVal = cancellationData.cancellation_notes || cancellationData.notes;
+      if (reasonVal) payload.cancellation_reason = reasonVal;
+      if (notesVal) payload.cancellation_notes = notesVal;
       if (cancellationData.fee !== undefined) payload.cancellation_fee = cancellationData.fee;
       if (cancellationData.tier) payload.cancellation_tier = cancellationData.tier;
       if (cancellationData.cancelled_by) payload.cancelled_by = cancellationData.cancelled_by;

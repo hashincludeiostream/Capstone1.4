@@ -8,7 +8,6 @@ import {
   Store,
   Sparkles,
   AlertTriangle,
-  AlertCircle,
   CheckCircle2,
   Clock,
   Check,
@@ -17,9 +16,16 @@ import {
   Shield,
   Heart,
   ArrowRight,
+  MoreVertical,
+  Trash,
+  Trash2,
+  RotateCcw,
+  Info,
+  CalendarX,
+  User,
 } from 'lucide-react';
 import {
-  User,
+  User as UserType,
   CartItem,
   Appointment,
   ProductOrder,
@@ -28,10 +34,10 @@ import {
   Review,
 } from '../types';
 import { NotificationBadge } from './common/NotificationBadge';
-import { useNotifications } from '../context/NotificationContext';
+import { useNotifications, SystemNotification } from '../context/NotificationContext';
 
 export interface NotificationMenuProps {
-  currentUser: User | null;
+  currentUser: UserType | null;
   cartItems?: CartItem[];
   cartItemCount?: number;
   onOpenCart?: (targetProductId?: number) => void;
@@ -54,7 +60,7 @@ export interface NotificationMenuProps {
   onDismissAllAnnouncements?: () => void;
 }
 
-type NotificationCategory = 'bookings' | 'cart' | 'alerts';
+type NotificationCategory = 'bookings' | 'cart' | 'alerts' | 'trash';
 
 export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   currentUser,
@@ -81,9 +87,21 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<NotificationCategory>('bookings');
+  const [activeDotMenuId, setActiveDotMenuId] = useState<string | null>(null);
+
   const {
     readItemIds,
+    trashedItemIds,
+    deletedItemIds,
+    systemNotifications,
     isRead: globalIsRead,
+    isTrashed,
+    isDeleted,
+    moveToTrash,
+    restoreFromTrash,
+    deleteNotification,
+    emptyTrash,
+    trashedCount,
     markAsRead: globalMarkAsRead,
     markAllAsRead: globalMarkAllAsRead,
     unreadCount: globalUnreadCount,
@@ -95,36 +113,46 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
 
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close dot dropdown and modal on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setActiveDotMenuId(null);
+      } else if (activeDotMenuId) {
+        // Close dot menu if click was outside the active dot menu container
+        const target = event.target as HTMLElement;
+        if (!target.closest('.dot-menu-container')) {
+          setActiveDotMenuId(null);
+        }
       }
     };
-    if (isOpen) {
+    if (isOpen || activeDotMenuId) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, activeDotMenuId]);
 
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
+      if (e.key === 'Escape') {
+        if (activeDotMenuId) {
+          setActiveDotMenuId(null);
+        } else if (isOpen) {
+          setIsOpen(false);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, activeDotMenuId]);
 
   // Persist read notifications & sync announcement dismissals
   const markAsRead = (id: string) => {
     globalMarkAsRead(id);
-    // If it's an announcement, also mark as viewed/dismissed so top banner never persists
     if (id.startsWith('announcement-')) {
       const numId = Number(id.replace('announcement-', ''));
       if (!isNaN(numId)) {
@@ -136,7 +164,6 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
 
   const markAllAsRead = () => {
     globalMarkAllAsRead();
-    // Dismiss and mark all active announcements viewed so banners do not persist once viewed
     announcements.forEach((a) => markAnnouncementViewed(a.id));
     onDismissAllAnnouncements?.();
   };
@@ -145,6 +172,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
     if (readId) markAsRead(readId);
     else if (targetDomId) markAsRead(targetDomId);
     setIsOpen(false);
+    setActiveDotMenuId(null);
     if (onNavigate) {
       onNavigate(tab, targetDomId);
     }
@@ -153,12 +181,34 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   const handleOpenCartDrawer = (readId?: string, targetProductId?: number) => {
     if (readId) markAsRead(readId);
     setIsOpen(false);
+    setActiveDotMenuId(null);
     if (onOpenCart) {
       onOpenCart(targetProductId);
     }
   };
 
-  // Calculations for In-Store Cart & Orders
+  // Filter out trashed and deleted notifications from active lists
+  const isExcluded = (id: string) => isTrashed(id) || isDeleted(id);
+
+  // Active Customer Bookings
+  const displayedCustomerBookings = customerAppointments.filter(
+    (a) => !isExcluded(`cust-appt-${a.id}`)
+  );
+
+  // Active Owner Bookings
+  const ownerPendingAppointments = ownerAppointments.filter(
+    (a) => a.status === 'pending' && !isExcluded(`owner-appt-${a.id}`)
+  );
+
+  const ownerConfirmedAppointments = ownerAppointments.filter(
+    (a) => a.status === 'confirmed' && !isExcluded(`owner-appt-${a.id}`)
+  );
+
+  const ownerCancelledAppointments = ownerAppointments.filter(
+    (a) => a.status === 'cancelled' && !isExcluded(`owner-appt-${a.id}`)
+  );
+
+  // In-Store Cart & Orders
   const effectiveCartCount =
     cartItemCount > 0
       ? cartItemCount
@@ -170,91 +220,214 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   );
 
   const activeCustomerOrders = customerOrders.filter(
-    (o) => o.status === 'pending_pickup' || o.status === 'ready_for_pickup'
+    (o) =>
+      (o.status === 'pending_pickup' || o.status === 'ready_for_pickup') &&
+      !isExcluded(`cust-order-${o.id}`)
   );
 
   const ownerPendingOrders = ownerProductOrders.filter(
-    (o) => o.status === 'pending_pickup'
+    (o) => o.status === 'pending_pickup' && !isExcluded(`owner-order-${o.id}`)
   );
 
-  // Calculations for Bookings
-  const activeCustomerBookings = customerAppointments.filter(
-    (a) => a.status === 'confirmed' || a.status === 'pending'
-  );
-  const displayedCustomerBookings =
-    customerAppointments.length > 0 ? customerAppointments : activeCustomerBookings;
-
-  const ownerPendingAppointments = ownerAppointments.filter(
-    (a) => a.status === 'pending'
-  );
-
-  const ownerConfirmedAppointments = ownerAppointments.filter(
-    (a) => a.status === 'confirmed'
-  );
-
-  const ownerCancelledAppointments = ownerAppointments.filter(
-    (a) => a.status === 'cancelled'
-  );
-
-  // Calculations for Alerts & System - Only show unviewed announcements (persistent UNLESS viewed)
+  // Alerts & Governance
   const activeAnnouncements = announcements.filter(
-    (a) => a.is_active && !isAnnouncementViewed(a.id) && !dismissedAnnouncements.includes(a.id)
+    (a) =>
+      a.is_active &&
+      !isAnnouncementViewed(a.id) &&
+      !dismissedAnnouncements.includes(a.id) &&
+      !isExcluded(`announcement-${a.id}`)
   );
+
   const ownerPendingSalons = ownerSalons.filter(
-    (s) => s.verification_status === 'pending'
+    (s) => s.verification_status === 'pending' && !isExcluded(`owner-branch-${s.id}`)
   );
+
+  const activeAdminPendingSalons = adminPendingSalons.filter(
+    (s) => !isExcluded(`admin-salon-${s.id}`)
+  );
+
+  // System Notifications for the current user role
+  const roleSystemNotifs = systemNotifications.filter(
+    (s) =>
+      !isExcluded(s.id) &&
+      (!s.recipient_role ||
+        s.recipient_role === 'all' ||
+        s.recipient_role === currentUser?.user_type) &&
+      (!s.recipient_user_id || s.recipient_user_id === currentUser?.id)
+  );
+
+  const bookingSystemNotifs = roleSystemNotifs.filter((s) => s.category === 'bookings');
+  const alertSystemNotifs = roleSystemNotifs.filter((s) => s.category === 'alerts');
+  const cartSystemNotifs = roleSystemNotifs.filter((s) => s.category === 'cart' || s.category === 'orders');
 
   // Grouped Counts
   const cartAndOrdersCount =
-    effectiveCartCount +
+    (effectiveCartCount > 0 && !isExcluded('cart-active') ? effectiveCartCount : 0) +
     (currentUser?.user_type === 'customer'
       ? activeCustomerOrders.length
       : currentUser?.user_type === 'salon_owner'
       ? ownerPendingOrders.length
-      : 0);
+      : 0) +
+    cartSystemNotifs.length;
 
   const bookingsCount =
-    currentUser?.user_type === 'customer'
+    (currentUser?.user_type === 'customer'
       ? displayedCustomerBookings.length
       : currentUser?.user_type === 'salon_owner'
-      ? ownerPendingAppointments.length + ownerConfirmedAppointments.length + ownerCancelledAppointments.length
-      : 0;
+      ? ownerPendingAppointments.length +
+        ownerConfirmedAppointments.length +
+        ownerCancelledAppointments.length
+      : 0) + bookingSystemNotifs.length;
 
   const alertsCount =
-    (currentUser?.user_type === 'admin' ? adminPendingSalons.length : 0) +
+    (currentUser?.user_type === 'admin' ? activeAdminPendingSalons.length : 0) +
     (currentUser?.user_type === 'salon_owner' ? ownerPendingSalons.length : 0) +
-    activeAnnouncements.length;
+    activeAnnouncements.length +
+    alertSystemNotifs.length;
 
-  // Unread status per category derived from global notification context
   const hasUnreadCart = categoryUnread.cart;
   const hasUnreadBookings = categoryUnread.bookings;
   const hasUnreadAlerts = categoryUnread.alerts;
   const unreadCount = globalUnreadCount;
   const urgentCount = globalUrgentCount;
 
-  // Total arranged notifications count
-  const totalNotificationsCount =
-    (effectiveCartCount > 0 ? 1 : 0) +
-    (currentUser?.user_type === 'customer'
-      ? activeCustomerOrders.length + displayedCustomerBookings.length
-      : currentUser?.user_type === 'salon_owner'
-      ? ownerPendingOrders.length +
-        ownerPendingAppointments.length +
-        ownerConfirmedAppointments.length +
-        ownerCancelledAppointments.length +
-        ownerPendingSalons.length
-      : currentUser?.user_type === 'admin'
-      ? adminPendingSalons.length
-      : 0) +
-    activeAnnouncements.length;
+  // Build the list of trashed items to display in the Trash tab
+  interface TrashedItemSummary {
+    id: string;
+    title: string;
+    subtitle: string;
+    category: string;
+  }
+
+  const trashedItems: TrashedItemSummary[] = [];
+
+  // Trashed customer appointments
+  customerAppointments.forEach((a) => {
+    const key = `cust-appt-${a.id}`;
+    if (isTrashed(key) && !isDeleted(key)) {
+      trashedItems.push({
+        id: key,
+        title: a.service_name || 'Appointment',
+        subtitle: `${a.appointment_date} at ${a.appointment_time} (${a.salon_name})`,
+        category: 'Booking',
+      });
+    }
+  });
+
+  // Trashed owner appointments
+  ownerAppointments.forEach((a) => {
+    const key = `owner-appt-${a.id}`;
+    if (isTrashed(key) && !isDeleted(key)) {
+      trashedItems.push({
+        id: key,
+        title: `${a.customer_name || 'Client'} - ${a.service_name}`,
+        subtitle: `${a.appointment_date} at ${a.appointment_time}`,
+        category: 'Booking',
+      });
+    }
+  });
+
+  // Trashed customer orders
+  customerOrders.forEach((o) => {
+    const key = `cust-order-${o.id}`;
+    if (isTrashed(key) && !isDeleted(key)) {
+      trashedItems.push({
+        id: key,
+        title: `Order #${o.order_number || o.id}`,
+        subtitle: `Pickup on ${o.pickup_date} • ₱${o.total_amount.toLocaleString()}`,
+        category: 'In-Store Cart',
+      });
+    }
+  });
+
+  // Trashed owner orders
+  ownerProductOrders.forEach((o) => {
+    const key = `owner-order-${o.id}`;
+    if (isTrashed(key) && !isDeleted(key)) {
+      trashedItems.push({
+        id: key,
+        title: `Fulfill Order #${o.order_number || o.id}`,
+        subtitle: `${o.customer_name} • ₱${o.total_amount.toLocaleString()}`,
+        category: 'In-Store Cart',
+      });
+    }
+  });
+
+  // Trashed system notifications
+  systemNotifications.forEach((s) => {
+    if (isTrashed(s.id) && !isDeleted(s.id)) {
+      trashedItems.push({
+        id: s.id,
+        title: s.title,
+        subtitle: s.message,
+        category: s.category === 'bookings' ? 'Booking' : s.category === 'alerts' ? 'Alert' : 'Order',
+      });
+    }
+  });
+
+  // Trashed announcements
+  announcements.forEach((a) => {
+    const key = `announcement-${a.id}`;
+    if (isTrashed(key) && !isDeleted(key)) {
+      trashedItems.push({
+        id: key,
+        title: a.title,
+        subtitle: a.message || '',
+        category: 'Alert',
+      });
+    }
+  });
+
+  if (isTrashed('cart-active') && !isDeleted('cart-active')) {
+    trashedItems.push({
+      id: 'cart-active',
+      title: 'In-Store Reservation Cart',
+      subtitle: `${effectiveCartCount} item(s) pending in cart`,
+      category: 'In-Store Cart',
+    });
+  }
+
+  // Helper to render the 3-dot options menu for each notification item
+  const renderDotMenu = (itemId: string, itemTitle?: string) => (
+    <div className="relative shrink-0 dot-menu-container">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveDotMenuId(activeDotMenuId === itemId ? null : itemId);
+        }}
+        className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100/90 transition-colors cursor-pointer flex items-center justify-center"
+        title="Notification options"
+        aria-label="Notification options"
+      >
+        <MoreVertical className="w-3.5 h-3.5" />
+      </button>
+
+      {activeDotMenuId === itemId && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-0 top-full mt-1 w-28 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 animate-in fade-in zoom-in-95 duration-100 text-left"
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteNotification(itemId);
+              setActiveDotMenuId(null);
+            }}
+            className="w-full px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+          >
+            <Trash className="w-3.5 h-3.5 text-rose-600" />
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="relative" ref={menuRef}>
-      {/* 
-        Notification Bell Button
-        Replaces the old 'view in store reservation cart' button.
-        Equipped with clean blinking notification badge when unread!
-      */}
+      {/* Notification Bell Button */}
       <button
         id="navbar-notifications-btn"
         data-testid="navbar-cart-btn"
@@ -265,15 +438,13 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
             ? 'bg-pink-100 border-pink-400 text-pink-800 ring-2 ring-pink-200'
             : unreadCount > 0
             ? 'border-pink-300 bg-pink-50/95 hover:bg-pink-100 text-pink-700 shadow-xs'
-            : effectiveCartCount > 0
+            : effectiveCartCount > 0 && !isExcluded('cart-active')
             ? 'border-pink-200 bg-pink-50/70 hover:bg-pink-100 text-pink-700'
             : 'border-pink-200 hover:border-pink-300 bg-white hover:bg-pink-50 text-pink-600'
         }`}
         title={
-          effectiveCartCount > 0
-            ? `Notifications • ${effectiveCartCount} item${effectiveCartCount !== 1 ? 's' : ''} in In-Store Cart`
-            : totalNotificationsCount > 0
-            ? `${totalNotificationsCount} arranged notification${totalNotificationsCount !== 1 ? 's' : ''}`
+          unreadCount > 0
+            ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
             : 'Notifications & In-Store Cart'
         }
       >
@@ -283,22 +454,14 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
           <Bell className="w-4 h-4 text-pink-600" />
         )}
 
-        {/* Clean Blinking Counter Badge */}
-        {(unreadCount > 0 || effectiveCartCount > 0) && (
+        {/* Counter Badge */}
+        {unreadCount > 0 && (
           <NotificationBadge
             id="navbar-notification-badge"
-            count={
-              unreadCount > 0
-                ? unreadCount > 9
-                  ? '9+'
-                  : unreadCount
-                : effectiveCartCount > 9
-                ? '9+'
-                : effectiveCartCount
-            }
+            count={unreadCount > 9 ? '9+' : unreadCount}
             variant="rose"
             priority={urgentCount > 0 ? 'urgent' : 'normal'}
-            isUnread={unreadCount > 0}
+            isUnread={true}
             showPing={false}
             size="badge-overlay"
             className="absolute -top-1 -right-1"
@@ -306,7 +469,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
         )}
       </button>
 
-      {/* Arranged Notifications Dropdown Panel */}
+      {/* Notifications Dropdown Panel */}
       {isOpen && (
         <div
           id="navbar-notifications-dropdown"
@@ -319,18 +482,18 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                 <Bell className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-gray-900 leading-tight">
                     Notifications
                   </h3>
-                  {totalNotificationsCount > 0 && (
+                  {unreadCount > 0 && (
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700">
-                      {totalNotificationsCount}
+                      {unreadCount} unread
                     </span>
                   )}
                 </div>
                 <p className="text-[11px] text-gray-500 truncate">
-                  Reservations, schedule & store alerts
+                  Reservations, booking status & store alerts
                 </p>
               </div>
             </div>
@@ -340,7 +503,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                 <button
                   onClick={markAllAsRead}
                   className="text-[11px] text-pink-600 hover:text-pink-800 font-semibold px-2 py-1 rounded-lg hover:bg-pink-50 transition-colors cursor-pointer flex items-center gap-1"
-                  title="Mark as read"
+                  title="Mark all as read"
                 >
                   <Check className="w-3 h-3" />
                   <span>Mark Read</span>
@@ -356,7 +519,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
             </div>
           </div>
 
-          {/* Arranged Category Navigation Tabs - Clean, without "All" tab */}
+          {/* Category Navigation Tabs */}
           <div className="px-3 py-2 bg-gray-50/70 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveCategory('bookings')}
@@ -423,37 +586,108 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                 />
               )}
             </button>
+
+            {/* Trash Tab when items exist in trash */}
+            {trashedItems.length > 0 && (
+              <button
+                onClick={() => setActiveCategory('trash')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeCategory === 'trash'
+                    ? 'bg-stone-700 text-white shadow-2xs'
+                    : 'text-stone-600 hover:bg-white hover:text-stone-900'
+                }`}
+                title="View trashed notifications"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Trash ({trashedItems.length})</span>
+              </button>
+            )}
           </div>
 
-          {/* Arranged Notifications Body (Scrollable, min-h-0 allows smooth scroll of all 16+ items) */}
+          {/* Notifications Body */}
           <div className="min-h-0 flex-1 overflow-y-auto max-h-[460px] p-2.5 space-y-2 divide-y-0 scrollbar-thin scrollbar-thumb-pink-200">
-            {/* 
-              SECTION 1: APPOINTMENTS & BOOKINGS
-              Shows appointments cleanly in streamlined compact items
-            */}
+            {/* ============================================================== */}
+            {/* SECTION 1: APPOINTMENTS & BOOKING NOTIFICATIONS               */}
+            {/* ============================================================== */}
             {activeCategory === 'bookings' && (
-              <div className="space-y-1.5">
-                {/* Customer Bookings */}
+              <div className="space-y-2">
+                {/* 1A. Dynamic System Booking Notifications */}
+                {bookingSystemNotifs.length > 0 && (
+                  <div className="space-y-1.5">
+                    {bookingSystemNotifs.map((s) => {
+                      const isItemRead = globalIsRead(s.id);
+                      const isCancelledAlert = s.type === 'booking_cancelled_by_owner' || s.type === 'booking_cancelled_by_customer';
+                      const isConfirmedNotice = s.type === 'booking_confirmed';
+
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => {
+                            if (s.linkTab) {
+                              handleItemNavigation(s.linkTab, s.linkTargetId, s.id);
+                            } else {
+                              markAsRead(s.id);
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-2.5 ${
+                            isItemRead
+                              ? 'bg-white border-gray-100 hover:border-purple-200 text-gray-600'
+                              : isCancelledAlert
+                              ? 'bg-rose-50/70 border-rose-300 hover:bg-rose-100/70 text-rose-950 shadow-2xs ring-1 ring-rose-200'
+                              : isConfirmedNotice
+                              ? 'bg-emerald-50/60 border-emerald-300 hover:bg-emerald-100/50 text-emerald-950 shadow-2xs'
+                              : 'bg-purple-50/60 border-purple-200 hover:bg-purple-100/60 text-purple-950 shadow-2xs'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              {isCancelledAlert ? (
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              ) : isConfirmedNotice ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              ) : (
+                                <Calendar className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                              )}
+                              <p className={`text-xs font-bold truncate ${isCancelledAlert ? 'text-rose-950' : 'text-gray-900'}`}>
+                                {s.title}
+                              </p>
+                            </div>
+                            <p className="text-[11px] text-gray-600 mt-1 leading-normal">
+                              {s.message}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {renderDotMenu(s.id, s.title)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 1B. Customer Bookings List */}
                 {currentUser?.user_type === 'customer' && (
                   <>
-                    <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                    <div className="flex items-center justify-between pb-1 border-b border-gray-100 pt-1">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-purple-900">
                         My Bookings
                       </span>
                       <span className="text-[10px] font-semibold text-purple-700">
-                        {displayedCustomerBookings.length} scheduled
+                        {displayedCustomerBookings.length} recorded
                       </span>
                     </div>
 
                     {displayedCustomerBookings.length > 0 ? (
                       <div className="space-y-1.5">
                         {displayedCustomerBookings.map((appt) => {
+                          const itemId = `cust-appt-${appt.id}`;
                           const isConfirmed = appt.status === 'confirmed';
                           const isPending = appt.status === 'pending';
                           const isCompleted = appt.status === 'completed';
                           const isCancelled = appt.status === 'cancelled';
-                          const statusKey = `cust-appt-${appt.id}-${appt.status}`;
-                          const isItemRead = globalIsRead(statusKey);
+                          const isCancelledBySalon = isCancelled && appt.cancelled_by === 'salon_owner';
+                          const isItemRead = globalIsRead(itemId);
 
                           return (
                             <div
@@ -462,56 +696,90 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'customer-dashboard',
                                   `customer-appointment-${appt.id}`,
-                                  statusKey
+                                  itemId
                                 )
                               }
-                              className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                 isItemRead
                                   ? 'bg-white border-gray-100 hover:border-purple-200 text-gray-600'
-                                  : isCancelled
-                                  ? 'bg-rose-50/70 border-rose-200 hover:bg-rose-100/60 text-gray-900 shadow-2xs'
-                                  : isConfirmed
-                                  ? 'bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100/60 text-gray-900 shadow-2xs'
+                                  : isCancelledBySalon
+                                  ? 'bg-rose-50 border-rose-300 text-rose-950 shadow-2xs ring-1 ring-rose-200'
                                   : 'bg-purple-50/50 border-purple-200 hover:bg-purple-50 text-gray-900 shadow-2xs'
                               }`}
                             >
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-gray-900 truncate">
-                                  {appt.service_name || 'Nail Treatment'}
-                                </p>
-                                <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                                  {appt.appointment_date} • {appt.appointment_time}
-                                  {appt.salon_name ? ` • ${appt.salon_name}` : ''}
-                                </p>
+                                {isCancelledBySalon ? (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 text-rose-800 font-bold text-xs truncate">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                      <span>Salon Owner Cancelled Booking</span>
+                                    </div>
+                                    <p className="text-[11px] text-rose-900 truncate mt-0.5">
+                                      {appt.salon_name || 'Salon'} cancelled {appt.service_name} ({appt.appointment_date} at {appt.appointment_time})
+                                    </p>
+                                    {appt.cancellation_reason && (
+                                      <p className="text-[10px] text-rose-700 italic truncate mt-0.5">
+                                        Reason: {appt.cancellation_reason}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      {isConfirmed ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      ) : isPending ? (
+                                        <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      ) : (
+                                        <Calendar className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                      )}
+                                      <p className="text-xs font-bold text-gray-900 truncate">
+                                        {appt.service_name || 'Nail Treatment'}
+                                      </p>
+                                    </div>
+                                    <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                                      {appt.appointment_date} • {appt.appointment_time}
+                                      {appt.salon_name ? ` • ${appt.salon_name}` : ''}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                              <span
-                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                                  isConfirmed
-                                    ? 'bg-emerald-100 text-emerald-800'
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span
+                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                                    isCancelledBySalon
+                                      ? 'bg-rose-200 text-rose-900 font-bold'
+                                      : isConfirmed
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : isPending
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : isCompleted
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : isCancelled
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}
+                                >
+                                  {isCancelledBySalon
+                                    ? 'Cancelled by Salon'
+                                    : isConfirmed
+                                    ? 'Confirmed'
                                     : isPending
-                                    ? 'bg-amber-100 text-amber-800'
+                                    ? 'Pending'
                                     : isCompleted
-                                    ? 'bg-blue-100 text-blue-800'
+                                    ? 'Completed'
                                     : isCancelled
-                                    ? 'bg-rose-100 text-rose-800'
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}
-                              >
-                                {isConfirmed
-                                  ? 'Confirmed'
-                                  : isPending
-                                  ? 'Pending'
-                                  : isCompleted
-                                  ? 'Completed'
-                                  : isCancelled
-                                  ? 'Cancelled'
-                                  : appt.status}
-                              </span>
+                                    ? 'Cancelled'
+                                    : appt.status}
+                                </span>
+                                {renderDotMenu(itemId, appt.service_name)}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
-                    ) : (
+                    ) : bookingSystemNotifs.length === 0 ? (
                       <div className="p-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 text-center">
                         <p className="text-xs text-gray-500">
                           No upcoming appointments booked right now.
@@ -524,19 +792,22 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           <ChevronRight className="w-3 h-3" />
                         </button>
                       </div>
-                    )}
+                    ) : null}
                   </>
                 )}
 
-                {/* Salon Owner Appointments: Pending Requests, Confirmed Bookings & Cancelled Bookings */}
+                {/* 1C. Salon Owner Bookings List */}
                 {currentUser?.user_type === 'salon_owner' && (
                   <div className="space-y-2.5">
-                    <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                    <div className="flex items-center justify-between pb-1 border-b border-gray-100 pt-1">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-purple-900">
                         Salon Appointments
                       </span>
                       <span className="text-[10px] font-semibold text-purple-700">
-                        {ownerPendingAppointments.length + ownerConfirmedAppointments.length + ownerCancelledAppointments.length} total activity
+                        {ownerPendingAppointments.length +
+                          ownerConfirmedAppointments.length +
+                          ownerCancelledAppointments.length}{' '}
+                        active
                       </span>
                     </div>
 
@@ -545,11 +816,11 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 pb-0.5">
                           <Clock className="w-3 h-3 text-amber-600" />
-                          <span>Pending ({ownerPendingAppointments.length})</span>
+                          <span>Pending Requests ({ownerPendingAppointments.length})</span>
                         </div>
                         {ownerPendingAppointments.map((appt) => {
-                          const statusKey = `owner-appt-${appt.id}-${appt.status}`;
-                          const isItemRead = globalIsRead(statusKey);
+                          const itemId = `owner-appt-${appt.id}`;
+                          const isItemRead = globalIsRead(itemId);
                           return (
                             <div
                               key={appt.id}
@@ -557,7 +828,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'owner-appointments',
                                   `owner-appointment-${appt.id}`,
-                                  statusKey
+                                  itemId
                                 )
                               }
                               className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
@@ -574,9 +845,12 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   {appt.appointment_date} at {appt.appointment_time}
                                 </p>
                               </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                                Pending
-                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                  Pending
+                                </span>
+                                {renderDotMenu(itemId, appt.service_name)}
+                              </div>
                             </div>
                           );
                         })}
@@ -591,8 +865,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           <span>Confirmed ({ownerConfirmedAppointments.length})</span>
                         </div>
                         {ownerConfirmedAppointments.map((appt) => {
-                          const statusKey = `owner-appt-${appt.id}-${appt.status}`;
-                          const isItemRead = globalIsRead(statusKey);
+                          const itemId = `owner-appt-${appt.id}`;
+                          const isItemRead = globalIsRead(itemId);
                           return (
                             <div
                               key={appt.id}
@@ -600,7 +874,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'owner-appointments',
                                   `owner-appointment-${appt.id}`,
-                                  statusKey
+                                  itemId
                                 )
                               }
                               className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
@@ -617,9 +891,12 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   {appt.appointment_date} at {appt.appointment_time}
                                 </p>
                               </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                                Confirmed
-                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                  Confirmed
+                                </span>
+                                {renderDotMenu(itemId, appt.service_name)}
+                              </div>
                             </div>
                           );
                         })}
@@ -630,12 +907,13 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                     {ownerCancelledAppointments.length > 0 && (
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-800 pb-0.5">
-                          <AlertCircle className="w-3 h-3 text-rose-600" />
-                          <span>Cancelled ({ownerCancelledAppointments.length})</span>
+                          <CalendarX className="w-3 h-3 text-rose-600" />
+                          <span>Cancelled Bookings ({ownerCancelledAppointments.length})</span>
                         </div>
                         {ownerCancelledAppointments.map((appt) => {
-                          const statusKey = `owner-appt-${appt.id}-${appt.status}`;
-                          const isItemRead = globalIsRead(statusKey);
+                          const itemId = `owner-appt-${appt.id}`;
+                          const isCustomerCancelled = appt.cancelled_by === 'customer';
+                          const isItemRead = globalIsRead(itemId);
                           return (
                             <div
                               key={appt.id}
@@ -643,27 +921,30 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 handleItemNavigation(
                                   'owner-appointments',
                                   `owner-appointment-${appt.id}`,
-                                  statusKey
+                                  itemId
                                 )
                               }
                               className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                 isItemRead
-                                  ? 'border-gray-100 bg-white hover:bg-rose-50/30 text-gray-700'
-                                  : 'border-rose-300 bg-rose-50/70 hover:bg-rose-100/60 text-rose-950 shadow-2xs'
+                                  ? 'border-gray-100 bg-white text-gray-500'
+                                  : 'border-rose-200 bg-rose-50/60 text-rose-950'
                               }`}
                             >
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-gray-900 truncate">
+                                <p className="text-xs font-bold text-rose-950 truncate">
+                                  {isCustomerCancelled ? 'Client Cancelled: ' : 'Cancelled: '}
                                   {appt.customer_name || 'Client'} • {appt.service_name}
                                 </p>
-                                <p className="text-[11px] text-rose-700 truncate mt-0.5">
-                                  {appt.appointment_date} at {appt.appointment_time}
-                                  {appt.cancellation_reason ? ` • ${appt.cancellation_reason}` : ''}
+                                <p className="text-[11px] text-rose-800 truncate mt-0.5">
+                                  {appt.appointment_date} • {appt.cancellation_reason || 'Cancelled'}
                                 </p>
                               </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
-                                Cancelled
-                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                                  Cancelled
+                                </span>
+                                {renderDotMenu(itemId, appt.service_name)}
+                              </div>
                             </div>
                           );
                         })}
@@ -672,15 +953,16 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
 
                     {ownerPendingAppointments.length === 0 &&
                       ownerConfirmedAppointments.length === 0 &&
-                      ownerCancelledAppointments.length === 0 && (
+                      ownerCancelledAppointments.length === 0 &&
+                      bookingSystemNotifs.length === 0 && (
                         <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
-                          Appointment requests are up to date.
+                          Appointment notifications are up to date.
                         </p>
                       )}
                   </div>
                 )}
 
-                {/* Super Admin Booking Overview */}
+                {/* Super Admin Booking Activity */}
                 {currentUser?.user_type === 'admin' && (
                   <div
                     onClick={() => handleItemNavigation('admin-dashboard', 'admin-stats-appointments')}
@@ -716,13 +998,13 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
               </div>
             )}
 
-            {/* 
-              SECTION 2: IN-STORE CART & PICKUP ORDERS 
-            */}
+            {/* ============================================================== */}
+            {/* SECTION 2: IN-STORE CART & PICKUP ORDERS                      */}
+            {/* ============================================================== */}
             {activeCategory === 'cart' && (
               <div className="space-y-2.5">
                 {/* Active Cart Quick Summary */}
-                {effectiveCartCount > 0 ? (
+                {effectiveCartCount > 0 && !isExcluded('cart-active') ? (
                   <div
                     id="notification-cart-card"
                     onClick={() => handleOpenCartDrawer('cart-active')}
@@ -745,24 +1027,14 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                         </p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-bold text-white bg-pink-600 hover:bg-pink-700 px-2.5 py-1 rounded-lg shadow-2xs shrink-0">
-                      View Cart
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] font-bold text-white bg-pink-600 hover:bg-pink-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                        View Cart
+                      </span>
+                      {renderDotMenu('cart-active', 'In-Store Cart')}
+                    </div>
                   </div>
-                ) : (
-                  <div className="p-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 text-center">
-                    <p className="text-xs text-gray-500">
-                      Your In-Store Reservation Cart is empty.
-                    </p>
-                    <button
-                      onClick={() => handleItemNavigation('products')}
-                      className="mt-1 text-xs text-pink-600 hover:text-pink-800 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
-                    >
-                      <span>Browse Products</span>
-                      <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
+                ) : null}
 
                 {/* Customer Placed Pickup Orders */}
                 {currentUser?.user_type === 'customer' && activeCustomerOrders.length > 0 && (
@@ -777,8 +1049,9 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                     </div>
 
                     {activeCustomerOrders.map((order) => {
+                      const itemId = `cust-order-${order.id}`;
                       const isReady = order.status === 'ready_for_pickup';
-                      const isItemRead = globalIsRead(`cust-order-${order.id}`);
+                      const isItemRead = globalIsRead(itemId);
 
                       return (
                         <div
@@ -787,7 +1060,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                             handleItemNavigation(
                               'customer-orders',
                               `customer-order-${order.id}`,
-                              `cust-order-${order.id}`
+                              itemId
                             )
                           }
                           className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
@@ -804,15 +1077,18 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               ₱{order.total_amount.toLocaleString()} • Pickup on {order.pickup_date}
                             </p>
                           </div>
-                          <span
-                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                              isReady
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {isReady ? 'Ready' : 'Pending'}
-                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                isReady
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {isReady ? 'Ready' : 'Pending'}
+                            </span>
+                            {renderDotMenu(itemId, `Order #${order.order_number || order.id}`)}
+                          </div>
                         </div>
                       );
                     })}
@@ -831,39 +1107,62 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                       </span>
                     </div>
 
-                    {ownerPendingOrders.map((order) => (
-                      <div
-                        key={order.id}
-                        onClick={() =>
-                          handleItemNavigation(
-                            'owner-inventory',
-                            `owner-order-${order.id}`,
-                            `owner-order-${order.id}`
-                          )
-                        }
-                        className="p-2 px-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100/50 transition-all cursor-pointer flex items-center justify-between gap-2.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-emerald-950 truncate">
-                            Order #{order.order_number || order.id} • {order.customer_name}
-                          </p>
-                          <p className="text-[11px] text-emerald-800 truncate mt-0.5">
-                            ₱{order.total_amount.toLocaleString()} • Pickup on {order.pickup_date}
-                          </p>
+                    {ownerPendingOrders.map((order) => {
+                      const itemId = `owner-order-${order.id}`;
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() =>
+                            handleItemNavigation(
+                              'owner-inventory',
+                              `owner-order-${order.id}`,
+                              itemId
+                            )
+                          }
+                          className="p-2 px-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100/50 transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-emerald-950 truncate">
+                              Order #{order.order_number || order.id} • {order.customer_name}
+                            </p>
+                            <p className="text-[11px] text-emerald-800 truncate mt-0.5">
+                              ₱{order.total_amount.toLocaleString()} • Pickup on {order.pickup_date}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              Fulfill
+                            </span>
+                            {renderDotMenu(itemId, `Order #${order.order_number || order.id}`)}
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                          Fulfill
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
+
+                {effectiveCartCount === 0 &&
+                  activeCustomerOrders.length === 0 &&
+                  ownerPendingOrders.length === 0 && (
+                    <div className="p-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 text-center">
+                      <p className="text-xs text-gray-500">
+                        Your In-Store Reservation Cart is empty.
+                      </p>
+                      <button
+                        onClick={() => handleItemNavigation('products')}
+                        className="mt-1 text-xs text-pink-600 hover:text-pink-800 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+                      >
+                        <span>Browse Products</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
               </div>
             )}
 
-            {/* 
-              SECTION 3: GOVERNANCE, STORE APPROVALS & SYSTEM ALERTS
-            */}
+            {/* ============================================================== */}
+            {/* SECTION 3: STORE & PLATFORM ALERTS                             */}
+            {/* ============================================================== */}
             {activeCategory === 'alerts' && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between pb-1 border-b border-gray-100">
@@ -878,74 +1177,87 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                 </div>
 
                 {/* Admin Pending Salon Approvals */}
-                {currentUser?.user_type === 'admin' && adminPendingSalons.length > 0 && (
+                {currentUser?.user_type === 'admin' && activeAdminPendingSalons.length > 0 && (
                   <div className="space-y-1">
-                    {adminPendingSalons.map((salon) => (
-                      <div
-                        key={salon.id}
-                        onClick={() =>
-                          handleItemNavigation(
-                            'admin-salons',
-                            `admin-salon-${salon.id}`,
-                            `admin-salon-${salon.id}`
-                          )
-                        }
-                        className="p-2 px-2.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-rose-950 truncate">
-                            Verify: {salon.salon_name}
-                          </p>
-                          <p className="text-[11px] text-rose-800 truncate mt-0.5">
-                            {salon.city || 'Location'} • Awaits review
-                          </p>
+                    {activeAdminPendingSalons.map((salon) => {
+                      const itemId = `admin-salon-${salon.id}`;
+                      return (
+                        <div
+                          key={salon.id}
+                          onClick={() =>
+                            handleItemNavigation(
+                              'admin-salons',
+                              `admin-salon-${salon.id}`,
+                              itemId
+                            )
+                          }
+                          className="p-2 px-2.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-rose-950 truncate">
+                              Verify: {salon.salon_name}
+                            </p>
+                            <p className="text-[11px] text-rose-800 truncate mt-0.5">
+                              {salon.city || 'Location'} • Awaits review
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                              Review
+                            </span>
+                            {renderDotMenu(itemId, salon.salon_name)}
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
-                          Review
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Salon Owner Branch Approval Status */}
                 {currentUser?.user_type === 'salon_owner' && ownerPendingSalons.length > 0 && (
                   <div className="space-y-1">
-                    {ownerPendingSalons.map((salon) => (
-                      <div
-                        key={salon.id}
-                        onClick={() =>
-                          handleItemNavigation(
-                            'owner-branches',
-                            `owner-branch-${salon.id}`,
-                            `owner-branch-${salon.id}`
-                          )
-                        }
-                        className="p-2 px-2.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-amber-950 truncate">
-                            Branch: {salon.salon_name}
-                          </p>
-                          <p className="text-[11px] text-amber-800 truncate mt-0.5">
-                            Under verification
-                          </p>
+                    {ownerPendingSalons.map((salon) => {
+                      const itemId = `owner-branch-${salon.id}`;
+                      return (
+                        <div
+                          key={salon.id}
+                          onClick={() =>
+                            handleItemNavigation(
+                              'owner-branches',
+                              `owner-branch-${salon.id}`,
+                              itemId
+                            )
+                          }
+                          className="p-2 px-2.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-amber-950 truncate">
+                              Branch: {salon.salon_name}
+                            </p>
+                            <p className="text-[11px] text-amber-800 truncate mt-0.5">
+                              Under verification
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                              Pending
+                            </span>
+                            {renderDotMenu(itemId, salon.salon_name)}
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                          Pending
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Site-wide Announcements / Promos */}
-                {activeAnnouncements.length > 0 ? (
+                {activeAnnouncements.length > 0 && (
                   <div className="space-y-1.5">
                     {activeAnnouncements.map((item) => {
+                      const itemId = `announcement-${item.id}`;
                       const isAlert = item.type === 'alert';
                       const isPromo = item.type === 'promo';
-                      const isItemRead = globalIsRead(`announcement-${item.id}`);
+                      const isItemRead = globalIsRead(itemId);
 
                       return (
                         <div
@@ -956,13 +1268,13 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               handleItemNavigation(
                                 'admin-announcements',
                                 `admin-announcement-${item.id}`,
-                                `announcement-${item.id}`
+                                itemId
                               );
                             } else {
                               handleItemNavigation(
                                 'explore',
                                 `site-announcement-${item.id}`,
-                                `announcement-${item.id}`
+                                itemId
                               );
                             }
                           }}
@@ -984,7 +1296,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               {item.message || ''}
                             </p>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                 isAlert
@@ -996,33 +1308,101 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                             >
                               {item.type.toUpperCase()}
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                markAsRead(`announcement-${item.id}`);
-                                onDismissAnnouncement?.(item.id);
-                              }}
-                              className="p-1 rounded-full text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
-                              title="Mark as read"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
+                            {renderDotMenu(itemId, item.title)}
                           </div>
                         </div>
                       );
                     })}
                   </div>
+                )}
+
+                {activeAnnouncements.length === 0 &&
+                  ownerPendingSalons.length === 0 &&
+                  activeAdminPendingSalons.length === 0 && (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl text-center">
+                      No active system or promotional alerts at this time.
+                    </p>
+                  )}
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* SECTION 4: TRASH (VIEW TRASHED NOTIFICATIONS)                 */}
+            {/* ============================================================== */}
+            {activeCategory === 'trash' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <div className="flex items-center gap-1.5 text-stone-700">
+                    <Trash2 className="w-4 h-4 text-stone-500" />
+                    <span className="text-xs font-bold">Trash ({trashedItems.length})</span>
+                  </div>
+                  {trashedItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={emptyTrash}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Trash className="w-3 h-3" />
+                      <span>Empty Trash</span>
+                    </button>
+                  )}
+                </div>
+
+                {trashedItems.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {trashedItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-2.5 rounded-xl border border-gray-200 bg-stone-50/60 flex items-center justify-between gap-2.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-gray-800 truncate">
+                            {item.title}
+                          </p>
+                          <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                            {item.subtitle}
+                          </p>
+                          <span className="inline-block mt-1 text-[9px] font-semibold px-1.5 py-0.2 rounded bg-stone-200 text-stone-700">
+                            {item.category}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => restoreFromTrash(item.id)}
+                            className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100/70 border border-emerald-200 bg-white text-xs font-medium cursor-pointer transition-colors flex items-center gap-1"
+                            title="Restore notification"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span className="text-[10px]">Restore</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteNotification(item.id)}
+                            className="p-1.5 rounded-lg text-rose-700 hover:bg-rose-100/70 border border-rose-200 bg-white text-xs font-medium cursor-pointer transition-colors flex items-center gap-1"
+                            title="Permanently delete"
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl text-center">
-                    No active system or promotional alerts at this time.
-                  </p>
+                  <div className="p-6 text-center text-gray-500 space-y-1">
+                    <Trash2 className="w-8 h-8 mx-auto text-gray-300" />
+                    <p className="text-xs font-semibold">Trash is empty</p>
+                    <p className="text-[11px] text-gray-400">
+                      Notifications you move to trash will appear here.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Arranged Bottom Action Footer */}
+          {/* Bottom Action Footer */}
           <div className="p-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 shrink-0">
             {/* Direct access to In-Store Cart */}
             <button

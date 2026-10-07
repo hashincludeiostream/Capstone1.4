@@ -22,6 +22,7 @@ import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, 
 import { calculatePaymentBreakdown, initiatePayment, checkPaymentGatewayStatus } from '../lib/paymentService';
 import { createFirestoreTransaction } from '../lib/firestoreService';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
+import { useNotifications } from '../context/NotificationContext';
 
 interface BookingWizardProps {
   salons: Salon[];
@@ -40,6 +41,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { addNotification } = useNotifications();
   const [step, setStep] = useState<number>(1);
   const [selectedSalonId, setSelectedSalonId] = useState<number>(
     initialSalon?.id || salons[0]?.id || 1
@@ -64,7 +66,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   // Customer Contact Info
   const [fullName, setFullName] = useState<string>(currentUser?.fullname || '');
   const [email, setEmail] = useState<string>(currentUser?.email || '');
-  const [phone, setPhone] = useState<string>(() => (currentUser?.phone || '').replace(/\D/g, '').slice(0, 11));
+  const [phone, setPhone] = useState<string>(currentUser?.phone || '');
   const [notes, setNotes] = useState<string>('');
   const [designImage, setDesignImage] = useState<string | null>(null);
   const [designImageName, setDesignImageName] = useState<string | null>(null);
@@ -72,8 +74,6 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const isSubmittingRef = React.useRef<boolean>(false);
-  const isSuccessRef = React.useRef<boolean>(false);
   const [confirmedAppt, setConfirmedAppt] = useState<Appointment | null>(null);
   const [confirmedTx, setConfirmedTx] = useState<PaymentTransaction | null>(null);
   const [livePaymongoCheckoutUrl, setLivePaymongoCheckoutUrl] = useState<string | null>(null);
@@ -213,7 +213,6 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   const handleSubmitBooking = async () => {
     if (!currentService) return;
-    if (isSubmittingRef.current || submitting) return;
     setValidationError(null);
 
     // Basic validation
@@ -221,13 +220,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       setValidationError('Please enter your full name');
       return;
     }
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (!cleanPhone) {
+    if (!phone.trim()) {
       setValidationError('Please enter your contact phone number');
-      return;
-    }
-    if (cleanPhone.length !== 11) {
-      setValidationError(`Phone number must be exactly 11 digits (currently ${cleanPhone.length}/11 digits, e.g. 09171234567)`);
       return;
     }
     if (!email.trim() || !email.includes('@')) {
@@ -243,20 +237,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       return;
     }
 
-    isSubmittingRef.current = true;
     setSubmitting(true);
 
     try {
       const breakdown = calculatePaymentBreakdown(Number(currentService.price) || 0, paymentType);
 
-      // Process payment through Dual-Mode service with customer info (email, name, phone)
+      // Process payment through Dual-Mode service
       const paymentResult = await initiatePayment(
         {
           entityType: 'appointment',
           customerId: currentUser?.id || 0,
-          customerName: fullName.trim() || 'Valued Client',
-          customerPhone: cleanPhone || '',
-          customerEmail: email.trim() || '',
+          customerName: fullName || 'Valued Client',
+          customerPhone: phone || '',
+          customerEmail: email || '',
           salonId: selectedSalonId,
           salonName: currentSalon?.salon_name,
           totalServicePrice: Number(currentService.price) || 0,
@@ -277,9 +270,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       // Create appointment record with payment telemetry
       const res = await createAppointment({
         customer_id: currentUser?.id || 0,
-        customer_name: fullName.trim() || 'Guest Client',
-        customer_phone: cleanPhone || '',
-        customer_email: email.trim() || '',
+        customer_name: fullName || 'Guest Client',
+        customer_phone: phone || '',
+        customer_email: email || '',
         salon_id: selectedSalonId,
         salon_name: currentSalon?.salon_name,
         service_id: currentService.id,
@@ -357,19 +350,35 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           setLivePaymongoCheckoutUrl(paymentResult.checkoutUrl);
         }
 
-        isSuccessRef.current = true;
         setConfirmedAppt(res.appointment);
         setStep(6); // Step 6: Confirmation
         onSuccess(res.appointment);
 
-        // Broadcast appointment update so customer and salon owner dashboards and notification counters immediately synchronize
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent('appointment-status-changed', {
-              detail: { appointment: res.appointment, action: 'created' },
-            })
-          );
-        }
+        // Instant Notification for the Client
+        addNotification({
+          recipient_role: 'customer',
+          recipient_user_id: currentUser?.id,
+          category: 'bookings',
+          title: 'Booking Confirmed! 🎉',
+          message: `Your appointment for ${currentService.service_name} at ${currentSalon?.salon_name || 'the salon'} on ${appointmentDate} at ${appointmentTime} is confirmed.`,
+          type: 'booking_confirmed',
+          priority: 'normal',
+          linkTab: 'customer-dashboard',
+          metadata: { appointmentId: res.appointment.id },
+        });
+
+        // Instant Notification for the Salon Owner
+        addNotification({
+          recipient_role: 'salon_owner',
+          recipient_salon_id: selectedSalonId,
+          category: 'bookings',
+          title: 'New Customer Booking 📅',
+          message: `${fullName || 'Client'} booked ${currentService.service_name} for ${appointmentDate} at ${appointmentTime}.`,
+          type: 'booking_new',
+          priority: 'urgent',
+          linkTab: 'owner-appointments',
+          metadata: { appointmentId: res.appointment.id },
+        });
 
         // If a real PayMongo checkout session URL was returned, open PayMongo
         if (paymentResult.checkoutUrl && !isSandboxMode) {
@@ -386,10 +395,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         err instanceof Error ? err.message : 'Failed to submit booking. Please check connection and try again.'
       );
     } finally {
-      if (!isSuccessRef.current) {
-        setSubmitting(false);
-        isSubmittingRef.current = false;
-      }
+      setSubmitting(false);
     }
   };
 
@@ -515,72 +521,51 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {services.map((service) => {
-                      const isUnavailable = service.is_active === false || service.is_available === false;
-                      const isSelected = selectedServiceId === service.id;
-
-                      return (
-                        <div
-                          key={service.id}
-                          onClick={() => {
-                            if (isUnavailable) {
-                              setValidationError(`"${service.service_name}" is temporarily unavailable. Please choose another service.`);
-                              return;
-                            }
-                            setValidationError(null);
-                            setSelectedServiceId(service.id);
-                          }}
-                          className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-2.5 sm:gap-3 min-w-0 max-w-full ${
-                            isUnavailable
-                              ? 'opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed'
-                              : isSelected
-                              ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20 cursor-pointer'
-                              : 'border-pink-100 hover:border-pink-300 bg-white cursor-pointer'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                            <div
-                              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                                isUnavailable
-                                  ? 'border-gray-200 bg-gray-100 text-gray-400'
-                                  : isSelected
-                                  ? 'border-pink-600 bg-pink-600 text-white'
-                                  : 'border-gray-300'
-                              }`}
-                            >
-                              {isSelected && !isUnavailable && (
-                                <div className="w-2 h-2 bg-white rounded-full" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                                <p className={`text-xs sm:text-sm font-semibold break-words ${isUnavailable ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                                  {service.service_name}
-                                </p>
-                                <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded-md shrink-0">
-                                  {service.category}
-                                </span>
-                                {isUnavailable && (
-                                  <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-md shrink-0">
-                                    Temporarily Unavailable
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5 break-words">
-                                {service.description}
-                              </p>
-                            </div>
+                    {services.map((service) => (
+                      <div
+                        key={service.id}
+                        onClick={() => setSelectedServiceId(service.id)}
+                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 sm:gap-3 min-w-0 max-w-full ${
+                          selectedServiceId === service.id
+                            ? 'border-pink-600 bg-pink-50/60 ring-2 ring-pink-500/20'
+                            : 'border-pink-100 hover:border-pink-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                              selectedServiceId === service.id
+                                ? 'border-pink-600 bg-pink-600 text-white'
+                                : 'border-gray-300'
+                            }`}
+                          >
+                            {selectedServiceId === service.id && (
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            )}
                           </div>
-
-                          <div className="text-right shrink-0">
-                            <span className="block text-xs sm:text-sm font-bold text-pink-700 whitespace-nowrap">
-                              ₱{Number(service.price).toLocaleString()}
-                            </span>
-                            <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{service.duration} mins</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                              <p className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
+                                {service.service_name}
+                              </p>
+                              <span className="text-[9px] sm:text-[10px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded-md shrink-0">
+                                {service.category}
+                              </span>
+                            </div>
+                            <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5 break-words">
+                              {service.description}
+                            </p>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="text-right shrink-0">
+                          <span className="block text-xs sm:text-sm font-bold text-pink-700 whitespace-nowrap">
+                            ₱{Number(service.price).toLocaleString()}
+                          </span>
+                          <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{service.duration} mins</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -750,61 +735,17 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                      Phone Number
-                    </label>
-                    <span className={`text-[10px] font-bold ${phone.length === 11 ? 'text-emerald-600' : 'text-pink-600'}`}>
-                      {phone.length}/11 digits
-                    </span>
-                  </div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                    Phone Number
+                  </label>
                   <input
                     type="tel"
-                    inputMode="numeric"
                     value={phone}
-                    onChange={(e) => {
-                      const cleanDigits = e.target.value.replace(/\D/g, '').slice(0, 11);
-                      setPhone(cleanDigits);
-                    }}
-                    onKeyDown={(e) => {
-                      const isControlKey =
-                        ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key) ||
-                        e.ctrlKey ||
-                        e.metaKey;
-                      if (!isControlKey) {
-                        if (!/[0-9]/.test(e.key)) {
-                          e.preventDefault();
-                          return;
-                        }
-                        const target = e.target as HTMLInputElement;
-                        const hasSelection =
-                          target.selectionStart !== null &&
-                          target.selectionEnd !== null &&
-                          target.selectionStart !== target.selectionEnd;
-                        if (phone.length >= 11 && !hasSelection) {
-                          e.preventDefault();
-                        }
-                      }
-                    }}
-                    onPaste={(e) => {
-                      e.preventDefault();
-                      const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 11);
-                      setPhone(pasted);
-                    }}
-                    maxLength={11}
-                    placeholder="09XXXXXXXXX (11 digits)"
-                    className={`w-full p-3 rounded-xl border text-sm focus:outline-pink-500 font-mono tracking-wide transition-colors ${
-                      phone.length === 11
-                        ? 'border-emerald-300 bg-emerald-50/20 focus:border-emerald-500'
-                        : 'border-pink-200 bg-pink-50/20'
-                    }`}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0917-xxx-xxxx"
+                    className="w-full p-3 rounded-xl border border-pink-200 bg-pink-50/20 text-sm focus:outline-pink-500"
                     required
                   />
-                  <p className={`text-[10px] mt-1 ${phone.length === 11 ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
-                    {phone.length === 11
-                      ? '✓ Valid 11-digit mobile number'
-                      : 'Philippines mobile format: exactly 11 numbers (e.g. 09171234567)'}
-                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
@@ -1169,38 +1110,6 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       </div>
                     </button>
                   </div>
-
-                  {/* Customer Information Attached to PayMongo */}
-                  <div className="p-3.5 rounded-2xl bg-white border border-pink-200/90 shadow-2xs space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-pink-600" />
-                        PayMongo Customer Information
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Included in Checkout
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Your customer details are transmitted to PayMongo for checkout session billing and transaction verification:
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                      <div className="p-2.5 rounded-xl bg-pink-50/50 border border-pink-100 min-w-0">
-                        <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Customer Name</span>
-                        <span className="font-semibold text-gray-900 truncate block">{fullName || 'Valued Client'}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-pink-50/50 border border-pink-100 min-w-0">
-                        <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Email Address</span>
-                        <span className="font-semibold text-gray-900 truncate block">{email || 'Not provided'}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-pink-50/50 border border-pink-100 min-w-0">
-                        <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Contact Phone</span>
-                        <span className="font-semibold text-gray-900 font-mono truncate block">
-                          {phone || 'Not available'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center gap-3 text-xs text-gray-700">
@@ -1397,7 +1306,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 type="button"
                 disabled={
                   (step === 1 && !selectedServiceId) ||
-                  (step === 4 && (!fullName.trim() || phone.replace(/\D/g, '').length !== 11 || !email.trim()))
+                  (step === 4 && (!fullName || !phone || !email))
                 }
                 onClick={() => {
                   setValidationError(null);
@@ -1406,13 +1315,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       setValidationError('Please enter your full name');
                       return;
                     }
-                    const cleanPhone = phone.replace(/\D/g, '');
-                    if (!cleanPhone) {
+                    if (!phone.trim()) {
                       setValidationError('Please enter your contact phone number');
-                      return;
-                    }
-                    if (cleanPhone.length !== 11) {
-                      setValidationError(`Phone number must be exactly 11 digits (currently ${cleanPhone.length}/11 digits, e.g. 09171234567)`);
                       return;
                     }
                     if (!email.trim() || !email.includes('@')) {
