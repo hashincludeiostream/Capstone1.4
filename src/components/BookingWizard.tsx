@@ -220,8 +220,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       setValidationError('Please enter your full name');
       return;
     }
-    if (!phone.trim()) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) {
       setValidationError('Please enter your contact phone number');
+      return;
+    }
+    if (cleanPhone.length !== 11) {
+      setValidationError('Phone number must have strictly 11 numbers (e.g. 09171234567). It cannot be less or more.');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
@@ -248,7 +253,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           entityType: 'appointment',
           customerId: currentUser?.id || 0,
           customerName: fullName || 'Valued Client',
-          customerPhone: phone || '',
+          customerPhone: cleanPhone,
           customerEmail: email || '',
           salonId: selectedSalonId,
           salonName: currentSalon?.salon_name,
@@ -271,7 +276,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       const res = await createAppointment({
         customer_id: currentUser?.id || 0,
         customer_name: fullName || 'Guest Client',
-        customer_phone: phone || '',
+        customer_phone: cleanPhone,
         customer_email: email || '',
         salon_id: selectedSalonId,
         salon_name: currentSalon?.salon_name,
@@ -735,17 +740,45 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Phone Number
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                      Phone Number (11 Digits)
+                    </label>
+                    <span
+                      className={`text-[11px] font-semibold transition-colors ${
+                        phone.replace(/\D/g, '').length === 11
+                          ? 'text-emerald-700'
+                          : phone.replace(/\D/g, '').length > 0
+                          ? 'text-amber-700'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {phone.replace(/\D/g, '').length}/11 digits {phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
+                    </span>
+                  </div>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={11}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0917-xxx-xxxx"
-                    className="w-full p-3 rounded-xl border border-pink-200 bg-pink-50/20 text-sm focus:outline-pink-500"
+                    onChange={(e) => {
+                      const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      setPhone(strictlyNumbers);
+                      if (validationError) setValidationError(null);
+                    }}
+                    placeholder="09171234567"
+                    className={`w-full p-3 rounded-xl border bg-pink-50/20 text-sm focus:outline-pink-500 font-mono tracking-wider ${
+                      phone && phone.replace(/\D/g, '').length !== 11
+                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50/20'
+                        : 'border-pink-200 focus:border-pink-500'
+                    }`}
                     required
                   />
+                  {phone && phone.replace(/\D/g, '').length !== 11 && (
+                    <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                      Phone number must have strictly 11 numbers (currently {phone.replace(/\D/g, '').length}).
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
@@ -1306,7 +1339,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 type="button"
                 disabled={
                   (step === 1 && !selectedServiceId) ||
-                  (step === 4 && (!fullName || !phone || !email))
+                  (step === 4 && (!fullName.trim() || phone.replace(/\D/g, '').length !== 11 || !email.trim()))
                 }
                 onClick={() => {
                   setValidationError(null);
@@ -1315,8 +1348,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       setValidationError('Please enter your full name');
                       return;
                     }
-                    if (!phone.trim()) {
+                    const cleanPhone = phone.replace(/\D/g, '');
+                    if (!cleanPhone) {
                       setValidationError('Please enter your contact phone number');
+                      return;
+                    }
+                    if (cleanPhone.length !== 11) {
+                      setValidationError('Phone number must have strictly 11 numbers (e.g. 09171234567). It cannot be less or more.');
                       return;
                     }
                     if (!email.trim() || !email.includes('@')) {

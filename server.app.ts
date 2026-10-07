@@ -1806,12 +1806,13 @@ async function startServer() {
 
   // Add Service
   app.post('/api/services', async (req, res) => {
-    const { salon_id, service_name, description, duration_minutes, category_name, image } = req.body;
+    const { salon_id, service_name, description, price, duration_minutes, category_name, image } = req.body;
     if (!service_name) {
       return res.status(400).json({ error: 'Service name is required' });
     }
 
     try {
+      const sanitizedPrice = price !== undefined && price !== null ? Math.max(0, Number(price)) : 0;
       const [result] = await db.execute(
         `INSERT INTO services (salon_id, service_name, description, price, duration_minutes, category_name, image)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -1819,7 +1820,7 @@ async function startServer() {
           Number(salon_id) || 1,
           service_name,
           description || '',
-          0,
+          sanitizedPrice,
           Number(duration_minutes) || 45,
           category_name || 'Nail Services',
           image || null

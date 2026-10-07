@@ -28,6 +28,8 @@ import {
   Image as ImageIcon,
   X,
   ShieldAlert,
+  User as UserIcon,
+  Upload,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
@@ -78,6 +80,7 @@ interface SalonOwnerDashboardProps {
   refreshKey?: number;
   initialSalons?: Salon[];
   targetId?: string | null;
+  onRefreshAppointments?: () => void;
 }
 
 export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
@@ -89,6 +92,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   refreshKey = 0,
   initialSalons,
   targetId,
+  onRefreshAppointments,
 }) => {
   const [salons, setSalons] = useState<Salon[]>(() => {
     if (initialSalons && initialSalons.length > 0) {
@@ -168,6 +172,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [showAddService, setShowAddService] = useState(false);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceCategory, setNewServiceCategory] = useState('Manicure');
+  const [newServicePrice, setNewServicePrice] = useState('500');
   const [newServiceDuration, setNewServiceDuration] = useState('60');
   const [newServiceDifficulty, setNewServiceDifficulty] = useState('Intermediate');
   const [newServiceDesc, setNewServiceDesc] = useState('');
@@ -181,6 +186,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [newTechPhone, setNewTechPhone] = useState('');
   const [newTechSpecialties, setNewTechSpecialties] = useState('');
   const [newTechExp, setNewTechExp] = useState('3');
+  const [newTechAvatar, setNewTechAvatar] = useState('');
   const [editingTechnicianId, setEditingTechnicianId] = useState<number | null>(null);
 
   // Salon Studio Settings State
@@ -427,6 +433,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     if (!newServiceName || !selectedSalonId) return;
 
     try {
+      const priceNum = Math.max(0, parseFloat(newServicePrice) || 0);
       const res = await fetch(`${API_BASE}/services${editingServiceId ? `/${editingServiceId}` : ''}`, {
         method: editingServiceId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -434,7 +441,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           salon_id: selectedSalonId,
           service_name: newServiceName,
           category_name: newServiceCategory,
-          price: 0,
+          price: priceNum,
           duration_minutes: Number(newServiceDuration),
           description: newServiceDesc,
           image: newServiceImage || null,
@@ -452,6 +459,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           : [...prev, saved]);
         setShowAddService(false);
         setNewServiceName('');
+        setNewServicePrice('500');
         setNewServiceDesc('');
         setNewServiceImage('');
         setEditingServiceId(null);
@@ -469,6 +477,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     setEditingServiceId(service.id);
     setNewServiceName(service.service_name);
     setNewServiceCategory(service.category || service.category_name || 'Manicure');
+    setNewServicePrice(service.price !== undefined ? String(service.price) : '500');
     setNewServiceDuration(String(service.duration || service.duration_minutes || 45));
     setNewServiceDesc(service.description || '');
     setNewServiceImage(service.image_url || service.image || '');
@@ -502,6 +511,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           phone: newTechPhone,
           specialties: newTechSpecialties,
           experience_years: Number(newTechExp),
+          avatar: newTechAvatar || null,
         }),
       });
       if (res.ok) {
@@ -514,6 +524,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         setNewTechEmail('');
         setNewTechPhone('');
         setNewTechSpecialties('');
+        setNewTechAvatar('');
         setEditingTechnicianId(null);
         showToast(`${editingTechnicianId ? 'Updated' : 'Registered'} specialist ${created.fullname}`);
       }
@@ -525,9 +536,28 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const startEditingTechnician = (technician: Technician) => {
     setEditingTechnicianId(technician.id);
     setNewTechName(technician.fullname || technician.name || '');
+    setNewTechEmail(technician.email || '');
+    setNewTechPhone(technician.phone || '');
     setNewTechSpecialties(technician.specialties || '');
     setNewTechExp(String(technician.experience_years || 0));
+    setNewTechAvatar(technician.avatar || '');
     setShowAddTech(true);
+  };
+
+  const handleDeleteTechnician = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/technicians/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setTechnicians((prev) => prev.filter((t) => t.id !== id));
+        showToast('Specialist removed from team');
+      } else {
+        showToast(data.details || data.error || 'Cannot remove specialist with existing bookings');
+      }
+    } catch (err) {
+      console.error('Delete technician error:', err);
+      showToast('Error removing specialist');
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -1196,7 +1226,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   className="p-5 rounded-2xl bg-purple-50/50 border border-purple-200 space-y-4 animate-in fade-in duration-150"
                 >
                   <h4 className="text-sm font-bold text-purple-950">{editingServiceId ? 'Edit Treatment' : 'Add New Treatment to Menu'}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">
                         Service Name
@@ -1230,7 +1260,25 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Duration (mins) & Skill Level
+                        Set Price (₱)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-600 text-xs font-bold">₱</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={newServicePrice}
+                          onChange={(e) => setNewServicePrice(e.target.value)}
+                          placeholder="500"
+                          className="w-full pl-7 pr-2 py-2 rounded-xl bg-white border border-purple-200 text-xs focus:outline-none focus:border-purple-500 font-semibold"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Duration & Skill Level
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -1339,11 +1387,11 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       </div>
                       <p className="text-xs text-gray-500 line-clamp-2">{s.description}</p>
                       <div className="flex items-center gap-3 mt-2 text-xs font-medium text-gray-700">
-                        <span className="text-pink-700 font-semibold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100">
-                          In-Store Settlement
+                        <span className="text-purple-800 font-bold bg-purple-100 px-2.5 py-0.5 rounded-md border border-purple-200">
+                          {Number(s.price) > 0 ? `₱${Number(s.price).toLocaleString()}` : 'Free / In-Store Settlement'}
                         </span>
                         <span>•</span>
-                        <span>{s.duration} mins</span>
+                        <span>{s.duration || s.duration_minutes || 45} mins</span>
                       </div>
                     </div>
 
@@ -1431,11 +1479,63 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                     </div>
                   </div>
 
+                  {/* Technician Profile Image Upload */}
+                  <div className="pt-1">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Profile Image / Photo
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {newTechAvatar ? (
+                        <div className="relative group shrink-0">
+                          <img
+                            src={newTechAvatar}
+                            alt="Technician avatar preview"
+                            className="w-14 h-14 rounded-full object-cover border-2 border-purple-300 shadow-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setNewTechAvatar('')}
+                            className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 hover:bg-rose-600 transition-colors shadow-xs cursor-pointer"
+                            title="Remove photo"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-purple-100/80 border-2 border-dashed border-purple-300 flex items-center justify-center text-purple-400 shrink-0">
+                          <UserIcon className="w-6 h-6 text-purple-400" />
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/jpg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 2 * 1024 * 1024) {
+                              showToast('Please choose an image smaller than 2 MB');
+                              e.currentTarget.value = '';
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => setNewTechAvatar(String(reader.result));
+                            reader.readAsDataURL(file);
+                          }}
+                          className="w-full rounded-xl bg-white border border-purple-200 p-2 text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200 cursor-pointer"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Upload JPG, PNG, or WEBP photo (up to 2MB). Displayed during appointment scheduling.</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         setShowAddTech(false);
+                        setNewTechAvatar('');
                         setEditingTechnicianId(null);
                       }}
                       className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs text-gray-700 cursor-pointer"
@@ -1478,13 +1578,22 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">{t.specialties}</p>
                     </div>
-                    <button
-                      onClick={() => startEditingTechnician(t)}
-                      className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
-                      title="Edit technician"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    <div className="ml-auto flex items-center gap-1">
+                      <button
+                        onClick={() => startEditingTechnician(t)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                        title="Edit technician"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTechnician(t.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete technician"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
