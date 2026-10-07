@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   FileText,
   Download,
-  Printer,
   Sparkles,
   BarChart3,
   Users,
@@ -34,7 +33,6 @@ import {
   ProfitRevenueReportData,
   generateStoreVisualHtmlReport,
   downloadFile,
-  openPrintableReport,
 } from '../../utils/reportGenerators';
 import { Salon, Service, Technician, Appointment, Product, ProductOrder } from '../../types';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
@@ -150,16 +148,30 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
           const sendRes = await sendEmailNotification({
             ...data.report,
             to: emailToUse,
+            subject: `📊 All-in-One Master Performance Report PDF: ${salon?.salon_name || 'Salon'} (${selectedTimeGrain.toUpperCase()})`,
+            attachmentName: `${(salon?.salon_name || 'Salon').replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
+            salonName: salon?.salon_name,
+            salonAddress: salon?.address,
+            periodLabel: `${selectedTimeGrain.toUpperCase()} Master Audit`,
+            pdfMetrics: {
+              grossRevenue: pnlData.summary.totalGrossRevenue,
+              netProfit: pnlData.summary.netProfit,
+              profitMargin: pnlData.summary.profitMargin,
+              appointmentCount: reportData.stats.completedCount,
+              orderCount: reportData.stats.totalAppointments,
+              averageTicket: pnlData.summary.averageTicket,
+            },
+            masterReportSummary: `All-in-One Master Performance Dossier for ${salon?.salon_name || 'Salon'}. Gross Revenue: PHP ${pnlData.summary.totalGrossRevenue.toLocaleString()}, Net Profit: PHP ${pnlData.summary.netProfit.toLocaleString()} (${pnlData.summary.profitMargin.toFixed(1)}% margin), ${reportData.stats.completedCount} completed sessions, CRM retention: ${reportData.crmSummary.retentionRate}%.`,
           });
           if (sendRes.gmailSent) {
-            showToast(`✅ ${selectedTimeGrain.toUpperCase()} PDF report delivered directly to ${emailToUse} via Gmail!`);
+            showToast(`✅ All-in-One Master Report PDF delivered directly to ${emailToUse} via Gmail!`);
           } else if (sendRes.error) {
-            showToast(`Report logged to ledger. Note: ${sendRes.error}`);
+            showToast(`Master report logged to ledger. Note: ${sendRes.error}`);
           } else {
-            showToast(`${selectedTimeGrain.toUpperCase()} PDF status report logged to audit ledger`);
+            showToast(`All-in-One Master Report PDF logged to audit ledger`);
           }
         } else {
-          showToast(`${selectedTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+          showToast(`All-in-One Master Report PDF dispatched to email!`);
         }
       } else {
         showToast(data.error || 'Failed to email report');
@@ -173,26 +185,29 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
 
   const handleDownloadDirectPdf = () => {
     try {
-      const filename = `${(salon?.salon_name || 'Salon').replace(/\s+/g, '_')}_${selectedTimeGrain}_Performance_Report.pdf`;
+      const filename = `${(salon?.salon_name || 'Salon').replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`;
       const ok = downloadCertifiedPdfFile(filename, {
-        title: `${salon?.salon_name || 'Salon'} ${selectedTimeGrain.toUpperCase()} Performance Audit`,
+        title: `${salon?.salon_name || 'Salon'} All-in-One Master Performance Audit`,
         salonName: salon?.salon_name,
         salonAddress: salon?.address,
-        periodLabel: selectedTimeGrain.toUpperCase(),
+        periodLabel: `${selectedTimeGrain.toUpperCase()} Master Audit`,
         metrics: {
           grossRevenue: pnlData.summary.totalGrossRevenue,
           netProfit: pnlData.summary.netProfit,
           profitMargin: pnlData.summary.profitMargin,
           appointmentCount: reportData.stats.completedCount,
+          orderCount: reportData.stats.totalAppointments,
+          averageTicket: pnlData.summary.averageTicket,
         },
+        summaryText: `Official All-in-One Master Performance Dossier auditing salon gross turnover of PHP ${pnlData.summary.totalGrossRevenue.toLocaleString()}, net retained profit of PHP ${pnlData.summary.netProfit.toLocaleString()} (${pnlData.summary.profitMargin.toFixed(1)}% margin), ${reportData.stats.completedCount} completed sessions, CRM retention rate of ${reportData.crmSummary.retentionRate}%, and complete operational inventory intelligence.`,
       });
       if (ok) {
         showToast(`Downloaded ${filename} successfully!`);
       } else {
-        showToast('Failed to download PDF report');
+        showToast('Failed to download Master PDF report');
       }
     } catch (err: any) {
-      showToast('Error downloading PDF');
+      showToast('Error downloading Master PDF');
     }
   };
 
@@ -632,31 +647,6 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
     }));
   }, [pnlData.periods]);
 
-  const handlePrint = () => {
-    const enrichedData: StoreReportData = {
-      ...reportData,
-      timeRange: selectedTimeGrain === 'yearly' ? `${selectedYearRange} (5-Year Range)` : timeGrainDescription[selectedTimeGrain],
-      stats: {
-        ...reportData.stats,
-        totalAppointments: pnlData.summary.totalAppointments,
-        completedCount: pnlData.summary.totalAppointments,
-        totalRevenue: pnlData.summary.totalServicesRevenue,
-      },
-      volumeSummary: {
-        grain: selectedTimeGrain,
-        metric: 'bookings',
-        totalVolume: pnlData.summary.totalAppointments,
-        totalIncome: pnlData.summary.totalServicesRevenue,
-        peakPeriod: pnlData.summary.peakPeriod,
-        trend: volumeTrend,
-      },
-      profitRevenueSummary: pnlData,
-    };
-    const html = generateStoreVisualHtmlReport(enrichedData);
-    openPrintableReport(html);
-    showToast(`Opening printable ${selectedTimeGrain.toUpperCase()} Master PDF Report`);
-  };
-
   const handleExportCsvInternal = () => {
     let csvContent = 'data:text/csv;charset=utf-8,';
     csvContent += `Nail Glam Hub - Executive Decision Report & Master Ledger\n`;
@@ -867,26 +857,18 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
               onClick={handleEmailReport}
               disabled={isEmailing}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
-              title={`Email certified ${selectedTimeGrain.toUpperCase()} PDF report`}
+              title={`Email certified ${selectedTimeGrain.toUpperCase()} Master PDF report`}
             >
               <Mail className="w-3.5 h-3.5" />
-              <span>{isEmailing ? 'Delivering...' : `Email ${selectedTimeGrain.toUpperCase()} PDF`}</span>
+              <span>{isEmailing ? 'Delivering...' : `Email Master PDF`}</span>
             </button>
             <button
               onClick={handleDownloadDirectPdf}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition-all cursor-pointer shadow-xs"
-              title="Download certified PDF performance report file"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+              title="Download certified all-in-one master PDF report file"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download PDF</span>
-            </button>
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              title="Print or Save Master PDF"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Master PDF</span>
+              <span>Download Master PDF</span>
             </button>
           </div>
         </div>
@@ -1850,7 +1832,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-gray-900">Master PDF Dossier &amp; Executive Briefing</h4>
-                      <p className="text-[11px] text-gray-500">Print or save executive PDF dossiers and copyable management summaries</p>
+                      <p className="text-[11px] text-gray-500">Download executive master PDF dossiers and copyable management summaries</p>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
@@ -1860,28 +1842,28 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
               )}
 
               <div className="text-xs text-gray-500">
-                Generate or print unified store reports covering all operational, financial P&amp;L, staff, and inventory records in one document.
+                Generate or download unified store reports covering all operational, financial P&amp;L, staff, and inventory records in one document.
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Option 1: Print / Save Master PDF Report */}
+                {/* Option 1: Download Master PDF Report */}
                 <div className="p-5 rounded-2xl border border-purple-200 bg-purple-50/50 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
                     <div className="w-10 h-10 rounded-xl bg-purple-700 text-white flex items-center justify-center font-bold">
-                      <Printer className="w-5 h-5" />
+                      <Download className="w-5 h-5" />
                     </div>
-                    <h5 className="text-sm font-bold text-purple-950">Print Master PDF Report</h5>
+                    <h5 className="text-sm font-bold text-purple-950">Download All-in-One Master PDF</h5>
                     <p className="text-xs text-gray-600">
-                      Standard print-ready executive master report with complete operating P&amp;L ledger, performance trajectory charts, staff scorecards, inventory valuation, and strategic action matrix.
+                      Standard certified executive master PDF report with complete operating P&amp;L ledger, performance trajectory charts, staff scorecards, inventory valuation, and strategic action matrix.
                     </p>
                   </div>
                   <div className="pt-2">
                     <button
-                      onClick={handlePrint}
+                      onClick={handleDownloadDirectPdf}
                       className="w-full py-2.5 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Print / Save Master PDF</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Master PDF File</span>
                     </button>
                   </div>
                 </div>

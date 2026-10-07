@@ -3,7 +3,6 @@ import {
   DollarSign,
   TrendingUp,
   Download,
-  Printer,
   FileSpreadsheet,
   Sliders,
   Calendar,
@@ -23,8 +22,8 @@ import {
   generateProfitRevenueVisualHtmlReport,
   generateProfitRevenueCsv,
   downloadFile,
-  openPrintableReport,
 } from '../../utils/reportGenerators';
+import { downloadCertifiedPdfFile } from '../../lib/emailService';
 import { ProfitRevenueModal } from './ProfitRevenueModal';
 
 interface ProfitRevenueReportSectionProps {
@@ -370,10 +369,22 @@ export const ProfitRevenueReportSection: React.FC<ProfitRevenueReportSectionProp
     periods,
   ]);
 
-  const handlePrint = () => {
-    const html = generateProfitRevenueVisualHtmlReport(fullReportData);
-    openPrintableReport(html);
-    showToast(`Opening ${timeGrain} financial statement print preview`);
+  const handleDownloadMasterPdf = () => {
+    downloadCertifiedPdfFile(`${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`, {
+      title: `${salon.salon_name} All-in-One Master Performance Audit`,
+      salonName: salon.salon_name,
+      salonAddress: salon.address,
+      periodLabel: `${timeGrain.toUpperCase()} Master Audit`,
+      metrics: {
+        grossRevenue: fullReportData.summary.totalGrossRevenue,
+        netProfit: fullReportData.summary.netProfit,
+        profitMargin: fullReportData.summary.profitMargin,
+        appointmentCount: fullReportData.summary.totalAppointments,
+        orderCount: fullReportData.summary.totalOrders,
+        averageTicket: fullReportData.summary.averageTicket,
+      },
+    });
+    showToast(`All-in-One Master PDF report downloaded successfully`);
   };
 
   const handleExportCsv = () => {
@@ -419,11 +430,11 @@ export const ProfitRevenueReportSection: React.FC<ProfitRevenueReportSectionProp
             </button>
 
             <button
-              onClick={handlePrint}
+              onClick={handleDownloadMasterPdf}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Print / Save PDF</span>
+              <Download className="w-3.5 h-3.5 text-purple-700" />
+              <span className="hidden sm:inline">Download Master PDF</span>
             </button>
 
             <button

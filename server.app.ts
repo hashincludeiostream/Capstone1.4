@@ -872,14 +872,14 @@ async function startServer() {
             <p style="margin: 4px 0;"><strong>Appointments:</strong> ${completedAppts.length} completed</p>
             <p style="margin: 4px 0;"><strong>Retail Orders:</strong> ${settledOrders.length} fulfilled</p>
             <p style="margin: 4px 0;"><strong>Average Ticket:</strong> ₱${averageTicket.toLocaleString()}</p>
-            <p style="margin: 4px 0;"><strong>PDF Attachment:</strong> <span style="background: #FCE7F3; color: #BE185D; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">Attached (${salon.salon_name.replace(/\s+/g, '_')}_${filePrefix}.pdf)</span></p>
+            <p style="margin: 4px 0;"><strong>PDF Attachment:</strong> <span style="background: #FCE7F3; color: #BE185D; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">Downloadable All-in-One Master Report PDF Attached</span></p>
           </div>
-          <p style="font-size: 13px; color: #6B7280;">You can download or print your PDF report directly from this email or access it anytime inside your Salon Owner Dashboard.</p>
+          <p style="font-size: 13px; color: #6B7280;">Your downloadable All-in-One Master Report PDF is attached to this email and archived in your Salon Owner Dashboard ledger.</p>
         </div>
       `.trim();
 
-      const subject = `${subjectPrefix} 📊 ${periodLabel} - ${salon.salon_name}`;
-      const attachmentName = `${salon.salon_name.replace(/\s+/g, '_')}_${filePrefix}.pdf`;
+      const subject = `📊 All-in-One Master Performance Report PDF: ${salon.salon_name} (${periodLabel})`;
+      const attachmentName = `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`;
 
       await logEmailRecord({
         recipient_email: targetEmail,
@@ -896,7 +896,7 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: `${periodBadge} PDF status report successfully generated for ${targetEmail}`,
+        message: `${periodBadge} All-in-One Master PDF report successfully generated for ${targetEmail}`,
         report: {
           to: targetEmail,
           toName: owner_name || salon.salon_name,
@@ -907,6 +907,18 @@ async function startServer() {
           hasPdfAttachment: true,
           pdfHtml,
           attachmentName,
+          salonName: salon.salon_name,
+          salonAddress: salon.address,
+          periodLabel,
+          pdfMetrics: {
+            grossRevenue: totalRevenue,
+            netProfit,
+            profitMargin,
+            appointmentCount: completedAppts.length,
+            orderCount: settledOrders.length,
+            averageTicket,
+          },
+          masterReportSummary: `All-in-One Master Performance Dossier for ${salon.salon_name} (${periodLabel}). Gross Turnover: PHP ${totalRevenue.toLocaleString()}, Net Profit: PHP ${netProfit.toLocaleString()} (${profitMargin.toFixed(1)}% margin), ${completedAppts.length} completed visits, and ${settledOrders.length} retail orders.`,
         },
         metrics: {
           monthYear: periodLabel,
@@ -1009,8 +1021,8 @@ async function startServer() {
         </div>
       `.trim();
 
-      const subject = `Platform Status Report (PDF) 🛡️ ${monthYear} - Nail Glam Hub Admin`;
-      const attachmentName = `Platform_Status_Report_${monthYear.replace(/\s+/g, '_')}.pdf`;
+      const subject = `🛡️ All-in-One Master Platform Ecosystem Performance Audit Report (PDF) - ${monthYear}`;
+      const attachmentName = `Platform_Ecosystem_All_In_One_Master_Report_${monthYear.replace(/\s+/g, '_')}.pdf`;
 
       await logEmailRecord({
         recipient_email: targetEmail,
@@ -1027,7 +1039,7 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: `Platform status PDF report generated for ${targetEmail}`,
+        message: `Platform status All-in-One Master PDF report generated for ${targetEmail}`,
         report: {
           to: targetEmail,
           toName: admin_name || 'Administrator',
@@ -1038,6 +1050,24 @@ async function startServer() {
           hasPdfAttachment: true,
           pdfHtml,
           attachmentName,
+          periodLabel: `Platform Ecosystem Master Audit (${monthYear})`,
+          pdfMetrics: {
+            grossRevenue: totalPlatformTurnover,
+            netProfit: Math.round(totalPlatformTurnover * 0.85),
+            profitMargin: 85,
+            appointmentCount: apptCount,
+            orderCount,
+            averageTicket: Math.round(totalPlatformTurnover / Math.max(1, apptCount + orderCount)),
+          },
+          masterReportSummary: `Comprehensive All-in-One Master Executive Platform Audit for ${monthYear}. Active Salons: ${salonsCount}, Users: ${usersCount}, Completed Bookings: ${apptCount}, Retail Orders: ${orderCount}, Gross Platform GMV: PHP ${totalPlatformTurnover.toLocaleString()}.`,
+        },
+        metrics: {
+          monthYear,
+          salonsCount,
+          usersCount,
+          apptCount,
+          orderCount,
+          totalPlatformTurnover,
         },
       });
     } catch (error) {

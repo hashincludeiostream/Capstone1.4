@@ -32,6 +32,7 @@ import {
   AlertCircle,
   Building,
   LogOut,
+  Download,
 } from 'lucide-react';
 import { Salon, User, Reel, Review, Announcement, BusinessCategory } from '../types';
 import { AdminEmailReportsManager } from './admin/AdminEmailReportsManager';
@@ -39,8 +40,8 @@ import {
   AdminReportData,
   generateAdminVisualHtmlReport,
   downloadFile,
-  openPrintableReport,
 } from '../utils/reportGenerators';
+import { downloadCertifiedPdfFile } from '../lib/emailService';
 import { scrollToElement } from '../utils/scrollHelper';
 import {
   fetchStats,
@@ -477,10 +478,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     showToast('Platform Visual Decision Report (HTML) downloaded');
   };
 
-  const handlePrintAdminReport = () => {
-    const html = generateAdminVisualHtmlReport(adminReportData);
-    openPrintableReport(html);
-    showToast('Opening print preview for PDF report');
+  const handleDownloadAdminPdf = () => {
+    downloadCertifiedPdfFile(`Platform_Ecosystem_All_In_One_Master_Report.pdf`, {
+      title: 'Nail Glam Hub Executive Ecosystem All-in-One Master Audit',
+      recipientName: 'Administrator',
+      periodLabel: 'Full Platform Ecosystem Master Audit',
+      summaryText: 'Executive master dossier auditing active partner studios, transaction volumes, revenue settlement integrity, and customer retention metrics across the entire platform ecosystem.',
+    });
+    showToast('Platform All-in-One Master PDF downloaded successfully');
   };
 
   const handleExportAdminCsv = () => {
@@ -590,11 +595,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <span className="sm:hidden">Report</span>
           </button>
           <button
-            onClick={handlePrintAdminReport}
+            onClick={handleDownloadAdminPdf}
             className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 backdrop-blur-sm transition-all cursor-pointer"
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Print PDF</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Download Master PDF</span>
           </button>
           <button
             onClick={handleExportAdminCsv}
@@ -948,10 +953,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Download Visual Report (HTML)</span>
               </button>
               <button
-                onClick={handlePrintAdminReport}
+                onClick={handleDownloadAdminPdf}
                 className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold backdrop-blur-sm transition-all flex items-center gap-2 cursor-pointer"
               >
-                <span>Print / PDF</span>
+                <Download className="w-4 h-4" />
+                <span>Download Master PDF</span>
               </button>
               <button
                 onClick={handleExportAdminCsv}

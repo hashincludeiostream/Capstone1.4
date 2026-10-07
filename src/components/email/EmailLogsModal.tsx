@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   Sparkles,
   Shield,
-  Printer,
   Download,
   ExternalLink,
   RefreshCw,
@@ -17,7 +16,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { EmailLog, User, UserRole } from '../../types';
-import { sendEmailNotification } from '../../lib/emailService';
+import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 
 interface EmailLogsModalProps {
   currentUser: User;
@@ -93,26 +92,6 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
     }
   };
 
-  const printIframeRef = React.useRef<HTMLIFrameElement | null>(null);
-
-  const handlePrintOrDownloadPdf = (log: EmailLog) => {
-    if (!log.pdf_html && !log.html_body) return;
-    const content = log.pdf_html || log.html_body;
-
-    if (printIframeRef.current) {
-      const doc = printIframeRef.current.contentDocument || printIframeRef.current.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(content);
-        doc.close();
-        setTimeout(() => {
-          printIframeRef.current?.contentWindow?.focus();
-          printIframeRef.current?.contentWindow?.print();
-        }, 300);
-      }
-    }
-  };
-
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'booking':
@@ -132,7 +111,6 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
-      <iframe ref={printIframeRef} className="hidden" title="Logs Print Frame" />
       <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-pink-100 my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Modal Top Header */}
@@ -287,15 +265,22 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                         {isSendingActualEmail ? 'Sending...' : 'Send to My Email'}
                       </button>
                       {selectedLog.has_pdf_attachment && (
-                        <a
-                          href={`data:text/html;charset=utf-8,${encodeURIComponent(selectedLog.pdf_html || selectedLog.html_body)}`}
-                          download={selectedLog.attachment_name || 'Report.html'}
-                          className="inline-flex items-center px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg shadow-xs transition"
-                          title="Download report file"
+                        <button
+                          onClick={() => {
+                            const filename = selectedLog.attachment_name || 'All_In_One_Master_Report.pdf';
+                            downloadCertifiedPdfFile(filename, {
+                              title: selectedLog.subject,
+                              recipientName: selectedLog.recipient_name,
+                              recipientEmail: selectedLog.recipient_email,
+                              summaryText: selectedLog.content_preview,
+                            });
+                          }}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-lg shadow-xs transition cursor-pointer"
+                          title="Download certified All-in-One Master PDF file"
                         >
                           <Download className="w-3.5 h-3.5 mr-1" />
-                          Download
-                        </a>
+                          Download Master PDF
+                        </button>
                       )}
                     </div>
                   </div>

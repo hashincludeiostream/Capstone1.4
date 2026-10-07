@@ -3,7 +3,6 @@ import {
   DollarSign,
   TrendingUp,
   Download,
-  Printer,
   FileSpreadsheet,
   X,
   Sparkles,
@@ -18,8 +17,8 @@ import {
   generateProfitRevenueVisualHtmlReport,
   generateProfitRevenueCsv,
   downloadFile,
-  openPrintableReport,
 } from '../../utils/reportGenerators';
+import { downloadCertifiedPdfFile } from '../../lib/emailService';
 
 interface ProfitRevenueModalProps {
   reportData: ProfitRevenueReportData;
@@ -36,10 +35,27 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'statement' | 'visuals' | 'export'>('statement');
 
-  const handlePrint = () => {
-    const html = generateProfitRevenueVisualHtmlReport(reportData);
-    openPrintableReport(html);
-    showToast(`Opening ${reportData.timeGrain} Financial Statement for printing/PDF`);
+  const handleDownloadMasterPdf = () => {
+    const filename = `${reportData.salonName.replace(/\s+/g, '_')}_${reportData.timeGrain.toUpperCase()}_All_In_One_Master_Report.pdf`;
+    const ok = downloadCertifiedPdfFile(filename, {
+      title: `${reportData.salonName} All-in-One Master Performance & Profit Audit`,
+      salonName: reportData.salonName,
+      periodLabel: `${reportData.timeGrain.toUpperCase()} Master Audit`,
+      metrics: {
+        grossRevenue: reportData.summary.totalGrossRevenue,
+        netProfit: reportData.summary.netProfit,
+        profitMargin: reportData.summary.profitMargin,
+        appointmentCount: reportData.summary.totalAppointments,
+        orderCount: reportData.summary.totalAppointments,
+        averageTicket: reportData.summary.averageTicket,
+      },
+      summaryText: `Official All-in-One Master Performance Audit statement for ${reportData.salonName}. Reconciled gross turnover of PHP ${reportData.summary.totalGrossRevenue.toLocaleString()}, retained net profit of PHP ${reportData.summary.netProfit.toLocaleString()} (${reportData.summary.profitMargin.toFixed(1)}% margin).`,
+    });
+    if (ok) {
+      showToast(`Downloaded ${filename} successfully!`);
+    } else {
+      showToast('Failed to download Master PDF report');
+    }
   };
 
   const handleDownloadHtml = () => {
@@ -139,11 +155,12 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
 
             <div className="flex items-center gap-1.5">
               <button
-                onClick={handlePrint}
-                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                onClick={handleDownloadMasterPdf}
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                title="Download certified All-in-One Master PDF report"
               >
-                <Printer className="w-3.5 h-3.5 text-gray-600" />
-                <span className="hidden sm:inline">Print / PDF</span>
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Download Master PDF</span>
               </button>
               <button
                 onClick={handleDownloadCsv}
@@ -432,28 +449,28 @@ export const ProfitRevenueModal: React.FC<ProfitRevenueModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Visual HTML / PDF Document */}
-                <div className="p-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 flex flex-col justify-between space-y-4">
+                {/* Master PDF Dossier */}
+                <div className="p-5 rounded-2xl border border-purple-200 bg-purple-50/50 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold">
-                      <Printer className="w-5 h-5" />
+                    <div className="w-10 h-10 rounded-xl bg-purple-700 text-white flex items-center justify-center font-bold">
+                      <Download className="w-5 h-5" />
                     </div>
-                    <h5 className="text-sm font-bold text-emerald-950">Visual HTML / PDF Statement</h5>
+                    <h5 className="text-sm font-bold text-purple-950">All-in-One Master PDF</h5>
                     <p className="text-xs text-gray-600">
-                      Standalone executive document with comparative bar charts, P&amp;L scorecards, and margin directives.
+                      Standard certified executive master PDF report with complete operating P&amp;L ledger, turnover reconciliation, and margin directives.
                     </p>
                   </div>
                   <div className="space-y-2 pt-2">
                     <button
-                      onClick={handlePrint}
-                      className="w-full py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                      onClick={handleDownloadMasterPdf}
+                      className="w-full py-2 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Print to PDF</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Master PDF</span>
                     </button>
                     <button
                       onClick={handleDownloadHtml}
-                      className="w-full py-2 px-3 rounded-xl bg-white hover:bg-gray-50 border border-emerald-200 text-emerald-900 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full py-2 px-3 rounded-xl bg-white hover:bg-gray-50 border border-purple-200 text-purple-900 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download HTML</span>

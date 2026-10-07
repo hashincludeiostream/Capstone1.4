@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Mail,
   FileText,
   Send,
-  Printer,
   Download,
   CheckCircle2,
   Calendar,
@@ -56,7 +55,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
 
   // In-app interactive Report Preview Modal (avoids window.open popup blockers)
   const [previewLog, setPreviewLog] = useState<EmailLog | null>(null);
-  const printIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Notification Preferences (with toggle on and off and frequency)
   const prefsKey = `email_prefs_owner_${currentUser.id}_${salon.id}`;
@@ -129,22 +127,23 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   // Instant direct PDF download
   const handleDownloadDirectPdf = async () => {
     try {
-      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_${reportFrequency}_Report.pdf`;
+      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`;
       const ok = downloadCertifiedPdfFile(filename, {
-        title: `${salon.salon_name} ${reportFrequency.toUpperCase()} Performance Audit`,
+        title: `${salon.salon_name} All-in-One Master Performance Audit`,
         salonName: salon.salon_name,
         salonAddress: salon.address,
         recipientName: ownerName,
         recipientEmail: recipientEmail.trim() || defaultTargetEmail,
-        periodLabel: `${reportFrequency.toUpperCase()} Dossier`,
+        periodLabel: `${reportFrequency.toUpperCase()} Master Dossier`,
+        summaryText: `Official All-in-One Master Performance Dossier auditing salon gross turnover, net retained operating profit, customer appointment fulfillment, and boutique retail orders.`,
       });
       if (ok) {
         showToast(`Downloaded ${filename} successfully!`);
       } else {
-        showToast('Failed to download PDF document');
+        showToast('Failed to download Master PDF document');
       }
     } catch (err: any) {
-      showToast(err?.message || 'Error downloading PDF');
+      showToast(err?.message || 'Error downloading Master PDF');
     }
   };
 
@@ -243,6 +242,20 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         sendResult = await sendEmailNotification({
           ...data.report,
           to: emailToUse,
+          subject: `📊 All-in-One Master Performance Report PDF: ${salon.salon_name} (${reportFrequency.toUpperCase()})`,
+          attachmentName: `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
+          salonName: salon.salon_name,
+          salonAddress: salon.address,
+          periodLabel: `${reportFrequency.toUpperCase()} Master Audit`,
+          pdfMetrics: data.metrics ? {
+            grossRevenue: data.metrics.totalRevenue,
+            netProfit: data.metrics.netProfit,
+            profitMargin: data.metrics.profitMargin,
+            appointmentCount: data.metrics.appointmentCount,
+            orderCount: data.metrics.orderCount,
+            averageTicket: data.metrics.averageTicket,
+          } : data.report.pdfMetrics,
+          masterReportSummary: `All-in-One Master Performance Dossier for ${salon.salon_name}. Covers gross turnover of PHP ${(data.metrics?.totalRevenue || 0).toLocaleString()}, net profit of PHP ${(data.metrics?.netProfit || 0).toLocaleString()}, and operating margins.`,
         });
         if (sendResult.gmailSent) {
           gmailDelivered = true;
@@ -251,19 +264,19 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
 
       if (gmailDelivered) {
         setFeedback(
-          `✅ Official ${reportFrequency === 'monthly' ? 'Monthly' : 'Yearly'} PDF report delivered directly to your Gmail inbox (${emailToUse})!`
+          `✅ Official All-in-One Master PDF report delivered directly to your Gmail inbox (${emailToUse})!`
         );
-        showToast(`Dispatched via Gmail to ${emailToUse}`);
+        showToast(`Master PDF report dispatched via Gmail to ${emailToUse}`);
       } else if (sendResult?.error) {
         setFeedback(
-          `Report generated and logged to ledger! Note: ${sendResult.error}`
+          `Master report generated and logged to ledger! Note: ${sendResult.error}`
         );
-        showToast('Report saved to ledger');
+        showToast('Master report saved to ledger');
       } else {
         setFeedback(
-          `Report compiled and recorded in your ledger! Connect Google Workspace to receive live delivery in your external Gmail.`
+          `Master report compiled and recorded in your ledger! Connect Google Workspace to receive live delivery in your external Gmail.`
         );
-        showToast('Report saved to ledger');
+        showToast('Master report saved to ledger');
       }
 
       await fetchEmailLogs();
@@ -298,8 +311,12 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         category: (log.category as any) || 'report',
         htmlBody: log.html_body,
         hasPdfAttachment: Boolean(log.has_pdf_attachment),
-        attachmentName: log.attachment_name,
+        attachmentName: log.attachment_name || `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
         pdfHtml: log.pdf_html,
+        salonName: salon.salon_name,
+        salonAddress: salon.address,
+        periodLabel: 'All-in-One Master Performance Audit',
+        masterReportSummary: log.content_preview,
       });
 
       if (sendResult.gmailSent) {
@@ -314,25 +331,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       showToast(err.message || 'Error resending email');
     } finally {
       setIsResending(false);
-    }
-  };
-
-  // Safe in-app print using hidden iframe (zero window.open popups)
-  const handlePrintLog = (log: EmailLog) => {
-    const htmlToPrint = log.pdf_html || log.html_body;
-    if (!htmlToPrint) return;
-
-    if (printIframeRef.current) {
-      const doc = printIframeRef.current.contentDocument || printIframeRef.current.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(htmlToPrint);
-        doc.close();
-        setTimeout(() => {
-          printIframeRef.current?.contentWindow?.focus();
-          printIframeRef.current?.contentWindow?.print();
-        }, 300);
-      }
     }
   };
 
@@ -351,9 +349,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
 
   return (
     <div className="space-y-6">
-      {/* Hidden print iframe for reliable zero-popup printing */}
-      <iframe ref={printIframeRef} className="hidden" title="Print Frame" />
-
       {/* Workspace / Gmail Status Banner */}
       <div className={`p-4 rounded-2xl border transition-all ${
         hasGoogleToken
@@ -430,7 +425,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
               Email Reports & Business Audits
             </h2>
             <p className="text-purple-200 text-sm mt-1 leading-relaxed">
-              Automated delivery of customer bookings, in-store orders, and certified printable PDF performance reports dispatched to <strong className="text-white underline">{targetEmail}</strong>.
+              Automated delivery of customer bookings, in-store orders, and certified downloadable All-in-One Master PDF performance reports dispatched to <strong className="text-white underline">{targetEmail}</strong>.
             </p>
           </div>
 
@@ -767,34 +762,25 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                     </button>
 
                     {selectedLog.has_pdf_attachment && (
-                      <>
-                        <button
-                          onClick={() => {
-                            const filename = selectedLog.attachment_name || `${salon.salon_name}_Report.pdf`;
-                            downloadCertifiedPdfFile(filename, {
-                              title: selectedLog.subject,
-                              recipientName: selectedLog.recipient_name,
-                              recipientEmail: selectedLog.recipient_email,
-                              salonName: salon.salon_name,
-                              salonAddress: salon.address,
-                              summaryText: selectedLog.content_preview,
-                            });
-                            showToast(`Downloaded ${filename} successfully!`);
-                          }}
-                          className="inline-flex items-center px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg transition cursor-pointer"
-                          title="Download certified PDF file directly"
-                        >
-                          <Download className="w-3.5 h-3.5 mr-1.5" />
-                          Download PDF
-                        </button>
-                        <button
-                          onClick={() => handlePrintLog(selectedLog)}
-                          className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5 mr-1.5" />
-                          Print / PDF
-                        </button>
-                      </>
+                      <button
+                        onClick={() => {
+                          const filename = selectedLog.attachment_name || `${salon.salon_name}_All_In_One_Master_Report.pdf`;
+                          downloadCertifiedPdfFile(filename, {
+                            title: selectedLog.subject,
+                            recipientName: selectedLog.recipient_name,
+                            recipientEmail: selectedLog.recipient_email,
+                            salonName: salon.salon_name,
+                            salonAddress: salon.address,
+                            summaryText: selectedLog.content_preview,
+                          });
+                          showToast(`Downloaded ${filename} successfully!`);
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg transition cursor-pointer"
+                        title="Download certified All-in-One Master PDF file directly"
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1.5" />
+                        Download Master PDF
+                      </button>
                     )}
                   </div>
                 </div>
@@ -935,20 +921,31 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                 {/* Direct download HTML report without window.open */}
                 <a
                   href={`data:text/html;charset=utf-8,${encodeURIComponent(previewLog.pdf_html || previewLog.html_body)}`}
-                  download={previewLog.attachment_name || `${salon.salon_name.replace(/\s+/g, '_')}_Report.html`}
+                  download={previewLog.attachment_name || `${salon.salon_name.replace(/\s+/g, '_')}_Master_Report.html`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs font-bold rounded-xl shadow-xs transition"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Download HTML</span>
                 </a>
 
-                {/* Print button */}
+                {/* Direct Master PDF download */}
                 <button
-                  onClick={() => handlePrintLog(previewLog)}
+                  onClick={() => {
+                    const filename = previewLog.attachment_name || `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`;
+                    downloadCertifiedPdfFile(filename, {
+                      title: previewLog.subject,
+                      recipientName: previewLog.recipient_name,
+                      recipientEmail: previewLog.recipient_email,
+                      salonName: salon.salon_name,
+                      salonAddress: salon.address,
+                      summaryText: previewLog.content_preview,
+                    });
+                    showToast(`Downloaded ${filename} successfully!`);
+                  }}
                   className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Print / PDF</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Download Master PDF</span>
                 </button>
 
                 <button

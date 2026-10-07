@@ -28,7 +28,6 @@ import {
   TrendingUp,
   Plus,
   ArrowRight,
-  Printer,
   FileSpreadsheet,
   Mail,
 } from 'lucide-react';
@@ -43,7 +42,6 @@ import {
   ProfitRevenueReportData,
   generateStoreVisualHtmlReport,
   downloadFile,
-  openPrintableReport,
 } from '../../utils/reportGenerators';
 
 interface StoreOverviewReportsProps {
@@ -984,10 +982,32 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
 
   const [isEmailingReport, setIsEmailingReport] = useState(false);
 
-  const handlePrintReport = () => {
-    const html = generateStoreVisualHtmlReport(storeReportData);
-    openPrintableReport(html);
-    showToast('Opening print preview for PDF report');
+  const handleDownloadDirectPdf = () => {
+    try {
+      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`;
+      const ok = downloadCertifiedPdfFile(filename, {
+        title: `${salon.salon_name} All-in-One Master Performance Audit`,
+        salonName: salon.salon_name,
+        salonAddress: salon.address,
+        periodLabel: `${volumeTimeGrain.toUpperCase()} All-in-One Master Audit`,
+        metrics: {
+          grossRevenue: profitRevenueData.summary.totalGrossRevenue,
+          netProfit: profitRevenueData.summary.netProfit,
+          profitMargin: profitRevenueData.summary.profitMargin,
+          appointmentCount: storeReportData.stats.completedCount,
+          orderCount: storeReportData.stats.totalAppointments,
+          averageTicket: profitRevenueData.summary.averageTicket,
+        },
+        summaryText: `Comprehensive All-in-One Master Performance Dossier auditing salon gross turnover of PHP ${profitRevenueData.summary.totalGrossRevenue.toLocaleString()}, net retained profit of PHP ${profitRevenueData.summary.netProfit.toLocaleString()} (${profitRevenueData.summary.profitMargin.toFixed(1)}% margin), ${storeReportData.stats.completedCount} completed appointments, CRM retention rate of ${storeReportData.crmSummary.retentionRate}%, and complete operational inventory intelligence.`,
+      });
+      if (ok) {
+        showToast(`Downloaded ${filename} successfully!`);
+      } else {
+        showToast('Failed to download Master PDF document');
+      }
+    } catch (err: any) {
+      showToast('Error downloading Master PDF');
+    }
   };
 
   const handleEmailReport = async () => {
@@ -1023,16 +1043,30 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
           const sendRes = await sendEmailNotification({
             ...data.report,
             to: emailToUse,
+            subject: `📊 All-in-One Master Performance Report PDF: ${salon.salon_name} (${volumeTimeGrain.toUpperCase()})`,
+            attachmentName: `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
+            salonName: salon.salon_name,
+            salonAddress: salon.address,
+            periodLabel: `${volumeTimeGrain.toUpperCase()} All-in-One Master Audit`,
+            pdfMetrics: {
+              grossRevenue: profitRevenueData.summary.totalGrossRevenue,
+              netProfit: profitRevenueData.summary.netProfit,
+              profitMargin: profitRevenueData.summary.profitMargin,
+              appointmentCount: storeReportData.stats.completedCount,
+              orderCount: storeReportData.stats.totalAppointments,
+              averageTicket: profitRevenueData.summary.averageTicket,
+            },
+            masterReportSummary: `All-in-One Master Performance Dossier for ${salon.salon_name}. Covers gross revenue of PHP ${profitRevenueData.summary.totalGrossRevenue.toLocaleString()}, net profit of PHP ${profitRevenueData.summary.netProfit.toLocaleString()} (${profitRevenueData.summary.profitMargin.toFixed(1)}% margin), ${storeReportData.stats.completedCount} completed visits, CRM retention of ${storeReportData.crmSummary.retentionRate}%, and complete operational inventory intelligence.`,
           });
           if (sendRes.gmailSent) {
-            showToast(`✅ ${volumeTimeGrain.toUpperCase()} PDF report delivered directly to ${emailToUse} via Gmail!`);
+            showToast(`✅ All-in-One Master Report PDF delivered directly to ${emailToUse} via Gmail!`);
           } else if (sendRes.error) {
-            showToast(`Report logged to ledger. Note: ${sendRes.error}`);
+            showToast(`Master report logged to ledger. Note: ${sendRes.error}`);
           } else {
-            showToast(`${volumeTimeGrain.toUpperCase()} PDF status report logged to ledger`);
+            showToast(`All-in-One Master Report PDF logged to audit ledger`);
           }
         } else {
-          showToast(`${volumeTimeGrain.toUpperCase()} PDF status report dispatched to email!`);
+          showToast(`All-in-One Master Report PDF dispatched to email!`);
         }
       } else {
         showToast(data.error || 'Failed to dispatch email report');
@@ -1041,31 +1075,6 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       showToast('Error emailing report');
     } finally {
       setIsEmailingReport(false);
-    }
-  };
-
-  const handleDownloadDirectPdf = () => {
-    try {
-      const filename = `${salon.salon_name.replace(/\s+/g, '_')}_${volumeTimeGrain}_Report.pdf`;
-      const ok = downloadCertifiedPdfFile(filename, {
-        title: `${salon.salon_name} ${volumeTimeGrain.toUpperCase()} Store Overview Audit`,
-        salonName: salon.salon_name,
-        salonAddress: salon.address,
-        periodLabel: volumeTimeGrain.toUpperCase(),
-        metrics: {
-          grossRevenue: pnlData.summary.totalGrossRevenue,
-          netProfit: pnlData.summary.netProfit,
-          profitMargin: pnlData.summary.profitMargin,
-          appointmentCount: reportData.stats.completedCount,
-        },
-      });
-      if (ok) {
-        showToast(`Downloaded ${filename} successfully!`);
-      } else {
-        showToast('Failed to download PDF document');
-      }
-    } catch (err: any) {
-      showToast('Error downloading PDF');
     }
   };
 
@@ -1154,37 +1163,27 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons: Email, Print & Master Report - No overlap with clean flex wrap */}
+          {/* Action Buttons: Email & Download All-in-One Master PDF Report */}
           <div className="flex items-center gap-2 flex-wrap shrink-0 justify-start sm:justify-end">
             <button
               type="button"
               onClick={handleEmailReport}
               disabled={isEmailingReport}
               className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
-              title="Email certified PDF report for current active scope"
+              title="Email certified All-in-One Master PDF report"
             >
               <Mail className="w-3.5 h-3.5" />
-              <span>{isEmailingReport ? 'Sending...' : 'Email PDF'}</span>
+              <span>{isEmailingReport ? 'Sending...' : 'Email Master PDF'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleDownloadDirectPdf}
               className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-900 border border-pink-200/80 text-xs font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
-              title="Download certified PDF performance report file"
+              title="Download certified all-in-one master PDF report file"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download PDF</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handlePrintReport}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/80 text-xs font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
-              title="Print or preview store report PDF"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print PDF</span>
+              <span>Download Master PDF</span>
             </button>
 
             <button
