@@ -24,6 +24,7 @@ import {
 import { User, Salon, Service, BusinessCategory, Appointment, Announcement, Product, ProductOrder, CartItem, PlatformStats, Reel, Review, Technician, PaymentTransaction } from './types';
 import { initializeFirestoreData, subscribeToAppointments, updateFirestoreUser } from './lib/firestoreService';
 import { fetchCategories, fetchSalons, fetchAnnouncements, updateUser, fetchProducts, fetchProductOrders, fetchAppointments, fetchStats, fetchReels, fetchReviews, fetchTechnicians, fetchServices, verifyAdminPermission, API_BASE } from './lib/api';
+import { ajax } from './lib/ajax';
 import { fetchReceiptByReference } from './lib/paymentService';
 import { localStorage as safeLocalStorage } from './lib/localStorage';
 
@@ -511,7 +512,7 @@ const AppContent: React.FC = () => {
     try {
       const [statsData, uRes, reelsData, revsData] = await Promise.all([
         fetchStats().catch(() => null),
-        fetch(`${API_BASE}/users`).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        ajax(`${API_BASE}/users`).then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetchReels().catch(() => []),
         fetchReviews().catch(() => []),
       ]);

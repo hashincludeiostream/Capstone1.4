@@ -23,6 +23,7 @@ import { User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
+import { ajax } from '../../lib/ajax';
 
 interface AdminEmailReportsManagerProps {
   currentUser?: User;
@@ -144,7 +145,7 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
   const fetchEmailLogs = async () => {
     setLoadingLogs(true);
     try {
-      const res = await fetch('/api/email/logs');
+      const res = await ajax('/api/email/logs');
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
@@ -191,7 +192,7 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
       const emailToUse = (adminTargetEmail.trim() || connectedGmailEmail || defaultAdminEmail).trim();
 
       // 2. Generate platform status report from server
-      const res = await fetch('/api/email/reports/admin-platform', {
+      const res = await ajax('/api/email/reports/admin-platform', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

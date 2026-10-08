@@ -1,3 +1,5 @@
+import { ajax } from './ajax';
+export { ajax } from './ajax';
 import {
   User,
   UserRole,
@@ -79,7 +81,7 @@ const getErrorMessage = (error: unknown, context: string): string => {
 
 export async function fetchCategories(): Promise<BusinessCategory[]> {
   try {
-    const res = await fetch(`${API_BASE}/categories`);
+    const res = await ajax(`${API_BASE}/categories`);
     if (!res.ok) throw new Error('Failed to fetch categories');
     const data = await res.json();
     return Array.isArray(data) ? data : (seedCategories as BusinessCategory[]);
@@ -98,7 +100,7 @@ export interface DistinctServiceCategory {
 
 export async function fetchServiceCategories(): Promise<DistinctServiceCategory[]> {
   try {
-    const res = await fetch(`${API_BASE}/services/categories`);
+    const res = await ajax(`${API_BASE}/services/categories`);
     if (!res.ok) throw new Error('Failed to fetch distinct service categories');
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
@@ -168,7 +170,7 @@ export async function fetchSalons(params?: {
     if (params?.owner_id) query.set('owner_id', String(params.owner_id));
     if (params?.includeUnpublished) query.set('include_unpublished', 'true');
 
-    const res = await fetch(`${API_BASE}/salons?${query.toString()}`);
+    const res = await ajax(`${API_BASE}/salons?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch salons');
     const salons = await res.json();
     const parsed = (Array.isArray(salons) ? salons : []).map((salon: Salon) => ({
@@ -223,7 +225,7 @@ export async function fetchSalonDetails(id: number): Promise<{
   working_hours: WorkingHour[];
 } | null> {
   try {
-    const res = await fetch(`${API_BASE}/salons/${id}`);
+    const res = await ajax(`${API_BASE}/salons/${id}`);
     if (!res.ok) throw new Error('Failed to fetch salon details');
     return await res.json();
   } catch (err) {
@@ -255,7 +257,7 @@ export async function fetchServices(salonId?: number, ownerId?: number): Promise
     if (salonId) params.append('salon_id', String(salonId));
     if (ownerId) params.append('owner_id', String(ownerId));
     const url = params.toString() ? `${API_BASE}/services?${params.toString()}` : `${API_BASE}/services`;
-    const res = await fetch(url);
+    const res = await ajax(url);
     if (!res.ok) throw new Error('Failed to fetch services');
     const services = await res.json();
     return (Array.isArray(services) ? services : []).map((service: Service) => ({
@@ -286,7 +288,7 @@ export async function fetchTechnicians(salonId?: number, ownerId?: number): Prom
     if (salonId) params.append('salon_id', String(salonId));
     if (ownerId) params.append('owner_id', String(ownerId));
     const url = params.toString() ? `${API_BASE}/technicians?${params.toString()}` : `${API_BASE}/technicians`;
-    const res = await fetch(url);
+    const res = await ajax(url);
     if (!res.ok) throw new Error('Failed to fetch technicians');
     return await res.json();
   } catch (err) {
@@ -305,7 +307,7 @@ export async function fetchAppointments(params?: { customer_id?: number; salon_i
     if (params?.customer_id) query.set('customer_id', String(params.customer_id));
     if (params?.salon_id) query.set('salon_id', String(params.salon_id));
 
-    const res = await fetch(`${API_BASE}/appointments?${query.toString()}`);
+    const res = await ajax(`${API_BASE}/appointments?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch appointments');
     return await res.json();
   } catch (err) {
@@ -332,7 +334,7 @@ export async function fetchAppointments(params?: { customer_id?: number; salon_i
 
 export async function createAppointment(data: Partial<Appointment>): Promise<{ success: boolean; appointment: Appointment }> {
   try {
-    const res = await fetch(`${API_BASE}/appointments`, {
+    const res = await ajax(`${API_BASE}/appointments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -381,7 +383,7 @@ export async function updateAppointmentStatus(
       if (cancellationData.cancelled_by) payload.cancelled_by = cancellationData.cancelled_by;
     }
 
-    const res = await fetch(`${API_BASE}/appointments/${id}/status`, {
+    const res = await ajax(`${API_BASE}/appointments/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -419,7 +421,7 @@ export async function cancelAppointment(
   refund_amount: number;
   message: string;
 }> {
-  const res = await fetch(`${API_BASE}/appointments/${id}/cancel`, {
+  const res = await ajax(`${API_BASE}/appointments/${id}/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -454,7 +456,7 @@ export async function rescheduleAppointment(
   appointment: Appointment;
   message: string;
 }> {
-  const res = await fetch(`${API_BASE}/appointments/${id}/reschedule`, {
+  const res = await ajax(`${API_BASE}/appointments/${id}/reschedule`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -476,7 +478,7 @@ export async function rescheduleAppointment(
 
 export async function updateAppointmentTechnician(id: number, technicianId: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/appointments/${id}/technician`, {
+    const res = await ajax(`${API_BASE}/appointments/${id}/technician`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ technician_id: technicianId }),
@@ -502,7 +504,7 @@ export async function fetchReviews(salonId?: number, includePrivate: boolean = f
     if (includePrivate) params.append('include_private', 'true');
     const queryString = params.toString();
     const url = queryString ? `${API_BASE}/reviews?${queryString}` : `${API_BASE}/reviews`;
-    const res = await fetch(url);
+    const res = await ajax(url);
     if (!res.ok) throw new Error('Failed to fetch reviews');
     return await res.json();
   } catch (err) {
@@ -520,7 +522,7 @@ export async function fetchReviews(salonId?: number, includePrivate: boolean = f
 
 export async function createReview(data: Partial<Review>): Promise<Review> {
   try {
-    const res = await fetch(`${API_BASE}/reviews`, {
+    const res = await ajax(`${API_BASE}/reviews`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -541,7 +543,7 @@ export async function createReview(data: Partial<Review>): Promise<Review> {
 
 export async function fetchReels(): Promise<Reel[]> {
   try {
-    const res = await fetch(`${API_BASE}/reels`);
+    const res = await ajax(`${API_BASE}/reels`);
     if (!res.ok) throw new Error('Failed to fetch reels');
     return await res.json();
   } catch (err) {
@@ -552,7 +554,7 @@ export async function fetchReels(): Promise<Reel[]> {
 
 export async function toggleReelLike(reelId: number): Promise<{ likes: number; is_liked: boolean }> {
   try {
-    const res = await fetch(`${API_BASE}/reels/${reelId}/like`, { method: 'POST' });
+    const res = await ajax(`${API_BASE}/reels/${reelId}/like`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to toggle like');
     return await res.json();
   } catch (err) {
@@ -565,7 +567,7 @@ export async function toggleReelLike(reelId: number): Promise<{ likes: number; i
 
 export async function toggleReelSave(reelId: number): Promise<{ saves_count: number; is_saved: boolean }> {
   try {
-    const res = await fetch(`${API_BASE}/reels/${reelId}/save`, { method: 'POST' });
+    const res = await ajax(`${API_BASE}/reels/${reelId}/save`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to toggle save');
     return await res.json();
   } catch (err) {
@@ -578,7 +580,7 @@ export async function toggleReelSave(reelId: number): Promise<{ saves_count: num
 
 export async function addReelComment(reelId: number, comment: string, userName?: string): Promise<ReelCommentResponse> {
   try {
-    const res = await fetch(`${API_BASE}/reels/${reelId}/comment`, {
+    const res = await ajax(`${API_BASE}/reels/${reelId}/comment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ comment, user_name: userName }),
@@ -595,7 +597,7 @@ export async function addReelComment(reelId: number, comment: string, userName?:
 
 export async function fetchPromotions(): Promise<Promotion[]> {
   try {
-    const res = await fetch(`${API_BASE}/promotions`);
+    const res = await ajax(`${API_BASE}/promotions`);
     if (!res.ok) throw new Error('Failed to fetch promotions');
     return await res.json();
   } catch (err) {
@@ -606,7 +608,7 @@ export async function fetchPromotions(): Promise<Promotion[]> {
 
 export async function fetchStats(): Promise<PlatformStats | null> {
   try {
-    const res = await fetch(`${API_BASE}/stats`);
+    const res = await ajax(`${API_BASE}/stats`);
     if (!res.ok) throw new Error('Failed to fetch stats');
     return await res.json();
   } catch (err) {
@@ -619,7 +621,7 @@ export async function fetchStats(): Promise<PlatformStats | null> {
 export async function fetchAnnouncements(audience?: string): Promise<Announcement[]> {
   try {
     const url = audience ? `${API_BASE}/announcements?audience=${audience}` : `${API_BASE}/announcements`;
-    const res = await fetch(url);
+    const res = await ajax(url);
     if (!res.ok) throw new Error('Failed to fetch announcements');
     return await res.json();
   } catch (err) {
@@ -633,7 +635,7 @@ export async function fetchAnnouncements(audience?: string): Promise<Announcemen
 }
 
 export async function createAnnouncement(data: Partial<Announcement>): Promise<Announcement> {
-  const res = await fetch(`${API_BASE}/announcements`, {
+  const res = await ajax(`${API_BASE}/announcements`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -643,7 +645,7 @@ export async function createAnnouncement(data: Partial<Announcement>): Promise<A
 }
 
 export async function updateAnnouncement(id: number, data: Partial<Announcement>): Promise<Announcement> {
-  const res = await fetch(`${API_BASE}/announcements/${id}`, {
+  const res = await ajax(`${API_BASE}/announcements/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -654,7 +656,7 @@ export async function updateAnnouncement(id: number, data: Partial<Announcement>
 
 export async function deleteAnnouncement(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/announcements/${id}`, { method: 'DELETE' });
+    const res = await ajax(`${API_BASE}/announcements/${id}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     return false;
@@ -662,14 +664,14 @@ export async function deleteAnnouncement(id: number): Promise<boolean> {
 }
 
 export async function fetchRegistrationRateLimitStatus(): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/settings/registration-rate-limit`);
+  const res = await ajax(`${API_BASE}/settings/registration-rate-limit`);
   if (!res.ok) throw new Error('Failed to fetch registration rate-limit status');
   const data = await res.json();
   return data.enabled === true;
 }
 
 export async function updateRegistrationRateLimit(enabled: boolean): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/settings/registration-rate-limit`, {
+  const res = await ajax(`${API_BASE}/settings/registration-rate-limit`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
@@ -681,7 +683,7 @@ export async function updateRegistrationRateLimit(enabled: boolean): Promise<boo
 
 // Salon Profile & Location Update
 export async function updateSalon(id: number, data: Partial<Salon>): Promise<Salon> {
-  const res = await fetch(`${API_BASE}/salons/${id}`, {
+  const res = await ajax(`${API_BASE}/salons/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -694,13 +696,13 @@ export async function updateSalon(id: number, data: Partial<Salon>): Promise<Sal
 }
 
 export async function fetchWorkingHours(salonId: number): Promise<WorkingHour[]> {
-  const res = await fetch(`${API_BASE}/working-hours?salon_id=${salonId}`);
+  const res = await ajax(`${API_BASE}/working-hours?salon_id=${salonId}`);
   if (!res.ok) throw new Error('Failed to fetch working hours');
   return await res.json();
 }
 
 export async function updateWorkingHours(salonId: number, hours: Partial<WorkingHour>[]): Promise<WorkingHour[]> {
-  const res = await fetch(`${API_BASE}/working-hours`, {
+  const res = await ajax(`${API_BASE}/working-hours`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ salon_id: salonId, hours }),
@@ -713,7 +715,7 @@ export async function updateWorkingHours(salonId: number, hours: Partial<Working
 // Admin Salon Approvals & Moderation
 export async function updateSalonVerification(id: number, status: 'verified' | 'pending' | 'rejected'): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/salons/${id}/verification`, {
+    const res = await ajax(`${API_BASE}/salons/${id}/verification`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ verification_status: status }),
@@ -726,7 +728,7 @@ export async function updateSalonVerification(id: number, status: 'verified' | '
 
 export async function toggleSalonActive(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/salons/${id}/toggle-active`, { method: 'PATCH' });
+    const res = await ajax(`${API_BASE}/salons/${id}/toggle-active`, { method: 'PATCH' });
     return res.ok;
   } catch (err) {
     return false;
@@ -735,7 +737,7 @@ export async function toggleSalonActive(id: number): Promise<boolean> {
 
 export async function toggleSalonFeatured(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/salons/${id}/toggle-featured`, { method: 'PATCH' });
+    const res = await ajax(`${API_BASE}/salons/${id}/toggle-featured`, { method: 'PATCH' });
     return res.ok;
   } catch (err) {
     return false;
@@ -744,7 +746,7 @@ export async function toggleSalonFeatured(id: number): Promise<boolean> {
 
 export async function deleteSalon(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/salons/${id}`, { method: 'DELETE' });
+    const res = await ajax(`${API_BASE}/salons/${id}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     return false;
@@ -754,7 +756,7 @@ export async function deleteSalon(id: number): Promise<boolean> {
 // Admin User Management
 export async function updateUserStatus(id: number, status: 'active' | 'suspended'): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/users/${id}/status`, {
+    const res = await ajax(`${API_BASE}/users/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -767,7 +769,7 @@ export async function updateUserStatus(id: number, status: 'active' | 'suspended
 
 export async function deleteUser(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/users/${id}`, { method: 'DELETE' });
+    const res = await ajax(`${API_BASE}/users/${id}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     return false;
@@ -777,7 +779,7 @@ export async function deleteUser(id: number): Promise<boolean> {
 // Admin Media/Content Moderation
 export async function deleteReel(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/reels/${id}`, { method: 'DELETE' });
+    const res = await ajax(`${API_BASE}/reels/${id}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     return false;
@@ -786,7 +788,7 @@ export async function deleteReel(id: number): Promise<boolean> {
 
 export async function deleteReview(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/reviews/${id}`, { method: 'DELETE' });
+    const res = await ajax(`${API_BASE}/reviews/${id}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     return false;
@@ -796,7 +798,7 @@ export async function deleteReview(id: number): Promise<boolean> {
 // User Profile Management
 export async function updateUser(id: number, data: Partial<User>): Promise<User> {
   try {
-    const res = await fetch(`${API_BASE}/users/${id}`, {
+    const res = await ajax(`${API_BASE}/users/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -834,7 +836,7 @@ export async function updateUser(id: number, data: Partial<User>): Promise<User>
 }
 
 export async function fetchUser(id: number): Promise<User> {
-  const res = await fetch(`${API_BASE}/users/${id}`);
+  const res = await ajax(`${API_BASE}/users/${id}`);
   if (!res.ok) throw new Error('Failed to fetch user');
   return await res.json();
 }
@@ -844,7 +846,7 @@ export async function changePassword(
   data: { currentPassword?: string; newPassword?: string }
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch(`${API_BASE}/users/${userId}/change-password`, {
+    const res = await ajax(`${API_BASE}/users/${userId}/change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -884,7 +886,7 @@ export async function verifyAdminPermission(user: User | null): Promise<AdminVer
   }
 
   try {
-    const res = await fetch(`${API_BASE}/auth/verify-admin`, {
+    const res = await ajax(`${API_BASE}/auth/verify-admin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: user.id, email: user.email }),
@@ -942,7 +944,7 @@ export async function fetchProducts(params?: {
     if (params?.search) query.set('search', params.search);
     if (params?.low_stock_only) query.set('low_stock_only', 'true');
 
-    const res = await fetch(`${API_BASE}/products?${query.toString()}`);
+    const res = await ajax(`${API_BASE}/products?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch products');
     const items = await res.json();
     return Array.isArray(items) ? items : [];
@@ -965,7 +967,7 @@ export async function fetchProducts(params?: {
 
 export async function fetchProductDetails(id: number): Promise<Product | null> {
   try {
-    const res = await fetch(`${API_BASE}/products/${id}`);
+    const res = await ajax(`${API_BASE}/products/${id}`);
     if (!res.ok) throw new Error('Failed to fetch product');
     return await res.json();
   } catch (err) {
@@ -975,7 +977,7 @@ export async function fetchProductDetails(id: number): Promise<Product | null> {
 }
 
 export async function createProduct(productData: Partial<Product>): Promise<Product> {
-  const res = await fetch(`${API_BASE}/products`, {
+  const res = await ajax(`${API_BASE}/products`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(productData),
@@ -988,7 +990,7 @@ export async function createProduct(productData: Partial<Product>): Promise<Prod
 }
 
 export async function updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
-  const res = await fetch(`${API_BASE}/products/${id}`, {
+  const res = await ajax(`${API_BASE}/products/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(productData),
@@ -1004,7 +1006,7 @@ export async function updateProductStock(
   id: number,
   change: { delta?: number; stock_quantity?: number }
 ): Promise<{ success: boolean; product: Product; message: string }> {
-  const res = await fetch(`${API_BASE}/products/${id}/stock`, {
+  const res = await ajax(`${API_BASE}/products/${id}/stock`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(change),
@@ -1018,7 +1020,7 @@ export async function updateProductStock(
 
 export async function deleteProduct(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+    const res = await ajax(`${API_BASE}/products/${id}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     return false;
@@ -1036,7 +1038,7 @@ export async function fetchProductOrders(params?: {
     if (params?.salon_id) query.set('salon_id', String(params.salon_id));
     if (params?.status) query.set('status', params.status);
 
-    const res = await fetch(`${API_BASE}/product-orders?${query.toString()}`);
+    const res = await ajax(`${API_BASE}/product-orders?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch product orders');
     const items = await res.json();
     return Array.isArray(items) ? items : [];
@@ -1064,7 +1066,7 @@ export async function createProductOrder(orderData: {
   pickup_time?: string;
   notes?: string;
 }): Promise<{ success: boolean; order: ProductOrder; message: string }> {
-  const res = await fetch(`${API_BASE}/product-orders`, {
+  const res = await ajax(`${API_BASE}/product-orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(orderData),
@@ -1100,7 +1102,7 @@ export async function updateProductOrderStatus(
     if (cancellationData.unclaimed_reason) payload.unclaimed_reason = cancellationData.unclaimed_reason;
   }
 
-  const res = await fetch(`${API_BASE}/product-orders/${orderId}/status`, {
+  const res = await ajax(`${API_BASE}/product-orders/${orderId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -1129,7 +1131,7 @@ export async function cancelProductOrder(
   restocked_items_count: number;
   message: string;
 }> {
-  const res = await fetch(`${API_BASE}/product-orders/${orderId}/cancel`, {
+  const res = await ajax(`${API_BASE}/product-orders/${orderId}/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -1158,7 +1160,7 @@ export async function updateAppointmentLateFee(
     notes?: string;
   }
 ): Promise<{ success: boolean; appointment: Appointment; message: string }> {
-  const res = await fetch(`${API_BASE}/appointments/${appointmentId}/late-fee`, {
+  const res = await ajax(`${API_BASE}/appointments/${appointmentId}/late-fee`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -1176,7 +1178,7 @@ export async function updateSalonCancellationPolicy(
   salonId: number,
   config: SalonCancellationPolicyConfig
 ): Promise<{ success: boolean; salon: Salon; message: string }> {
-  const res = await fetch(`${API_BASE}/salons/${salonId}/cancellation-policy`, {
+  const res = await ajax(`${API_BASE}/salons/${salonId}/cancellation-policy`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ config }),
@@ -1193,7 +1195,7 @@ export async function updateSalonCancellationPolicy(
 export async function batchMarkUnclaimedOrders(
   salonId?: number
 ): Promise<{ success: boolean; updatedCount: number; totalRestockedUnits: number; message: string }> {
-  const res = await fetch(`${API_BASE}/product-orders/batch-mark-unclaimed`, {
+  const res = await ajax(`${API_BASE}/product-orders/batch-mark-unclaimed`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ salon_id: salonId }),
@@ -1220,7 +1222,7 @@ export async function fetchUserReliability(userId: number): Promise<{
   tier: 'excellent' | 'good' | 'caution' | 'restricted';
   info: any;
 }> {
-  const res = await fetch(`${API_BASE}/users/${userId}/reliability`);
+  const res = await ajax(`${API_BASE}/users/${userId}/reliability`);
   if (!res.ok) {
     throw new Error('Failed to fetch user reliability status');
   }
@@ -1233,7 +1235,7 @@ export async function fetchTransactions(params?: { customer_id?: number; salon_i
     if (params?.customer_id) query.set('customer_id', String(params.customer_id));
     if (params?.salon_id) query.set('salon_id', String(params.salon_id));
 
-    const res = await fetch(`${API_BASE}/payments/transactions?${query.toString()}`);
+    const res = await ajax(`${API_BASE}/payments/transactions?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch transactions');
     return await res.json();
   } catch (err) {
@@ -1266,7 +1268,7 @@ export interface ChatApiResponse {
 }
 
 export async function sendChatMessage(params: SendChatParams): Promise<ChatApiResponse> {
-  const res = await fetch(`${API_BASE}/chat`, {
+  const res = await ajax(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

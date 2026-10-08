@@ -48,6 +48,7 @@ import {
   updateSalon,
   updateWorkingHours,
   API_BASE,
+  ajax,
 } from '../lib/api';
 import { StoreOverviewReports } from './owner/StoreOverviewReports';
 import { BranchOverview } from './owner/BranchOverview';
@@ -240,7 +241,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           userSalons = cached;
           // Silent background re-sync to backend in case database restarted
           for (const s of cached) {
-            fetch(`${API_BASE}/salons`, {
+            ajax(`${API_BASE}/salons`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -397,7 +398,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         return;
       }
       for (const srv of sourceServices) {
-        await fetch(`${API_BASE}/services`, {
+        await ajax(`${API_BASE}/services`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -435,7 +436,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         return;
       }
       for (const stf of sourceStaff) {
-        await fetch(`${API_BASE}/technicians`, {
+        await ajax(`${API_BASE}/technicians`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -549,7 +550,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
     try {
       const priceNum = Math.max(0, parseFloat(newServicePrice) || 0);
-      const res = await fetch(`${API_BASE}/services${editingServiceId ? `/${editingServiceId}` : ''}`, {
+      const res = await ajax(`${API_BASE}/services${editingServiceId ? `/${editingServiceId}` : ''}`, {
         method: editingServiceId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -601,7 +602,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
   const handleDeleteService = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/services/${id}`, { method: 'DELETE' });
+      const res = await ajax(`${API_BASE}/services/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setServices((prev) => prev.filter((s) => s.id !== id));
         showToast('Treatment removed from menu');
@@ -616,7 +617,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     if (!newTechName) return;
 
     try {
-      const res = await fetch(`${API_BASE}/technicians${editingTechnicianId ? `/${editingTechnicianId}` : ''}`, {
+      const res = await ajax(`${API_BASE}/technicians${editingTechnicianId ? `/${editingTechnicianId}` : ''}`, {
         method: editingTechnicianId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -661,7 +662,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
   const handleDeleteTechnician = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/technicians/${id}`, { method: 'DELETE' });
+      const res = await ajax(`${API_BASE}/technicians/${id}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setTechnicians((prev) => prev.filter((t) => t.id !== id));
