@@ -376,6 +376,32 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Dedicated AJAX product loader for customer boutique & owner sync
+  const loadProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const prods = await fetchProducts();
+      setProducts(prods);
+      return prods;
+    } catch (err) {
+      console.error('Failed to load products via AJAX:', err);
+      return [];
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  // Live listener: sync customer catalog whenever owner adds/edits/deletes/restocks products
+  useEffect(() => {
+    const handleProductsUpdated = () => {
+      loadProducts();
+    };
+    window.addEventListener('products-updated', handleProductsUpdated);
+    return () => {
+      window.removeEventListener('products-updated', handleProductsUpdated);
+    };
+  }, []);
+
   // Load Customer's Reserved Product Orders
   const loadCustomerOrders = async () => {
     if (!currentUser || currentUser.user_type !== 'customer') {
@@ -1034,6 +1060,10 @@ const AppContent: React.FC = () => {
 
     setActiveTab(tab);
 
+    if (tab === 'products') {
+      loadProducts();
+    }
+
     if (targetDomId) {
       setTargetElementId(targetDomId);
       scrollToElement(targetDomId);
@@ -1547,6 +1577,7 @@ const AppContent: React.FC = () => {
               onAddToCart={(p, qty) => handleAddToCart(p, qty || 1)}
               onOpenCart={() => setCartOpen(true)}
               cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+              onRefresh={loadProducts}
             />
           )}
 
@@ -1604,6 +1635,7 @@ const AppContent: React.FC = () => {
                   loadOwnerData();
                   loadCustomerAppointments();
                 }}
+                onRefreshProducts={loadProducts}
               />
             ) : currentUser ? (
               <div className="py-16 text-center bg-white rounded-3xl p-8 border border-purple-100 max-w-lg mx-auto shadow-sm">

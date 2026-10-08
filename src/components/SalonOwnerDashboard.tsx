@@ -82,6 +82,7 @@ interface SalonOwnerDashboardProps {
   initialSalons?: Salon[];
   targetId?: string | null;
   onRefreshAppointments?: () => void;
+  onRefreshProducts?: () => void;
 }
 
 export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
@@ -94,6 +95,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   initialSalons,
   targetId,
   onRefreshAppointments,
+  onRefreshProducts,
 }) => {
   const [salons, setSalons] = useState<Salon[]>(() => {
     if (initialSalons && initialSalons.length > 0) {
@@ -314,6 +316,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         setWorkingHours(hours.length > 0 ? hours : DEFAULT_WORKING_HOURS.map((hour) => ({ ...hour, salon_id: currentId })));
         setProducts(prods);
         setProductOrders(prodOrders);
+        onRefreshProducts?.();
         console.log('Loaded reviews for salon:', currentId, revs);
 
         const currentSalon = userSalons.find((s) => s.id === currentId) || userSalons[0];
