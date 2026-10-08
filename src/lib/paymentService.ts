@@ -1,4 +1,5 @@
 import { PaymentMethod, PaymentType, PaymentTransaction } from '../types';
+import { ajax } from './ajax';
 
 export interface CreatePaymentParams {
   entityType: 'appointment' | 'product_order';
@@ -71,7 +72,7 @@ export async function checkPaymentGatewayStatus(): Promise<{
   defaultMode: 'live' | 'sandbox';
 }> {
   try {
-    const res = await fetch('/api/payments/status');
+    const res = await ajax('/api/payments/status');
     if (res.ok) {
       const data = await res.json();
       return data;
@@ -132,7 +133,7 @@ export async function initiatePayment(
 
   try {
     const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-    const response = await fetch('/api/payments/create-charge', {
+    const response = await ajax('/api/payments/create-charge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -207,7 +208,7 @@ export async function fetchReceiptByReference(
     if (paymentStatus) {
       query.append('payment_status', paymentStatus);
     }
-    const res = await fetch(`/api/payments/receipt-by-ref?${query.toString()}`);
+    const res = await ajax(`/api/payments/receipt-by-ref?${query.toString()}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: err.error || `Failed with status ${res.status}` };

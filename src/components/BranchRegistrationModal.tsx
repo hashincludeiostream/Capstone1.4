@@ -31,9 +31,18 @@ export const BranchRegistrationModal: React.FC<BranchRegistrationModalProps> = (
     event.preventDefault();
     if (!branchName.trim() || !address.trim()) return;
 
+    if (phone.trim()) {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length !== 11) {
+        setError('Phone number must have strictly 11 numbers (e.g. 09171234567).');
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError('');
     try {
+      const cleanPhone = phone.trim() ? phone.replace(/\D/g, '') : '';
       const response = await fetch(`${API_BASE}/salons`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,7 +50,7 @@ export const BranchRegistrationModal: React.FC<BranchRegistrationModalProps> = (
           owner_id: currentUser.id,
           salon_name: branchName.trim(),
           address: address.trim(),
-          phone: phone.trim(),
+          phone: cleanPhone,
           email: email.trim(),
           description: description.trim(),
           category_id: categoryId,
@@ -128,8 +137,42 @@ export const BranchRegistrationModal: React.FC<BranchRegistrationModalProps> = (
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">Branch Phone</label>
-                <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="0917-xxx-xxxx" className="w-full p-2.5 rounded-xl border border-purple-200 bg-purple-50/20 text-xs" />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">Branch Phone (11 Digits)</label>
+                  <span
+                    className={`text-[11px] font-semibold transition-colors ${
+                      phone.replace(/\D/g, '').length === 11
+                        ? 'text-emerald-700'
+                        : phone.replace(/\D/g, '').length > 0
+                        ? 'text-amber-700'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {phone.replace(/\D/g, '').length}/11 digits {phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
+                  </span>
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={11}
+                  value={phone}
+                  onChange={(event) => {
+                    const strictlyNumbers = event.target.value.replace(/\D/g, '').slice(0, 11);
+                    setPhone(strictlyNumbers);
+                    if (error) setError('');
+                  }}
+                  placeholder="09171234567"
+                  className={`w-full p-2.5 rounded-xl border font-mono tracking-wider text-xs ${
+                    phone && phone.replace(/\D/g, '').length !== 11
+                      ? 'border-amber-400 bg-amber-50/20'
+                      : 'border-purple-200 bg-purple-50/20'
+                  }`}
+                />
+                {phone && phone.replace(/\D/g, '').length !== 11 && (
+                  <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                    Phone number must have strictly 11 numbers (currently {phone.replace(/\D/g, '').length}).
+                  </p>
+                )}
               </div>
             </div>
             <div>

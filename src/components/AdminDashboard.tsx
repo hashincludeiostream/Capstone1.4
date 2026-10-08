@@ -322,11 +322,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
+    if (newUserForm.phone.trim()) {
+      const cleanPhone = newUserForm.phone.replace(/\D/g, '');
+      if (cleanPhone.length !== 11) {
+        alert('Phone number must have strictly 11 numbers (e.g. 09171234567).');
+        return;
+      }
+    }
+
     try {
+      const cleanPhone = newUserForm.phone.trim() ? newUserForm.phone.replace(/\D/g, '') : '';
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUserForm),
+        body: JSON.stringify({
+          ...newUserForm,
+          phone: cleanPhone,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.user) {
@@ -1739,14 +1751,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-gray-700 font-semibold mb-1">Contact Phone</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-gray-700 font-semibold">Contact Phone (11 Digits)</label>
+                  <span
+                    className={`text-[11px] font-semibold transition-colors ${
+                      newUserForm.phone.replace(/\D/g, '').length === 11
+                        ? 'text-emerald-700'
+                        : newUserForm.phone.replace(/\D/g, '').length > 0
+                        ? 'text-amber-700'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {newUserForm.phone.replace(/\D/g, '').length}/11 digits {newUserForm.phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
+                  </span>
+                </div>
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={11}
                   value={newUserForm.phone}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, phone: e.target.value })}
-                  placeholder="0917-000-0000"
-                  className="w-full p-2.5 rounded-xl border border-gray-300 text-xs focus:outline-rose-600"
+                  onChange={(e) => {
+                    const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
+                    setNewUserForm({ ...newUserForm, phone: strictlyNumbers });
+                  }}
+                  placeholder="09171234567"
+                  className={`w-full p-2.5 rounded-xl border text-xs focus:outline-rose-600 font-mono tracking-wider ${
+                    newUserForm.phone && newUserForm.phone.replace(/\D/g, '').length !== 11
+                      ? 'border-amber-400 bg-amber-50/20'
+                      : 'border-gray-300'
+                  }`}
                 />
+                {newUserForm.phone && newUserForm.phone.replace(/\D/g, '').length !== 11 && (
+                  <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                    Phone number must have strictly 11 numbers (currently {newUserForm.phone.replace(/\D/g, '').length}).
+                  </p>
+                )}
               </div>
 
               <div>

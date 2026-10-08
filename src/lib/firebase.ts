@@ -53,16 +53,13 @@ export const activeFirebaseConfig = {
 // Initialize Firebase App instance safely (singleton)
 export const app = getApps().find(a => a.name === '[DEFAULT]') || initializeApp(activeFirebaseConfig);
 
-// Initialize dedicated Firebase App for Firestore pointing to the provisioned database project gen-lang-client-0593264091
-const firestoreApp = getApps().find(a => a.name === 'firestore-db-app') || initializeApp(PERMANENT_FIREBASE_CONFIG, 'firestore-db-app');
-
-// Initialize Firestore with auto-detected long-polling to prevent gRPC streaming drops
+// Initialize Firestore directly bound to main app instance with auto-detected long-polling
 function getFirestoreInstance() {
-  const dbId = PERMANENT_FIREBASE_CONFIG.firestoreDatabaseId;
+  const dbId = activeFirebaseConfig.firestoreDatabaseId || PERMANENT_FIREBASE_CONFIG.firestoreDatabaseId;
   try {
-    return initializeFirestore(firestoreApp, { experimentalAutoDetectLongPolling: true }, dbId);
+    return initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId);
   } catch {
-    return getFirestore(firestoreApp, dbId);
+    return getFirestore(app, dbId);
   }
 }
 
@@ -74,8 +71,12 @@ export const auth = getAuth(app);
 export async function testFirestoreConnection(): Promise<void> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
+  } catch (error: any) {
+    if (
+      error?.code === 'unavailable' ||
+      error?.message?.includes('the client is offline') ||
+      error?.message?.includes('Could not reach Cloud Firestore')
+    ) {
       console.warn('Notice: Firestore running in offline/cache mode.');
     }
   }

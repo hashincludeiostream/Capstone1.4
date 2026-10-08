@@ -271,6 +271,9 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
       }
 
       setIsFormModalOpen(false);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('products-updated'));
+      }
       onRefresh();
     } catch (err: any) {
       setFormError(err.message || 'Failed to save product');
@@ -286,6 +289,9 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
 
     try {
       await deleteProduct(productId);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('products-updated'));
+      }
       onRefresh();
     } catch (err) {
       console.error('Delete product error:', err);
@@ -296,6 +302,9 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
     setAdjustingStockId(productId);
     try {
       await updateProductStock(productId, { delta });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('products-updated'));
+      }
       onRefresh();
     } catch (err) {
       console.error('Failed to update stock:', err);
@@ -318,6 +327,9 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
         delete copy[productId];
         return copy;
       });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('products-updated'));
+      }
       onRefresh();
     } catch (err) {
       console.error('Failed to update stock:', err);

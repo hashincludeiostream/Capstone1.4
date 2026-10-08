@@ -161,6 +161,14 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
       return;
     }
 
+    if (phone) {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length !== 11) {
+        setError('Phone number must have strictly 11 numbers (e.g. 09171234567).');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -473,20 +481,48 @@ export const AdminAuthPage: React.FC<AdminAuthPageProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                    Contact Phone
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                      Contact Phone (11 Digits)
+                    </label>
+                    <span
+                      className={`text-[11px] font-semibold transition-colors ${
+                        phone.replace(/\D/g, '').length === 11
+                          ? 'text-emerald-700'
+                          : phone.replace(/\D/g, '').length > 0
+                          ? 'text-amber-700'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {phone.replace(/\D/g, '').length}/11 digits {phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
+                    </span>
+                  </div>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       id="admin-register-phone"
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0912-xxx-xxxx"
-                      className="w-full pl-10 pr-4 py-2 rounded-xl border border-rose-200 bg-rose-50/20 text-xs text-gray-900 focus:outline-rose-600"
+                      onChange={(e) => {
+                        const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        setPhone(strictlyNumbers);
+                        if (error) setError('');
+                      }}
+                      placeholder="09171234567"
+                      className={`w-full pl-10 pr-4 py-2 rounded-xl border font-mono tracking-wider text-xs text-gray-900 focus:outline-rose-600 ${
+                        phone && phone.replace(/\D/g, '').length !== 11
+                          ? 'border-amber-400 bg-amber-50/20'
+                          : 'border-rose-200 bg-rose-50/20'
+                      }`}
                     />
                   </div>
+                  {phone && phone.replace(/\D/g, '').length !== 11 && (
+                    <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                      Phone number must have strictly 11 numbers (currently {phone.replace(/\D/g, '').length}).
+                    </p>
+                  )}
                 </div>
 
                 <div>

@@ -36,6 +36,7 @@ import {
 import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder } from '../../types';
 import { DecisionReportModal } from './DecisionReportModal';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
+import { ajax } from '../../lib/ajax';
 import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 import {
@@ -1029,7 +1030,7 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
       const savedUser = safeLocalStorage.getJSON<any>('nailglamhub_user');
       const emailToUse = (connectedEmail || savedUser?.email || salon.email || 'salon@nailglamhub.com').trim();
 
-      const res = await fetch('/api/email/reports/monthly', {
+      const res = await ajax('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

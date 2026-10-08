@@ -66,8 +66,14 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim() || !customerPhone.trim()) {
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    if (!customerName.trim() || !cleanPhone) {
       setErrorMsg('Please provide your full name and valid phone number for pickup verification.');
+      return;
+    }
+
+    if (cleanPhone.length !== 11) {
+      setErrorMsg('Phone number must have strictly 11 numbers (e.g. 09171234567). It cannot be less or more.');
       return;
     }
 
@@ -84,7 +90,7 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
         salon_id: primarySalon?.id || primarySalonId,
         customer_id: currentUser?.id || 0,
         customer_name: customerName.trim(),
-        customer_phone: customerPhone.trim(),
+        customer_phone: cleanPhone,
         customer_email: customerEmail.trim(),
         pickup_date: pickupDate,
         pickup_time: pickupTime,
@@ -323,18 +329,46 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-stone-700 flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-stone-400" />
-                    <span>Mobile Phone *</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-stone-700 flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-stone-400" />
+                      <span>Mobile Phone (11 Digits) *</span>
+                    </label>
+                    <span
+                      className={`text-[11px] font-semibold transition-colors ${
+                        customerPhone.replace(/\D/g, '').length === 11
+                          ? 'text-emerald-700'
+                          : customerPhone.replace(/\D/g, '').length > 0
+                          ? 'text-amber-700'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {customerPhone.replace(/\D/g, '').length}/11 digits {customerPhone.replace(/\D/g, '').length === 11 ? '✓' : ''}
+                    </span>
+                  </div>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={11}
                     required
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="e.g. 0917 123 4567"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 bg-stone-50/50"
+                    onChange={(e) => {
+                      const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      setCustomerPhone(strictlyNumbers);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    placeholder="09171234567"
+                    className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 font-mono tracking-wider ${
+                      customerPhone && customerPhone.replace(/\D/g, '').length !== 11
+                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50/20'
+                        : 'border-stone-200 focus:border-pink-500 bg-stone-50/50'
+                    }`}
                   />
+                  {customerPhone && customerPhone.replace(/\D/g, '').length !== 11 && (
+                    <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                      Phone number must have strictly 11 numbers (currently {customerPhone.replace(/\D/g, '').length}).
+                    </p>
+                  )}
                 </div>
               </div>
 
