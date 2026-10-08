@@ -6,7 +6,6 @@
 import { EmailLog, User, Salon, Appointment, ProductOrder, UserRole, PlatformStats } from '../types';
 import { getCachedAccessToken, getCachedGmailUserEmail } from './firebase';
 import { jsPDF } from 'jspdf';
-import { ajax } from './ajax';
 
 export interface EmailDispatchOptions {
   to: string;
@@ -560,7 +559,7 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
     if (accessToken) {
       try {
         const raw = createRawEmail(options, gmailUserEmail || undefined);
-        const gmailRes = await ajax('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        const gmailRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -593,7 +592,7 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    const response = await ajax('/api/email/send', {
+    const response = await fetch('/api/email/send', {
       method: 'POST',
       headers,
       body: JSON.stringify({

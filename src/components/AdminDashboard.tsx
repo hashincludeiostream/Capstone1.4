@@ -66,7 +66,6 @@ import {
   deleteReview,
   fetchCategories,
   API_BASE,
-  ajax,
 } from '../lib/api';
 
 interface AdminDashboardProps {
@@ -215,7 +214,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         console.warn('Failed to load registration rate-limit status:', error);
       }
 
-      const uRes = await ajax(`${API_BASE}/users`);
+      const uRes = await fetch(`${API_BASE}/users`);
       if (uRes.ok) {
         const uList = await uRes.json();
         setUsers(uList);
@@ -324,7 +323,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     try {
-      const res = await ajax(`${API_BASE}/auth/register`, {
+      const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUserForm),

@@ -46,16 +46,7 @@ async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
 
-  app.use(cors({
-    origin: true,
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  }));
-  app.use((req, res, next) => {
-    res.setHeader('X-Requested-With-Support', 'XMLHttpRequest');
-    next();
-  });
+  app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
   // Rate limiting for login attempts

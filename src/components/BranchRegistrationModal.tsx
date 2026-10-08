@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X, Store, MapPin, Mail, FileText, CheckCircle2 } from 'lucide-react';
 import { Salon, User, BusinessCategory } from '../types';
 import { API_BASE } from '../lib/api';
-import { ajax } from '../lib/ajax';
 import { createFirestoreSalon } from '../lib/firestoreService';
 
 interface BranchRegistrationModalProps {
@@ -35,7 +34,7 @@ export const BranchRegistrationModal: React.FC<BranchRegistrationModalProps> = (
     setSubmitting(true);
     setError('');
     try {
-      const response = await ajax(`${API_BASE}/salons`, {
+      const response = await fetch(`${API_BASE}/salons`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
