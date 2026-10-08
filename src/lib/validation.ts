@@ -222,8 +222,12 @@ export const validatePhone = (phone: string): { isValid: boolean; error?: string
   // Remove all non-digit characters
   const cleanedPhone = phone.replace(/\D/g, '');
 
-  if (cleanedPhone.length !== 11) {
-    return { isValid: false, error: 'Phone number must have strictly 11 numbers (e.g. 09171234567).' };
+  if (cleanedPhone.length < 10) {
+    return { isValid: false, error: 'Phone number must be at least 10 digits' };
+  }
+
+  if (cleanedPhone.length > 15) {
+    return { isValid: false, error: 'Phone number is too long' };
   }
 
   return { isValid: true };

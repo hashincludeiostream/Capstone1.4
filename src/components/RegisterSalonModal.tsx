@@ -24,7 +24,6 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<number>(1);
   const [logoUrl, setLogoUrl] = useState('');
-  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -32,18 +31,8 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
     e.preventDefault();
     if (!currentUser || currentUser.user_type !== 'salon_owner' || !salonName || !address) return;
 
-    if (phone.trim()) {
-      const cleanPhone = phone.replace(/\D/g, '');
-      if (cleanPhone.length !== 11) {
-        setPhoneError('Phone number must have strictly 11 numbers (e.g. 09171234567).');
-        return;
-      }
-    }
-
     setSubmitting(true);
-    setPhoneError(null);
     try {
-      const cleanPhone = phone.trim() ? phone.replace(/\D/g, '') : '';
       const res = await fetch(`${API_BASE}/salons`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,7 +40,7 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
           owner_id: currentUser.id,
           salon_name: salonName,
           address,
-          phone: cleanPhone,
+          phone,
           email,
           description,
           logo: logoUrl,
@@ -144,44 +133,16 @@ export const RegisterSalonModal: React.FC<RegisterSalonModalProps> = ({
                 </select>
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                    Contact Phone (11 Digits)
-                  </label>
-                  <span
-                    className={`text-[11px] font-semibold transition-colors ${
-                      phone.replace(/\D/g, '').length === 11
-                        ? 'text-emerald-700'
-                        : phone.replace(/\D/g, '').length > 0
-                        ? 'text-amber-700'
-                        : 'text-gray-400'
-                    }`}
-                  >
-                    {phone.replace(/\D/g, '').length}/11 digits {phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
-                  </span>
-                </div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Contact Phone
+                </label>
                 <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={11}
+                  type="text"
                   value={phone}
-                  onChange={(e) => {
-                    const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
-                    setPhone(strictlyNumbers);
-                    if (phoneError) setPhoneError(null);
-                  }}
-                  placeholder="09171234567"
-                  className={`w-full p-2.5 rounded-xl border font-mono tracking-wider text-xs focus:outline-pink-500 ${
-                    phone && phone.replace(/\D/g, '').length !== 11
-                      ? 'border-amber-400 bg-amber-50/20'
-                      : 'border-pink-200 bg-pink-50/20'
-                  }`}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0917-xxx-xxxx"
+                  className="w-full p-2.5 rounded-xl border border-pink-200 bg-pink-50/20 text-xs focus:outline-pink-500"
                 />
-                {((phone && phone.replace(/\D/g, '').length !== 11) || phoneError) && (
-                  <p className="text-[11px] text-amber-700 mt-1 font-medium">
-                    {phoneError || `Phone number must have strictly 11 numbers (currently ${phone.replace(/\D/g, '').length}).`}
-                  </p>
-                )}
               </div>
             </div>
 

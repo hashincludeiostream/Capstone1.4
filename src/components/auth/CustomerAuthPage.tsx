@@ -460,48 +460,20 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                    Mobile Number (11 Digits)
-                  </label>
-                  <span
-                    className={`text-[11px] font-semibold transition-colors ${
-                      phone.replace(/\D/g, '').length === 11
-                        ? 'text-emerald-700'
-                        : phone.replace(/\D/g, '').length > 0
-                        ? 'text-amber-700'
-                        : 'text-gray-400'
-                    }`}
-                  >
-                    {phone.replace(/\D/g, '').length}/11 digits {phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
-                  </span>
-                </div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
+                  Mobile Number (For SMS reminders)
+                </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     id="customer-register-phone"
                     type="tel"
-                    inputMode="numeric"
-                    maxLength={11}
                     value={phone}
-                    onChange={(e) => {
-                      const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
-                      setPhone(strictlyNumbers);
-                      if (error) setError('');
-                    }}
-                    placeholder="09171234567"
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-gray-900 font-mono tracking-wider focus:outline-pink-500 focus:border-pink-500 transition-colors ${
-                      phone && phone.replace(/\D/g, '').length !== 11
-                        ? 'border-amber-400 bg-amber-50/20'
-                        : 'border-pink-200 bg-pink-50/20'
-                    }`}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0917-xxx-xxxx"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-pink-200 bg-pink-50/20 text-sm text-gray-900 focus:outline-pink-500 focus:border-pink-500 transition-colors"
                   />
                 </div>
-                {phone && phone.replace(/\D/g, '').length !== 11 && (
-                  <p className="text-[11px] text-amber-700 mt-1 font-medium">
-                    Phone number must have strictly 11 numbers (currently {phone.replace(/\D/g, '').length}).
-                  </p>
-                )}
               </div>
 
               <div>

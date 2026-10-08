@@ -53,19 +53,10 @@ export default function ProfileCustomizationModal({
   };
 
   const handleSave = async () => {
-    if (phone.trim()) {
-      const cleanPhone = phone.replace(/\D/g, '');
-      if (cleanPhone.length !== 11) {
-        setErrorMsg('Phone number must have strictly 11 numbers (e.g. 09171234567).');
-        return;
-      }
-    }
-
     setLoading(true);
     setErrorMsg(null);
     try {
-      const cleanPhone = phone.trim() ? phone.replace(/\D/g, '') : '';
-      await onSave({ avatar: avatarUrl, fullname: fullname.trim(), phone: cleanPhone });
+      await onSave({ avatar: avatarUrl, fullname: fullname.trim(), phone: phone.trim() });
       onClose();
     } catch (error: any) {
       console.error('Error saving profile:', error);
@@ -234,44 +225,16 @@ export default function ProfileCustomizationModal({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-gray-700">
-                  Phone Number (11 Digits)
-                </label>
-                <span
-                  className={`text-[11px] font-semibold transition-colors ${
-                    phone.replace(/\D/g, '').length === 11
-                      ? 'text-emerald-700'
-                      : phone.replace(/\D/g, '').length > 0
-                      ? 'text-amber-700'
-                      : 'text-gray-400'
-                  }`}
-                >
-                  {phone.replace(/\D/g, '').length}/11 digits {phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
-                </span>
-              </div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Phone Number (Optional)
+              </label>
               <input
                 type="tel"
-                inputMode="numeric"
-                maxLength={11}
                 value={phone}
-                onChange={(e) => {
-                  const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
-                  setPhone(strictlyNumbers);
-                  if (errorMsg) setErrorMsg(null);
-                }}
-                placeholder="09171234567"
-                className={`w-full px-3.5 py-2 rounded-xl border text-sm outline-none font-mono tracking-wider transition-all ${
-                  phone && phone.replace(/\D/g, '').length !== 11
-                    ? 'border-amber-400 bg-amber-50/20 focus:border-amber-500'
-                    : 'border-gray-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-100'
-                }`}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. 09123456789"
+                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-100 transition-all text-sm outline-none"
               />
-              {phone && phone.replace(/\D/g, '').length !== 11 && (
-                <p className="text-[11px] text-amber-700 mt-1 font-medium">
-                  Phone number must have strictly 11 numbers (currently {phone.replace(/\D/g, '').length}).
-                </p>
-              )}
             </div>
 
             <div>

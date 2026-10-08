@@ -153,21 +153,12 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
     event.preventDefault();
     if (!editingSalon || !settingsName.trim() || !settingsAddress.trim()) return;
 
-    if (settingsPhone.trim()) {
-      const cleanPhone = settingsPhone.replace(/\D/g, '');
-      if (cleanPhone.length !== 11) {
-        onShowToast('Phone number must have strictly 11 numbers (e.g. 09171234567).');
-        return;
-      }
-    }
-
     setSavingSettings(true);
     try {
-      const cleanPhone = settingsPhone.trim() ? settingsPhone.replace(/\D/g, '') : '';
       const updatedSalon = await updateSalon(editingSalon.id, {
         salon_name: settingsName.trim(),
         address: settingsAddress.trim(),
-        phone: cleanPhone,
+        phone: settingsPhone.trim(),
         email: settingsEmail.trim(),
         description: settingsDescription.trim(),
         logo: settingsLogo || undefined,
@@ -514,43 +505,10 @@ export const BranchOverview: React.FC<BranchOverviewProps> = ({
                 <input value={settingsAddress} onChange={(event) => setSettingsAddress(event.target.value)} required className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
               </label>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-gray-700">Phone (11 Digits)</label>
-                    <span
-                      className={`text-[11px] font-semibold transition-colors ${
-                        settingsPhone.replace(/\D/g, '').length === 11
-                          ? 'text-emerald-700'
-                          : settingsPhone.replace(/\D/g, '').length > 0
-                          ? 'text-amber-700'
-                          : 'text-gray-400'
-                      }`}
-                    >
-                      {settingsPhone.replace(/\D/g, '').length}/11 digits {settingsPhone.replace(/\D/g, '').length === 11 ? '✓' : ''}
-                    </span>
-                  </div>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={11}
-                    value={settingsPhone}
-                    onChange={(event) => {
-                      const strictlyNumbers = event.target.value.replace(/\D/g, '').slice(0, 11);
-                      setSettingsPhone(strictlyNumbers);
-                    }}
-                    placeholder="09171234567"
-                    className={`w-full rounded-xl border p-2.5 text-sm font-mono tracking-wider ${
-                      settingsPhone && settingsPhone.replace(/\D/g, '').length !== 11
-                        ? 'border-amber-400 bg-amber-50/20'
-                        : 'border-purple-200'
-                    }`}
-                  />
-                  {settingsPhone && settingsPhone.replace(/\D/g, '').length !== 11 && (
-                    <p className="text-[11px] text-amber-700 mt-1 font-medium">
-                      Phone number must have strictly 11 numbers (currently {settingsPhone.replace(/\D/g, '').length}).
-                    </p>
-                  )}
-                </div>
+                <label className="block text-xs font-semibold text-gray-700">
+                  Phone
+                  <input value={settingsPhone} onChange={(event) => setSettingsPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />
+                </label>
                 <label className="block text-xs font-semibold text-gray-700">
                   Email
                   <input type="email" value={settingsEmail} onChange={(event) => setSettingsEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-purple-200 p-2.5 text-sm" />

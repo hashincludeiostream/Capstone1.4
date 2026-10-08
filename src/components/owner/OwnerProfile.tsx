@@ -254,14 +254,6 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
       return;
     }
 
-    if (formData.phone.trim()) {
-      const cleanPhone = formData.phone.replace(/\D/g, '');
-      if (cleanPhone.length !== 11) {
-        setFeedback({ type: 'error', message: 'Phone number must have strictly 11 numbers (e.g. 09171234567).' });
-        return;
-      }
-    }
-
     setLoading(true);
     setFeedback(null);
     try {
@@ -759,46 +751,15 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-gray-700">Phone Number (11 Digits)</label>
-                    {isEditing && (
-                      <span
-                        className={`text-[11px] font-semibold transition-colors ${
-                          formData.phone.replace(/\D/g, '').length === 11
-                            ? 'text-emerald-700'
-                            : formData.phone.replace(/\D/g, '').length > 0
-                            ? 'text-amber-700'
-                            : 'text-gray-400'
-                        }`}
-                      >
-                        {formData.phone.replace(/\D/g, '').length}/11 digits {formData.phone.replace(/\D/g, '').length === 11 ? '✓' : ''}
-                      </span>
-                    )}
-                  </div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
                   {isEditing ? (
-                    <>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={11}
-                        value={formData.phone}
-                        onChange={(e) => {
-                          const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
-                          setFormData({ ...formData, phone: strictlyNumbers });
-                        }}
-                        placeholder="09171234567"
-                        className={`w-full px-3 py-2 text-sm rounded-xl border font-mono tracking-wider outline-none transition-all ${
-                          formData.phone && formData.phone.replace(/\D/g, '').length !== 11
-                            ? 'border-amber-400 bg-amber-50/20 focus:border-amber-500'
-                            : 'border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
-                        }`}
-                      />
-                      {formData.phone && formData.phone.replace(/\D/g, '').length !== 11 && (
-                        <p className="text-[11px] text-amber-700 mt-1 font-medium">
-                          Phone number must have strictly 11 numbers (currently {formData.phone.replace(/\D/g, '').length}).
-                        </p>
-                      )}
-                    </>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Add phone number"
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+                    />
                   ) : (
                     <div className="flex items-center gap-2 text-sm text-gray-700 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
                       <Phone className="w-4 h-4 text-gray-400" />

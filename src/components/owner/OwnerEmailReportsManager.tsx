@@ -24,7 +24,6 @@ import { Salon, User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
-import { ajax } from '../../lib/ajax';
 
 interface OwnerEmailReportsManagerProps {
   salon: Salon;
@@ -171,7 +170,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   const fetchEmailLogs = async () => {
     setLoadingLogs(true);
     try {
-      const res = await ajax(`/api/email/logs?email=${encodeURIComponent(targetEmail)}`);
+      const res = await fetch(`/api/email/logs?email=${encodeURIComponent(targetEmail)}`);
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
@@ -220,7 +219,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
       const emailToUse = (recipientEmail.trim() || connectedGmailEmail || defaultTargetEmail).trim();
 
       // 2. Generate certified report payload from backend
-      const res = await ajax('/api/email/reports/monthly', {
+      const res = await fetch('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

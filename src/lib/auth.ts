@@ -4,7 +4,6 @@
 
 import { User } from '../types';
 import { API_BASE } from './api';
-import { ajax } from './ajax';
 import { signInWithGoogleAccount } from './firebase';
 
 export interface AuthResponse {
@@ -49,7 +48,7 @@ async function readAuthResponse(response: Response): Promise<{ error?: string; d
  */
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
   try {
-    const response = await ajax(`${API_BASE}/auth/login`, {
+    const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
@@ -88,7 +87,7 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
  */
 export async function register(userData: RegisterData): Promise<AuthResponse> {
   try {
-    const response = await ajax(`${API_BASE}/auth/register`, {
+    const response = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
@@ -138,7 +137,7 @@ export async function loginWithGoogle(
       return { success: false, error: 'No Google account was selected' };
     }
 
-    const response = await ajax(`${API_BASE}/auth/google`, {
+    const response = await fetch(`${API_BASE}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

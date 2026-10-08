@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { EmailLog, User, UserRole } from '../../types';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
-import { ajax } from '../../lib/ajax';
 
 interface EmailLogsModalProps {
   currentUser: User;
@@ -36,7 +35,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
     try {
       // If admin, can see all logs; if customer or owner, filter by their email
       const queryParam = currentUser.user_type === 'admin' ? '' : `?email=${encodeURIComponent(currentUser.email)}`;
-      const res = await ajax(`/api/email/logs${queryParam}`);
+      const res = await fetch(`/api/email/logs${queryParam}`);
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
