@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Salon } from '../../types';
 import { calculateDistanceKm } from '../../utils/geoUtils';
+import { ajax } from '../../lib/ajax';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 // CSS import for Leaflet
@@ -355,7 +356,7 @@ function RouteLine({
 
       try {
         const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${salonLocation.lng},${salonLocation.lat}?overview=full&geometries=geojson`;
-        const res = await fetch(url, { signal: controller.signal });
+        const res = await ajax(url, { signal: controller.signal });
         if (!res.ok) throw new Error('OSRM routing request returned non-200');
         const data = await res.json();
 

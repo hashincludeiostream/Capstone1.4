@@ -678,11 +678,21 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSalonId || !settingsName.trim() || !settingsAddress.trim()) return;
+
+    if (settingsPhone.trim()) {
+      const cleanPhone = settingsPhone.replace(/\D/g, '');
+      if (cleanPhone.length !== 11) {
+        showToast('Phone number must have strictly 11 numbers (e.g. 09171234567).');
+        return;
+      }
+    }
+
     try {
+      const cleanPhone = settingsPhone.trim() ? settingsPhone.replace(/\D/g, '') : '';
       const updatedSalon = await updateSalon(selectedSalonId, {
         salon_name: settingsName.trim(),
         address: settingsAddress.trim(),
-        phone: settingsPhone.trim(),
+        phone: cleanPhone,
         email: settingsEmail.trim(),
         description: settingsDesc.trim(),
       });
@@ -1915,15 +1925,43 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   </div>
 
                     <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Contact Phone
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-gray-700">
+                        Contact Phone (11 Digits)
+                      </label>
+                      <span
+                        className={`text-[11px] font-semibold transition-colors ${
+                          settingsPhone.replace(/\D/g, '').length === 11
+                            ? 'text-emerald-700'
+                            : settingsPhone.replace(/\D/g, '').length > 0
+                            ? 'text-amber-700'
+                            : 'text-gray-400'
+                        }`}
+                      >
+                        {settingsPhone.replace(/\D/g, '').length}/11 digits {settingsPhone.replace(/\D/g, '').length === 11 ? '✓' : ''}
+                      </span>
+                    </div>
                     <input
-                      type="text"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
                       value={settingsPhone}
-                      onChange={(e) => setSettingsPhone(e.target.value)}
-                      className="w-full p-2.5 rounded-xl border border-gray-200 text-xs focus:border-purple-500 focus:outline-none"
+                      onChange={(e) => {
+                        const strictlyNumbers = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        setSettingsPhone(strictlyNumbers);
+                      }}
+                      placeholder="09171234567"
+                      className={`w-full p-2.5 rounded-xl border text-xs focus:outline-none font-mono tracking-wider ${
+                        settingsPhone && settingsPhone.replace(/\D/g, '').length !== 11
+                          ? 'border-amber-400 bg-amber-50/20 focus:border-amber-500'
+                          : 'border-gray-200 focus:border-purple-500'
+                      }`}
                     />
+                    {settingsPhone && settingsPhone.replace(/\D/g, '').length !== 11 && (
+                      <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                        Phone number must have strictly 11 numbers (currently {settingsPhone.replace(/\D/g, '').length}).
+                      </p>
+                    )}
                   </div>
 
                     <div>

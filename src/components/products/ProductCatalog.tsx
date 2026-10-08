@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -18,6 +18,7 @@ import {
   Lock,
   Package,
   XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Product, Salon, User } from '../../types';
 import { ProductCard, ProductCardSkeleton } from './ProductCard';
@@ -32,6 +33,7 @@ interface ProductCatalogProps {
   onAddToCart: (product: Product, quantity?: number) => void;
   onOpenCart: () => void;
   cartItemCount: number;
+  onRefresh?: () => void;
 }
 
 const CATEGORIES = [
@@ -54,6 +56,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   onAddToCart,
   onOpenCart,
   cartItemCount,
+  onRefresh,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -61,6 +64,22 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating' | 'stock' | 'stock-asc'>('featured');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [addedAnimationId, setAddedAnimationId] = useState<number | null>(null);
+
+  // Auto-refresh products via AJAX when entering Boutique catalog
+  useEffect(() => {
+    onRefresh?.();
+  }, []);
+
+  // Listen for live product updates from salon owners (creation, edits, deletions, stock adjustments)
+  useEffect(() => {
+    const handleProductsUpdated = () => {
+      onRefresh?.();
+    };
+    window.addEventListener('products-updated', handleProductsUpdated);
+    return () => {
+      window.removeEventListener('products-updated', handleProductsUpdated);
+    };
+  }, [onRefresh]);
 
   const isCustomer = currentUser?.user_type === 'customer';
 
@@ -181,6 +200,10 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-stone-300">
             <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl backdrop-blur-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Live AJAX Sync</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl backdrop-blur-xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>Zero Online Transactions</span>
             </div>
@@ -245,6 +268,19 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 <option value="rating">Top Rated</option>
               </select>
             </div>
+
+            {/* Live AJAX Sync Button */}
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                title="Synchronize boutique inventory via AJAX"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs font-semibold border border-stone-200 transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-pink-600' : 'text-stone-500'}`} />
+                <span className="hidden sm:inline">{loading ? 'Syncing...' : 'Live Sync'}</span>
+              </button>
+            )}
 
             {/* Open Cart Button */}
             <button
@@ -319,17 +355,29 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
             Try adjusting your search query, selecting another category, or clearing filters.
           </p>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedCategory('All');
-              setSelectedSalonId('all');
-              setInStockOnly(false);
-            }}
-            className="mt-4 px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold cursor-pointer"
-          >
-            Reset Filters
-          </button>
+          <div className="mt-4 flex items-center justify-center gap-2.5">
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('All');
+                setSelectedSalonId('all');
+                setInStockOnly(false);
+              }}
+              className="px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold cursor-pointer"
+            >
+              Reset Filters
+            </button>
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 transition disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>Sync via AJAX</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5 xl:gap-6">
