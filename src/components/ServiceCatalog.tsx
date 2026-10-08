@@ -35,11 +35,6 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
     return matchCat && matchSearch;
   });
 
-  const getSalonName = (salonId: number) => {
-    const s = salons.find((item) => item.id === salonId);
-    return s ? s.salon_name : 'Partner Salon';
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -133,9 +128,6 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
 
               <div className="p-5 flex-1 flex flex-col justify-between">
                 <div>
-                  <p className="text-[11px] font-bold text-pink-700 uppercase tracking-wider mb-1">
-                    {getSalonName(service.salon_id)}
-                  </p>
                   <h3 className="text-base font-serif font-bold text-gray-900 group-hover:text-pink-700 transition-colors line-clamp-1">
                     {service.service_name}
                   </h3>

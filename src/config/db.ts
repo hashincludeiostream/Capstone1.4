@@ -12,7 +12,7 @@ export async function testConnection(): Promise<boolean> {
   // Trigger sync in background with a quick race so the web server binds immediately
   Promise.race([
     inMemoryDb.syncFromFirestore(),
-    new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 3000)),
+    new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 8000)),
   ])
     .then((totalDocs) => {
       isFirestoreConnected = true;

@@ -350,15 +350,9 @@ const AppContent: React.FC = () => {
 
       let effectiveSalons = slns;
       if (currentUser?.id && isOwnerOrAdmin) {
-        const cachedOwnerSalons = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`);
-        if (Array.isArray(cachedOwnerSalons) && cachedOwnerSalons.length > 0) {
-          const missingSalons = cachedOwnerSalons.filter(
-            (cs) => !effectiveSalons.some((s) => s.id === cs.id)
-          );
-          if (missingSalons.length > 0) {
-            effectiveSalons = [...missingSalons, ...effectiveSalons];
-          }
-        }
+        // Keep localStorage in sync with authoritative server data, removing any deleted salons
+        const mySalons = slns.filter((s) => Number(s.owner_id) === Number(currentUser.id));
+        safeLocalStorage.setJSON(`nailglamhub_owner_salons_${currentUser.id}`, mySalons);
       }
 
       setSalons(effectiveSalons);

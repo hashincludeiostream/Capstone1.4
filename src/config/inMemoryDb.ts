@@ -139,6 +139,38 @@ class InMemoryDatabase {
         console.warn(`[Firestore Sync] Could not pull collection "${col}":`, err?.message || err);
       }
     }
+
+    // Cascade cleanup: purge any orphan records in subcollections/related tables
+    // (services, technicians, appointments, etc.) whose parent salon document was deleted in Firestore
+    const validSalonIds = new Set((this.tables['salons'] || []).map((s) => Number(s.id)));
+    const tablesWithSalonId = [
+      'services',
+      'technicians',
+      'working_hours',
+      'appointments',
+      'reviews',
+      'reels',
+      'promotions',
+      'products',
+      'product_orders',
+      'email_logs',
+    ];
+    for (const table of tablesWithSalonId) {
+      if (Array.isArray(this.tables[table])) {
+        const orphans = this.tables[table].filter(
+          (item) => item.salon_id !== undefined && item.salon_id !== null && !validSalonIds.has(Number(item.salon_id))
+        );
+        if (orphans.length > 0) {
+          this.tables[table] = this.tables[table].filter(
+            (item) => item.salon_id === undefined || item.salon_id === null || validSalonIds.has(Number(item.salon_id))
+          );
+          for (const item of orphans) {
+            this.syncToFirestore(table, 'delete', item.id);
+          }
+        }
+      }
+    }
+
     console.log(`🔥 [Firestore] Successfully synchronized ${totalLoaded} live documents into database layer.`);
     this.saveToDisk();
     return totalLoaded;

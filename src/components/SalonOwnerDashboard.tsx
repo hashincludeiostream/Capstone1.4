@@ -233,33 +233,8 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           ? allSalons
           : allSalons.filter((s) => Number(s.owner_id) === Number(currentUser.id));
 
-      // Resilient fallback: if server returned empty, check local storage for this owner
-      if (userSalons.length === 0 && currentUser?.id) {
-        const cached = safeLocalStorage.getJSON<Salon[]>(`nailglamhub_owner_salons_${currentUser.id}`);
-        if (Array.isArray(cached) && cached.length > 0) {
-          userSalons = cached;
-          // Silent background re-sync to backend in case database restarted
-          for (const s of cached) {
-            fetch(`${API_BASE}/salons`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                owner_id: currentUser.id,
-                salon_name: s.salon_name,
-                address: s.address,
-                phone: s.phone || '',
-                email: s.email || '',
-                description: s.description || '',
-                logo: s.logo || null,
-                category_id: s.category_id || 1,
-              }),
-            }).catch((err) => console.warn('Auto recovery sync error:', err));
-          }
-        }
-      }
-
       setSalons(userSalons);
-      if (userSalons.length > 0 && currentUser?.id) {
+      if (currentUser?.id) {
         safeLocalStorage.setJSON(`nailglamhub_owner_salons_${currentUser.id}`, userSalons);
       }
 
@@ -384,84 +359,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       setSettingsDesc(s.description || '');
     }
     setLoading(false);
-  };
-
-  const handleCopyServicesFromBranch = async (sourceSalonId: number) => {
-    if (!selectedSalonId || sourceSalonId === selectedSalonId) return;
-    try {
-      setLoading(true);
-      const sourceServices = await fetchServices(sourceSalonId);
-      if (sourceServices.length === 0) {
-        showToast('No treatments found in source branch to copy.');
-        setLoading(false);
-        return;
-      }
-      for (const srv of sourceServices) {
-        await fetch(`${API_BASE}/services`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            salon_id: selectedSalonId,
-            service_name: srv.service_name,
-            category_name: srv.category || srv.category_name || 'Nail Services',
-            price: Number(srv.price) || 0,
-            duration_minutes: Number(srv.duration || srv.duration_minutes || 45),
-            description: srv.description || '',
-            image: srv.image_url || srv.image || null,
-          }),
-        }).catch((e) => console.warn('Copy service error:', e));
-      }
-      const updatedServs = await fetchServices(selectedSalonId);
-      setServices(updatedServs);
-      const allServs = await fetchServices(undefined, currentUser.id).catch(() => []);
-      setAllOwnerServices(allServs);
-      showToast(`Copied ${sourceServices.length} treatments to active branch.`);
-    } catch (err) {
-      console.error('Error copying treatments:', err);
-      showToast('Failed to copy treatments.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCopyStaffFromBranch = async (sourceSalonId: number) => {
-    if (!selectedSalonId || sourceSalonId === selectedSalonId) return;
-    try {
-      setLoading(true);
-      const sourceStaff = await fetchTechnicians(sourceSalonId);
-      if (sourceStaff.length === 0) {
-        showToast('No specialists found in source branch to copy.');
-        setLoading(false);
-        return;
-      }
-      for (const stf of sourceStaff) {
-        await fetch(`${API_BASE}/technicians`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            salon_id: selectedSalonId,
-            fullname: stf.fullname || stf.name,
-            email: stf.email || '',
-            phone: stf.phone || '',
-            specialties: stf.specialties || 'Nail Specialist',
-            experience_years: Number(stf.experience_years || 2),
-            avatar: stf.avatar || null,
-            rating: Number(stf.rating || 5),
-            is_available: true,
-          }),
-        }).catch((e) => console.warn('Copy staff error:', e));
-      }
-      const updatedStaff = await fetchTechnicians(selectedSalonId);
-      setTechnicians(updatedStaff);
-      const allTechs = await fetchTechnicians(undefined, currentUser.id).catch(() => []);
-      setAllOwnerTechnicians(allTechs);
-      showToast(`Assigned ${sourceStaff.length} specialists to active branch.`);
-    } catch (err) {
-      console.error('Error copying specialists:', err);
-      showToast('Failed to assign specialists.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleStatusChange = async (appointmentId: number, newStatus: AppointmentStatus) => {
@@ -721,14 +618,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     if (!activeBranchId) return [];
     return technicians.filter((t) => Number(t.salon_id) === Number(activeBranchId));
   }, [technicians, activeBranchId]);
-
-  const otherBranchesWithServices = useMemo(() => {
-    return salons.filter((s) => s.id !== selectedSalonId && allOwnerServices.some((srv) => Number(srv.salon_id) === Number(s.id)));
-  }, [salons, selectedSalonId, allOwnerServices]);
-
-  const otherBranchesWithStaff = useMemo(() => {
-    return salons.filter((s) => s.id !== selectedSalonId && allOwnerTechnicians.some((t) => Number(t.salon_id) === Number(s.id)));
-  }, [salons, selectedSalonId, allOwnerTechnicians]);
 
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
   const lowStockProductCount = useMemo(
@@ -1537,15 +1426,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       <Plus className="w-4 h-4" />
                       <span>Add Treatment</span>
                     </button>
-                    {otherBranchesWithServices.length > 0 && (
-                      <button
-                        onClick={() => handleCopyServicesFromBranch(otherBranchesWithServices[0].id)}
-                        className="px-4 py-2 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles className="w-4 h-4 text-pink-600" />
-                        <span>Copy treatments from {otherBranchesWithServices[0].salon_name}</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -1553,7 +1433,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               {/* Service List */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {displayedServices.map((s) => {
-                  const branchName = salons.find((sl) => sl.id === s.salon_id)?.salon_name;
                   return (
                     <div
                       key={s.id}
@@ -1757,22 +1636,12 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       <Plus className="w-4 h-4" />
                       <span>Add Specialist</span>
                     </button>
-                    {otherBranchesWithStaff.length > 0 && (
-                      <button
-                        onClick={() => handleCopyStaffFromBranch(otherBranchesWithStaff[0].id)}
-                        className="px-4 py-2 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        <span>Assign specialists from {otherBranchesWithStaff[0].salon_name}</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {displayedStaff.map((t) => {
-                  const branchName = salons.find((sl) => sl.id === t.salon_id)?.salon_name;
                   return (
                     <div
                       key={t.id}

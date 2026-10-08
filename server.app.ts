@@ -4194,6 +4194,14 @@ async function startServer() {
     const id = Number(req.params.id);
     try {
       await db.execute('DELETE FROM salons WHERE id = ?', [id]);
+      await db.execute('DELETE FROM services WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM technicians WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM working_hours WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM appointments WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM reviews WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM promotions WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM products WHERE salon_id = ?', [id]);
+      await db.execute('DELETE FROM email_logs WHERE salon_id = ?', [id]);
       res.json({ success: true });
     } catch (error) {
       console.error('Delete salon error:', error);
