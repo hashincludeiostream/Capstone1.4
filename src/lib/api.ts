@@ -260,12 +260,16 @@ export async function fetchServices(salonId?: number, ownerId?: number): Promise
     const res = await ajax(url);
     if (!res.ok) throw new Error('Failed to fetch services');
     const services = await res.json();
-    return (Array.isArray(services) ? services : []).map((service: Service) => ({
+    let mapped: Service[] = (Array.isArray(services) ? services : []).map((service: Service) => ({
       ...service,
       id: Number(service.id),
       salon_id: Number(service.salon_id),
       image_url: service.image_url || (service as any).image,
     }));
+    if (salonId) {
+      mapped = mapped.filter((s) => Number(s.salon_id) === Number(salonId));
+    }
+    return mapped;
   } catch (err) {
     console.warn('API fetchServices fallback:', err);
     let s: Service[] = seedServices.map((srv) => ({
@@ -276,7 +280,7 @@ export async function fetchServices(salonId?: number, ownerId?: number): Promise
       difficulty_level: srv.difficulty_level as 'Beginner' | 'Intermediate' | 'Advanced' | undefined,
     }));
     if (salonId) {
-      s = s.filter((item) => item.salon_id === Number(salonId));
+      s = s.filter((item) => Number(item.salon_id) === Number(salonId));
     }
     return s;
   }
@@ -290,12 +294,29 @@ export async function fetchTechnicians(salonId?: number, ownerId?: number): Prom
     const url = params.toString() ? `${API_BASE}/technicians?${params.toString()}` : `${API_BASE}/technicians`;
     const res = await ajax(url);
     if (!res.ok) throw new Error('Failed to fetch technicians');
-    return await res.json();
+    const technicians = await res.json();
+    let mapped: Technician[] = (Array.isArray(technicians) ? technicians : []).map((tech: any) => ({
+      ...tech,
+      id: Number(tech.id),
+      salon_id: Number(tech.salon_id),
+      name: tech.fullname || tech.name,
+      rating: Number(tech.rating) || 0,
+      experience_years: Number(tech.experience_years) || 0,
+      is_available: tech.is_available === undefined ? true : Boolean(tech.is_available),
+    }));
+    if (salonId) {
+      mapped = mapped.filter((t) => Number(t.salon_id) === Number(salonId));
+    }
+    return mapped;
   } catch (err) {
     console.warn('API fetchTechnicians fallback:', err);
-    let techs = seedTechnicians as Technician[];
+    let techs = seedTechnicians.map((t) => ({
+      ...t,
+      id: Number(t.id),
+      salon_id: Number(t.salon_id),
+    })) as Technician[];
     if (salonId) {
-      techs = techs.filter((t) => t.salon_id === Number(salonId));
+      techs = techs.filter((t) => Number(t.salon_id) === Number(salonId));
     }
     return techs;
   }

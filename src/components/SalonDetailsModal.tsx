@@ -58,8 +58,8 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
       const res = await fetchSalonDetails(salon.id);
       if (res) {
         setSalonData({
-          services: res.services || [],
-          technicians: res.technicians || [],
+          services: (res.services || []).filter((s: Service) => Number(s.salon_id) === Number(salon.id)),
+          technicians: (res.technicians || []).filter((t: Technician) => Number(t.salon_id) === Number(salon.id)),
           reviews: (res.reviews || []).filter((r: any) => !r.is_private),
           working_hours: res.working_hours || [],
         });

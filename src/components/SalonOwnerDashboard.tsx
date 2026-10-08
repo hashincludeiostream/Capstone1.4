@@ -81,6 +81,7 @@ interface SalonOwnerDashboardProps {
   initialSalons?: Salon[];
   targetId?: string | null;
   onRefreshAppointments?: () => void;
+  onRefreshProducts?: () => void;
 }
 
 export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
@@ -93,6 +94,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   initialSalons,
   targetId,
   onRefreshAppointments,
+  onRefreshProducts,
 }) => {
   const [salons, setSalons] = useState<Salon[]>(() => {
     if (initialSalons && initialSalons.length > 0) {
@@ -117,8 +119,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [allOwnerServices, setAllOwnerServices] = useState<Service[]>([]);
   const [allOwnerTechnicians, setAllOwnerTechnicians] = useState<Technician[]>([]);
-  const [serviceBranchFilter, setServiceBranchFilter] = useState<'selected' | 'all'>('selected');
-  const [staffBranchFilter, setStaffBranchFilter] = useState<'selected' | 'all'>('selected');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -306,8 +306,8 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
         if (loadId !== dashboardLoadId.current) return;
 
-        setServices(servs);
-        setTechnicians(techs);
+        setServices(servs.filter((s) => Number(s.salon_id) === Number(currentId)));
+        setTechnicians(techs.filter((t) => Number(t.salon_id) === Number(currentId)));
         setAppointments(appts);
         setReviews(revs);
         setWorkingHours(hours.length > 0 ? hours : DEFAULT_WORKING_HOURS.map((hour) => ({ ...hour, salon_id: currentId })));
@@ -368,8 +368,8 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
       fetchProducts({ salon_id: salonId }),
       fetchProductOrders({ salon_id: salonId }),
     ]);
-    setServices(servs);
-    setTechnicians(techs);
+    setServices(servs.filter((s) => Number(s.salon_id) === Number(salonId)));
+    setTechnicians(techs.filter((t) => Number(t.salon_id) === Number(salonId)));
     setAppointments(appts);
     setReviews(revs);
     setProducts(prods);
@@ -709,13 +709,18 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   };
 
   const activeSalon = salons.find((s) => s.id === selectedSalonId) || salons[0];
-  const displayedServices = serviceBranchFilter === 'all' && allOwnerServices.length > 0
-    ? allOwnerServices
-    : services;
+  const activeBranchId = activeSalon?.id || selectedSalonId;
 
-  const displayedStaff = staffBranchFilter === 'all' && allOwnerTechnicians.length > 0
-    ? allOwnerTechnicians
-    : technicians;
+  // Strictly isolate treatments and staff to the active branch only
+  const displayedServices = useMemo(() => {
+    if (!activeBranchId) return [];
+    return services.filter((s) => Number(s.salon_id) === Number(activeBranchId));
+  }, [services, activeBranchId]);
+
+  const displayedStaff = useMemo(() => {
+    if (!activeBranchId) return [];
+    return technicians.filter((t) => Number(t.salon_id) === Number(activeBranchId));
+  }, [technicians, activeBranchId]);
 
   const otherBranchesWithServices = useMemo(() => {
     return salons.filter((s) => s.id !== selectedSalonId && allOwnerServices.some((srv) => Number(srv.salon_id) === Number(s.id)));
@@ -1367,26 +1372,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                 </button>
               </div>
 
-              {/* Branch Filter & View Control */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-purple-50/70 border border-purple-100">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-purple-900">Branch View:</span>
-                  <select
-                    value={serviceBranchFilter}
-                    onChange={(e) => setServiceBranchFilter(e.target.value as 'selected' | 'all')}
-                    className="bg-white text-purple-950 text-xs font-semibold px-3 py-1.5 rounded-xl border border-purple-200 shadow-2xs cursor-pointer focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="selected">Active Branch: {activeSalon?.salon_name || 'Selected'} ({services.length})</option>
-                    {salons.length > 1 && (
-                      <option value="all">All Branches Combined ({allOwnerServices.length > 0 ? allOwnerServices.length : services.length})</option>
-                    )}
-                  </select>
-                </div>
-                <div className="text-xs text-purple-800 font-medium">
-                  Showing <strong className="font-bold">{displayedServices.length}</strong> treatment{displayedServices.length !== 1 ? 's' : ''}
-                </div>
-              </div>
-
               {/* Add Service Modal/Form */}
               {showAddService && (
                 <form
@@ -1584,11 +1569,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                               {s.difficulty_level}
                             </span>
                           )}
-                          {serviceBranchFilter === 'all' && branchName && (
-                            <span className="text-[10px] text-pink-700 bg-pink-50 px-2 py-0.2 rounded-md border border-pink-100 font-semibold">
-                              {branchName}
-                            </span>
-                          )}
                           <span className="text-xs font-bold text-gray-900">{s.service_name}</span>
                         </div>
                         <p className="text-xs text-gray-500 line-clamp-2">{s.description}</p>
@@ -1644,26 +1624,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>Add Specialist</span>
                 </button>
-              </div>
-
-              {/* Branch Filter & View Control */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-blue-50/70 border border-blue-100">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-blue-900">Branch View:</span>
-                  <select
-                    value={staffBranchFilter}
-                    onChange={(e) => setStaffBranchFilter(e.target.value as 'selected' | 'all')}
-                    className="bg-white text-blue-950 text-xs font-semibold px-3 py-1.5 rounded-xl border border-blue-200 shadow-2xs cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="selected">Active Branch: {activeSalon?.salon_name || 'Selected'} ({technicians.length})</option>
-                    {salons.length > 1 && (
-                      <option value="all">All Branches Combined ({allOwnerTechnicians.length > 0 ? allOwnerTechnicians.length : technicians.length})</option>
-                    )}
-                  </select>
-                </div>
-                <div className="text-xs text-blue-800 font-medium">
-                  Showing <strong className="font-bold">{displayedStaff.length}</strong> specialist{displayedStaff.length !== 1 ? 's' : ''}
-                </div>
               </div>
 
               {/* Add Tech Form */}
@@ -1834,11 +1794,6 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                       <div>
                         <div className="flex items-center gap-1.5">
                           <h5 className="text-sm font-bold text-gray-900">{t.name}</h5>
-                          {staffBranchFilter === 'all' && branchName && (
-                            <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.2 rounded-md border border-blue-100 font-semibold">
-                              {branchName}
-                            </span>
-                          )}
                         </div>
                         <p className="text-xs text-purple-800 font-medium">
                           {t.experience_years} Years Experience

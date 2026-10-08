@@ -1786,9 +1786,15 @@ async function startServer() {
   // Services List
   app.get('/api/services', async (req, res) => {
     const { salon_id, owner_id } = req.query;
+    const salonIdNum = salon_id !== undefined && salon_id !== '' && salon_id !== 'null' && salon_id !== 'undefined'
+      ? Number(salon_id)
+      : null;
+    const ownerIdNum = owner_id !== undefined && owner_id !== '' && owner_id !== 'null' && owner_id !== 'undefined'
+      ? Number(owner_id)
+      : null;
     try {
-      if (salon_id) {
-        const [rows] = await db.execute('SELECT * FROM services WHERE salon_id = ?', [Number(salon_id)]);
+      if (salonIdNum !== null && !isNaN(salonIdNum)) {
+        const [rows] = await db.execute('SELECT * FROM services WHERE salon_id = ?', [salonIdNum]);
         return res.json((rows as any[]).map((service) => ({
           ...service,
           salon_id: Number(service.salon_id),
@@ -1798,8 +1804,8 @@ async function startServer() {
           is_active: service.is_active === undefined ? true : Boolean(service.is_active),
         })));
       }
-      if (owner_id) {
-        const [salonRows] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(owner_id)]);
+      if (ownerIdNum !== null && !isNaN(ownerIdNum)) {
+        const [salonRows] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [ownerIdNum]);
         const salonIds = (salonRows as any[]).map((s) => Number(s.id));
         if (salonIds.length > 0) {
           const placeholders = salonIds.map(() => '?').join(',');
@@ -2733,9 +2739,15 @@ async function startServer() {
   // Technicians List
   app.get('/api/technicians', async (req, res) => {
     const { salon_id, owner_id } = req.query;
+    const salonIdNum = salon_id !== undefined && salon_id !== '' && salon_id !== 'null' && salon_id !== 'undefined'
+      ? Number(salon_id)
+      : null;
+    const ownerIdNum = owner_id !== undefined && owner_id !== '' && owner_id !== 'null' && owner_id !== 'undefined'
+      ? Number(owner_id)
+      : null;
     try {
-      if (salon_id) {
-        const [rows] = await db.execute('SELECT * FROM technicians WHERE salon_id = ?', [Number(salon_id)]);
+      if (salonIdNum !== null && !isNaN(salonIdNum)) {
+        const [rows] = await db.execute('SELECT * FROM technicians WHERE salon_id = ?', [salonIdNum]);
         // Format data properly
         const technicians = (rows as any[]).map((tech: any) => ({
           ...tech,
@@ -2747,8 +2759,8 @@ async function startServer() {
         }));
         return res.json(technicians);
       }
-      if (owner_id) {
-        const [salonRows] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(owner_id)]);
+      if (ownerIdNum !== null && !isNaN(ownerIdNum)) {
+        const [salonRows] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [ownerIdNum]);
         const salonIds = (salonRows as any[]).map((s) => Number(s.id));
         if (salonIds.length > 0) {
           const placeholders = salonIds.map(() => '?').join(',');

@@ -111,14 +111,20 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         fetchSalonDetails(selectedSalonId),
         fetchAppointments({ salon_id: selectedSalonId }),
       ]);
-      setServices(servs);
-      setTechnicians(techs);
+      const branchServs = servs.filter((s) => Number(s.salon_id) === Number(selectedSalonId));
+      const branchTechs = techs.filter((t) => Number(t.salon_id) === Number(selectedSalonId));
+      setServices(branchServs);
+      setTechnicians(branchTechs);
       setWorkingHours(salonDetails?.working_hours || []);
       setBookedAppointments(appts);
 
-      // Auto-select first service if not already set or invalid
-      if (!selectedServiceId || !servs.find((s) => s.id === selectedServiceId)) {
-        if (servs.length > 0) setSelectedServiceId(servs[0].id);
+      // Auto-select first service if not already set or invalid for this branch
+      if (!selectedServiceId || !branchServs.find((s) => s.id === selectedServiceId)) {
+        if (branchServs.length > 0) setSelectedServiceId(branchServs[0].id);
+      }
+      // Reset technician if previously selected specialist does not belong to this branch
+      if (selectedStaffId && !branchTechs.some((t) => t.id === selectedStaffId)) {
+        setSelectedStaffId(null);
       }
       setLoading(false);
     }
