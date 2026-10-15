@@ -24,6 +24,7 @@ import {
   Compass,
   ExternalLink,
   Mail,
+  MessageSquare,
 } from 'lucide-react';
 import {
   User,
@@ -106,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onDismissAnnouncement,
   onDismissAllAnnouncements,
 }) => {
-  const { categoryUnread } = useNotifications();
+  const { categoryUnread, unreadMessagesCount } = useNotifications();
   const handleNavigation = (tab: string, targetDomId?: string) => {
     if (onNavigate) {
       onNavigate(tab, targetDomId);
@@ -241,6 +242,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>Admin Console</span>
                 </button>
               )
+            )}
+
+            {/* Direct Private Messages */}
+            {currentUser && (
+              <button
+                id="navbar-direct-messages-btn"
+                onClick={() => {
+                  if (currentUser.user_type === 'customer') {
+                    handleNavigation('customer-dashboard');
+                  } else if (currentUser.user_type === 'salon_owner') {
+                    handleNavigation('owner-messages');
+                  }
+                }}
+                className="relative p-2 rounded-full text-gray-600 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
+                title="Direct Messages & Inquiries"
+                aria-label="Direct Messages"
+              >
+                <MessageSquare className="w-5 h-5 text-gray-600 hover:text-pink-600 transition-colors" />
+                {unreadMessagesCount > 0 && (
+                  <span className="absolute top-1 right-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
+                    {unreadMessagesCount}
+                  </span>
+                )}
+              </button>
             )}
 
             {/* Notification Button (Arranged In-Store Cart & System Notifications) */}

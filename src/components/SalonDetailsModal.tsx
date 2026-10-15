@@ -27,6 +27,7 @@ interface SalonDetailsModalProps {
   onClose: () => void;
   onBookService: (salon: Salon, service?: Service) => void;
   onOpenLeaveReview: (salon: Salon) => void;
+  onOpenChatWithSalon?: (salon: Salon) => void;
 }
 
 export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
@@ -34,6 +35,7 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
   onClose,
   onBookService,
   onOpenLeaveReview,
+  onOpenChatWithSalon,
 }) => {
   const [activeTab, setActiveTab] = useState<'services' | 'technicians' | 'reviews' | 'location' | 'about'>('services');
   const [loading, setLoading] = useState(true);
@@ -217,8 +219,21 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                 </div>
               </div>
 
-              {/* Book Appointment button (with right padding so it leaves space for the close button) */}
+              {/* Action buttons (with right padding so it leaves space for the close button) */}
               <div className="flex items-center gap-2 shrink-0 pr-12">
+                {onOpenChatWithSalon && (
+                  <button
+                    onClick={() => {
+                      onOpenChatWithSalon(salon);
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 rounded-xl border border-pink-300 hover:bg-pink-50 text-pink-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    title="Send private direct message to salon owner"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Message</span>
+                  </button>
+                )}
                 <button
                   onClick={() => onBookService(salon)}
                   className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-semibold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
@@ -351,12 +366,15 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                                 <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-1 mt-0.5">
                                   {service.description}
                                 </p>
-                                <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-[11px] sm:text-xs font-medium text-gray-600">
-                                  <span className="text-pink-700 font-semibold bg-pink-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-pink-100 shrink-0">
+                                <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-[11px] sm:text-xs font-medium text-gray-600 flex-wrap">
+                                  <span className="text-pink-700 font-bold bg-pink-50 px-2 py-0.5 rounded-md border border-pink-100 shrink-0">
+                                    ₱{Number(service.price || 0).toLocaleString()}
+                                  </span>
+                                  <span className="text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 text-[10px] shrink-0">
                                     Pay In-Store
                                   </span>
                                   <span>•</span>
-                                  <span>{service.duration} mins</span>
+                                  <span>{service.duration || 45} mins</span>
                                 </div>
                               </div>
                             </div>
@@ -402,22 +420,25 @@ export const SalonDetailsModal: React.FC<SalonDetailsModalProps> = ({
                             {tech.avatar ? (
                               <img
                                 src={tech.avatar}
-                                alt={tech.name}
+                                alt={tech.name || tech.fullname || 'Master Specialist'}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80';
+                                }}
                                 className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-pink-200 shrink-0"
                               />
                             ) : (
                               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center border-2 border-pink-200 shrink-0">
-                                <span className="text-sm font-bold">{tech.name?.charAt(0).toUpperCase()}</span>
+                                <span className="text-sm font-bold">{(tech.name || tech.fullname || 'M').charAt(0).toUpperCase()}</span>
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
-                              <h5 className="text-sm font-bold text-gray-900 truncate">{tech.name}</h5>
+                              <h5 className="text-sm font-bold text-gray-900 truncate">{tech.name || tech.fullname || 'Master Specialist'}</h5>
                               <p className="text-xs text-pink-700 font-medium">
-                                {tech.experience_years} Years Experience
+                                {tech.experience_years || 4} Years Experience
                               </p>
                               <p className="text-xs text-gray-600 mt-1 font-medium break-words">
                                 <span className="font-semibold text-gray-700">Specialties:</span>{' '}
-                                {tech.specialties}
+                                {tech.specialties || 'Russian Manicure, Japanese Gel Art'}
                               </p>
                               {tech.bio && (
                                 <p className="text-xs text-gray-500 mt-1 italic leading-relaxed break-words line-clamp-3">

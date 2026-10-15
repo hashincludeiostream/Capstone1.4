@@ -28,6 +28,7 @@ import {
   ShoppingBag,
   LogOut,
   ShieldAlert,
+  MessageSquare,
 } from 'lucide-react';
 import { User } from '../types';
 import { NotificationBadge } from './common/NotificationBadge';
@@ -249,7 +250,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
-  const { categoryUnread, unreadBookingsCount, unreadOrdersCount, unreadAlertsCount } = useNotifications();
+  const { categoryUnread, unreadBookingsCount, unreadOrdersCount, unreadAlertsCount, unreadMessagesCount } = useNotifications();
 
   // ----------------------------------------------------
   // SUPER ADMIN SIDEBAR VIEW (Exclusive Admin Tools Only)
@@ -832,6 +833,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="truncate">Salon Profile & Hours</span>
               </div>
+            </button>
+
+            {/* Client Messages & Inquiries */}
+            <button
+              id="sidebar-owner-messages-btn"
+              onClick={() => handleNavigation('owner-messages')}
+              aria-current={isPathActive('owner-messages') ? 'page' : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                isPathActive('owner-messages')
+                  ? 'bg-purple-700 text-white font-bold shadow-xs ring-1 ring-purple-600'
+                  : 'text-purple-950 hover:bg-purple-50'
+              }`}
+              title="Two-way private customer messaging & inquiries"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <MessageSquare className={`w-4 h-4 shrink-0 ${isPathActive('owner-messages') ? 'text-white' : 'text-purple-600'}`} />
+                </div>
+                <span className="truncate">Client Messages</span>
+              </div>
+              {unreadMessagesCount > 0 && (
+                <NotificationBadge
+                  id="sidebar-owner-messages-badge"
+                  count={unreadMessagesCount}
+                  variant={isPathActive('owner-messages') ? 'white' : 'rose'}
+                  size="sm"
+                />
+              )}
             </button>
 
             {/* My Account Profile */}

@@ -27,6 +27,7 @@ import { AppointmentCancellationModal } from './cancellation/AppointmentCancella
 import { RescheduleAppointmentModal } from './cancellation/RescheduleAppointmentModal';
 import { AccountReliabilityBadge } from './cancellation/AccountReliabilityBadge';
 import { useNotifications } from '../context/NotificationContext';
+import { MessagesInboxView } from './chat/MessagesInboxView';
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -55,7 +56,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
-  const { addNotification } = useNotifications();
+  const [activePortalTab, setActivePortalTab] = useState<'appointments' | 'messages'>('appointments');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const { addNotification, unreadMessagesCount } = useNotifications();
 
   useEffect(() => {
     if (targetAppointmentId) {
@@ -252,8 +255,58 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         </button>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 max-w-full">
+      {/* Portal Tab Switcher: Appointments vs Direct Messages */}
+      <div className="flex items-center gap-2 p-1.5 bg-pink-100/60 rounded-2xl w-fit border border-pink-200/60 shadow-2xs">
+        <button
+          onClick={() => setActivePortalTab('appointments')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            activePortalTab === 'appointments'
+              ? 'bg-white text-pink-900 shadow-sm'
+              : 'text-gray-600 hover:text-pink-900 hover:bg-white/40'
+          }`}
+        >
+          <Calendar className="w-4 h-4 text-pink-600" />
+          <span>My Appointments</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700">
+            {appointments.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActivePortalTab('messages')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            activePortalTab === 'messages'
+              ? 'bg-white text-pink-900 shadow-sm'
+              : 'text-gray-600 hover:text-pink-900 hover:bg-white/40'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4 text-pink-600" />
+          <span>Messages &amp; Inquiries</span>
+          {unreadMessagesCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
+              {unreadMessagesCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activePortalTab === 'messages' ? (
+        <div className="animate-in fade-in duration-200">
+          <MessagesInboxView
+            currentUser={currentUser}
+            salons={salons}
+            initialConversationId={selectedConversationId || undefined}
+            onViewSalon={(sId) => {
+              const target = salons.find((s) => s.id === sId);
+              if (target) onSelectSalon(target);
+            }}
+            onNavigateToBooking={() => onOpenBooking()}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Stats Overview */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 max-w-full">
         <div className="bg-white p-3 sm:p-5 rounded-2xl border border-pink-100 shadow-xs min-w-0">
           <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Total Bookings</p>
           <p className="text-xl sm:text-2xl font-bold font-serif text-pink-900 mt-1 truncate">
@@ -477,6 +530,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                         </button>
                       )}
 
+                      <button
+                        onClick={() => {
+                          setActivePortalTab('messages');
+                          setSelectedConversationId(`salon_${appt.salon_id}_cust_${currentUser.id}`);
+                        }}
+                        className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-pink-300 text-pink-700 hover:bg-pink-50 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors whitespace-nowrap shadow-2xs"
+                        title="Chat directly with this salon about your appointment"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+                        <span>Message Salon</span>
+                      </button>
+
                       {/* Official Payment & Booking Receipt */}
                       {onViewReceipt && (appt.paid_amount || appt.transaction_reference || appt.payment_status) && (
                         <button
@@ -527,6 +592,8 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
           </div>
         )}
       </div>
+        </>
+      )}
         {/* Lightbox Modal for Inspiration Photo */}
         {previewImage && (
           <div

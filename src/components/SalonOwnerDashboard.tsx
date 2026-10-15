@@ -30,6 +30,7 @@ import {
   ShieldAlert,
   User as UserIcon,
   Upload,
+  MessageSquare,
 } from 'lucide-react';
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
@@ -58,6 +59,7 @@ import { OwnerEmailReportsManager } from './owner/OwnerEmailReportsManager';
 import { CancelBookingConfirmationModal } from './cancellation/CancelBookingConfirmationModal';
 import { useNotifications } from '../context/NotificationContext';
 import { EmptyState } from './EmptyState';
+import { MessagesInboxView } from './chat/MessagesInboxView';
 import { scrollToElement } from '../utils/scrollHelper';
 
 const DEFAULT_WORKING_HOURS: WorkingHour[] = [
@@ -73,7 +75,7 @@ const DEFAULT_WORKING_HOURS: WorkingHour[] = [
 
 interface SalonOwnerDashboardProps {
   currentUser: User;
-  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails';
+  initialTab?: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails' | 'messages';
   onOpenRegisterSalon?: () => void;
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
@@ -123,15 +125,15 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   const [reviews, setReviews] = useState<Review[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productOrders, setProductOrders] = useState<ProductOrder[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails' | 'messages'>(initialTab);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewInspoImage, setPreviewInspoImage] = useState<{ url: string; clientName: string } | null>(null);
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
-  const { addNotification } = useNotifications();
+  const { addNotification, unreadMessagesCount } = useNotifications();
   const dashboardLoadId = React.useRef(0);
 
-  const handleTabClick = (tabKey: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails') => {
+  const handleTabClick = (tabKey: 'overview' | 'appointments' | 'services' | 'staff' | 'location' | 'settings' | 'branches' | 'inventory' | 'cancellation-fees' | 'emails' | 'messages') => {
     setActiveTab(tabKey);
     if (onNavigateTab) {
       const parentTab = tabKey === 'overview' ? 'owner-dashboard' : `owner-${tabKey}`;
@@ -900,6 +902,25 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               PDF
             </span>
           </button>
+
+          {/* Tab 9: Direct Client Messages */}
+          <button
+            id="owner-tab-messages"
+            onClick={() => handleTabClick('messages')}
+            className={`py-3.5 px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
+              activeTab === 'messages'
+                ? 'border-purple-600 text-purple-900 font-bold bg-white/70 rounded-t-xl shadow-2xs'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-purple-700" />
+            <span>Client Messages</span>
+            {unreadMessagesCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold animate-pulse">
+                {unreadMessagesCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Tab Content Container */}
@@ -1198,6 +1219,17 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
                             <span>Confirm Booking</span>
                           </button>
                         )}
+
+                        <button
+                          onClick={() => {
+                            setActiveTab('messages');
+                          }}
+                          className="px-3 py-2 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors shadow-2xs"
+                          title="Open private message thread with client"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-purple-600" />
+                          <span>Message Client</span>
+                        </button>
 
                         {appt.status === 'confirmed' && (
                           <button
@@ -1875,6 +1907,16 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
               currentUser={currentUser}
               showToast={showToast}
             />
+          )}
+
+          {/* TAB 9: CLIENT PRIVATE MESSAGES */}
+          {activeTab === 'messages' && (
+            <div className="animate-in fade-in duration-200">
+              <MessagesInboxView
+                currentUser={currentUser}
+                salons={salons}
+              />
+            </div>
           )}
         </div>
       </div>

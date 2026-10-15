@@ -26,10 +26,13 @@ import {
   Compass,
   Search,
   ArrowRight,
+  MessageSquare,
 } from 'lucide-react';
 import { User, Salon } from '../../types';
 import { sendChatMessage, ChatApiMessage } from '../../lib/api';
 import { CHATBOT_FAQS, ChatbotFaq } from '../../data/chatbotFaqs';
+import { useNotifications } from '../../context/NotificationContext';
+import { MessagesInboxView } from './MessagesInboxView';
 
 interface ChatWidgetProps {
   currentUser: User | null;
@@ -56,10 +59,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeView, setActiveView] = useState<'chat' | 'faqs'>('chat');
+  const [activeView, setActiveView] = useState<'chat' | 'faqs' | 'direct_messages'>('chat');
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
+  const { unreadMessagesCount } = useNotifications();
 
   // FAQ state
   const [faqCategory, setFaqCategory] = useState<string>('all');
@@ -451,8 +455,16 @@ How can I help you today?
         >
           <div className="relative shrink-0">
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse text-pink-200" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white ring-1 ring-emerald-500 animate-ping" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
+            {unreadMessagesCount > 0 ? (
+              <span className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold border-2 border-white animate-bounce shadow-md">
+                {unreadMessagesCount}
+              </span>
+            ) : (
+              <>
+                <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white ring-1 ring-emerald-500 animate-ping" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
+              </>
+            )}
           </div>
           <div className="flex flex-col text-left">
             <span className="text-xs font-bold tracking-wide">
@@ -615,6 +627,26 @@ How can I help you today?
                   {filteredFaqs.length}
                 </span>
               </button>
+
+              {currentUser && (
+                <button
+                  type="button"
+                  onClick={() => setActiveView('direct_messages')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeView === 'direct_messages'
+                      ? 'bg-white text-gray-900 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Salon Chat</span>
+                  {unreadMessagesCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
+                      {unreadMessagesCount}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Context Chip */}
@@ -755,6 +787,20 @@ How can I help you today?
                   <span>Have another question? Chat with GlamBot</span>
                 </button>
               </div>
+            </div>
+          ) : activeView === 'direct_messages' && currentUser ? (
+            <div className="flex-1 overflow-hidden flex flex-col bg-white">
+              <MessagesInboxView
+                currentUser={currentUser}
+                salons={salons}
+                onViewSalon={() => {
+                  onNavigate('landing');
+                }}
+                onNavigateToBooking={() => {
+                  if (onOpenBookingModal) onOpenBookingModal();
+                  setIsOpen(false);
+                }}
+              />
             </div>
           ) : (
             /* VIEW: INTERACTIVE CHAT */

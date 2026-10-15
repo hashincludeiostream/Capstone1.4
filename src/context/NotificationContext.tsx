@@ -60,10 +60,12 @@ export interface NotificationContextType {
   unreadCount: number;
   urgentCount: number;
   trashedCount: number;
+  unreadMessagesCount: number;
   categoryUnread: {
     cart: boolean;
     bookings: boolean;
     alerts: boolean;
+    messages?: boolean;
   };
   unreadBookingsCount: number;
   unreadOrdersCount: number;
@@ -253,6 +255,96 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
+
+  // Add system notification
+  const addNotification = useCallback(
+    (notif: Omit<SystemNotification, 'id' | 'timestamp'> & { id?: string; timestamp?: string }) => {
+      const fullNotif: SystemNotification = {
+        ...notif,
+        id: notif.id || `sys-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: notif.timestamp || new Date().toISOString(),
+      };
+      setSystemNotifications((prev) => {
+        const next = [fullNotif, ...prev];
+        safeLocalStorage.setJSON(STORAGE_KEY_SYSTEM_NOTIFS, next);
+        return next;
+      });
+    },
+    []
+  );
+
+  // Unread private messages count
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+
+  // Poll schedule warnings (24h, 2h, overdue) and private messages unread count
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkScheduleAndMessages = async () => {
+      if (!currentUser) return;
+
+      // 1. Fetch conversations to tally unread messages
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('user_id', String(currentUser.id));
+        queryParams.append('user_type', currentUser.user_type);
+
+        const res = await fetch(`/api/messages/conversations?${queryParams.toString()}`);
+        if (res.ok && isMounted) {
+          const channels = await res.json();
+          if (Array.isArray(channels)) {
+            const totalUnread = channels.reduce((sum, ch) => sum + (Number(ch.unread_count) || 0), 0);
+            setUnreadMessagesCount(totalUnread);
+          }
+        }
+      } catch (msgErr) {
+        // quiet fallback
+      }
+
+      // 2. Fetch schedule warnings
+      try {
+        const warnParams = new URLSearchParams();
+        if (currentUser.user_type === 'customer') {
+          warnParams.append('customer_id', String(currentUser.id));
+        }
+        warnParams.append('dispatch_emails', 'true');
+
+        const warnRes = await fetch(`/api/appointments/schedule-warnings?${warnParams.toString()}`);
+        if (warnRes.ok && isMounted) {
+          const data = await warnRes.json();
+          const warnings = data.warnings || [];
+
+          warnings.forEach((warn: any) => {
+            const alertKey = `sys-warn-${warn.type}-${warn.appointment_id}`;
+            const exists = systemNotifications.some((s) => s.id === alertKey);
+
+            if (!exists) {
+              addNotification({
+                id: alertKey,
+                category: 'bookings',
+                title: warn.title,
+                message: warn.message,
+                recipient_role: currentUser.user_type as any,
+                recipient_user_id: currentUser.id,
+                priority: warn.priority,
+                type: warn.type === 'overdue_alert' ? 'system_alert' : 'booking_new',
+                linkTab: currentUser.user_type === 'salon_owner' ? 'owner-appointments' : 'customer-dashboard',
+              });
+            }
+          });
+        }
+      } catch (warnErr) {
+        // quiet fallback
+      }
+    };
+
+    checkScheduleAndMessages();
+    const interval = setInterval(checkScheduleAndMessages, 45000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser, systemNotifications, addNotification]);
 
   // Check if an item is read
   const isRead = useCallback(
@@ -484,22 +576,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     });
   }, [trashedItemIds]);
 
-  const addNotification = useCallback(
-    (notif: Omit<SystemNotification, 'id' | 'timestamp'> & { id?: string; timestamp?: string }) => {
-      const fullNotif: SystemNotification = {
-        ...notif,
-        id: notif.id || `sys-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: notif.timestamp || new Date().toISOString(),
-      };
-      setSystemNotifications((prev) => {
-        const next = [fullNotif, ...prev];
-        safeLocalStorage.setJSON(STORAGE_KEY_SYSTEM_NOTIFS, next);
-        return next;
-      });
-    },
-    []
-  );
-
   // Calculate unread items & urgent notifications (excluding trashed or deleted items)
   const { unreadCount, urgentCount, categoryUnread, unreadBookingsCount, unreadOrdersCount, unreadAlertsCount } = useMemo(() => {
     let unread = 0;
@@ -649,18 +725,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     });
 
     return {
-      unreadCount: unread,
+      unreadCount: unread + unreadMessagesCount,
       urgentCount: urgent,
       categoryUnread: {
         cart: unreadCart,
         bookings: unreadBookings,
         alerts: unreadAlerts,
+        messages: unreadMessagesCount > 0,
       },
       unreadBookingsCount: bookingsUnreadCount,
       unreadOrdersCount: ordersUnreadCount,
       unreadAlertsCount: alertsUnreadCount,
     };
   }, [
+    unreadMessagesCount,
     cartItemCount,
     readItemIds,
     trashedItemIds,
@@ -702,12 +780,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       unreadCount,
       urgentCount,
       trashedCount: trashedItemIds.size,
+      unreadMessagesCount,
       categoryUnread,
       unreadBookingsCount,
       unreadOrdersCount,
       unreadAlertsCount,
     }),
     [
+      unreadMessagesCount,
       readItemIds,
       viewedAnnouncementIds,
       trashedItemIds,

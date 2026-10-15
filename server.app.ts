@@ -681,6 +681,421 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // APPOINTMENT SCHEDULE WARNINGS & DEADLINE ALERTS (24h, 2h, Overdue)
+  // =========================================================================
+  app.get('/api/appointments/schedule-warnings', async (req, res) => {
+    const { customer_id, salon_id, dispatch_emails } = req.query;
+    try {
+      const now = new Date();
+      const [allAppts] = await db.execute("SELECT * FROM appointments WHERE status IN ('pending', 'confirmed')");
+      const warnings: any[] = [];
+
+      for (const appt of (allAppts as any[])) {
+        if (customer_id && Number(appt.customer_id) !== Number(customer_id)) continue;
+        if (salon_id && Number(appt.salon_id) !== Number(salon_id)) continue;
+
+        // Parse scheduled appointment datetime
+        const datePart = appt.appointment_date;
+        const timePart = appt.appointment_time || '10:00';
+        const scheduledTime = new Date(`${datePart}T${timePart}:00`);
+        if (isNaN(scheduledTime.getTime())) continue;
+
+        const diffMs = scheduledTime.getTime() - now.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        // 1. 24-Hour Reminder Alert (between 2 and 24 hours away)
+        if (diffHours > 2 && diffHours <= 24) {
+          const hoursLeft = Math.round(diffHours);
+          const warnObj = {
+            id: `warn-24h-${appt.id}`,
+            appointment_id: Number(appt.id),
+            type: '24h_reminder',
+            priority: 'normal',
+            hours_remaining: hoursLeft,
+            title: `Appointment in ${hoursLeft} Hours ⏰`,
+            message: `Reminder: Your appointment for ${appt.service_name} at ${appt.salon_name} is scheduled for ${appt.appointment_date} at ${appt.appointment_time}.`,
+            appointment: appt,
+          };
+          warnings.push(warnObj);
+
+          if (dispatch_emails === 'true' && appt.customer_email) {
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Reminder: Upcoming Appointment in ${hoursLeft} Hours (${appt.salon_name})`,
+              category: 'booking',
+              content_preview: `Your appointment for ${appt.service_name} is tomorrow (${appt.appointment_date} at ${appt.appointment_time}).`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D;">Upcoming Appointment Reminder (24h) ⏰</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>This is a friendly reminder that your booking at <strong>${appt.salon_name}</strong> is coming up in approximately ${hoursLeft} hours.</p>
+                <ul>
+                  <li><strong>Service:</strong> ${appt.service_name}</li>
+                  <li><strong>Date:</strong> ${appt.appointment_date}</li>
+                  <li><strong>Time:</strong> ${appt.appointment_time}</li>
+                  <li><strong>Specialist:</strong> ${appt.technician_name || 'Assigned Artist'}</li>
+                </ul>
+              </div>`,
+            }).catch(() => {});
+          }
+        }
+        // 2. 2-Hour Urgent Preparation Alert (between 0 and 2 hours away)
+        else if (diffHours > 0 && diffHours <= 2) {
+          const minsLeft = Math.max(1, Math.round(diffMs / (1000 * 60)));
+          const warnObj = {
+            id: `warn-2h-${appt.id}`,
+            appointment_id: Number(appt.id),
+            type: '2h_urgent',
+            priority: 'urgent',
+            minutes_remaining: minsLeft,
+            title: `Urgent: Appointment in ${minsLeft} mins! ⚠️`,
+            message: `Final reminder: Your visit for ${appt.service_name} at ${appt.salon_name} starts soon at ${appt.appointment_time}. Please prepare your arrival.`,
+            appointment: appt,
+          };
+          warnings.push(warnObj);
+
+          if (dispatch_emails === 'true' && appt.customer_email) {
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Urgent Reminder: Appointment in ${minsLeft} minutes! (${appt.salon_name})`,
+              category: 'booking',
+              content_preview: `Your appointment for ${appt.service_name} starts in ${minsLeft} minutes.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FEF2F2; border-radius: 12px; border: 1px solid #FCA5A5;">
+                <h2 style="color: #DC2626;">Starting Soon: 2-Hour Appointment Advisory ⚠️</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>Your session at <strong>${appt.salon_name}</strong> starts in <strong>${minsLeft} minutes</strong> (${appt.appointment_time}). Please arrive 5-10 minutes prior.</p>
+              </div>`,
+            }).catch(() => {});
+          }
+        }
+        // 3. Overdue Appointment Alert (past scheduled time, not yet marked completed or cancelled)
+        else if (diffHours <= 0) {
+          const overdueMins = Math.round(Math.abs(diffMs) / (1000 * 60));
+          const warnObj = {
+            id: `warn-overdue-${appt.id}`,
+            appointment_id: Number(appt.id),
+            type: 'overdue_alert',
+            priority: 'urgent',
+            overdue_minutes: overdueMins,
+            title: `Overdue Appointment Alert ⚠️`,
+            message: `Your appointment for ${appt.service_name} at ${appt.salon_name} was scheduled for ${appt.appointment_date} at ${appt.appointment_time} (${overdueMins} mins ago). Please check in with the salon or reschedule.`,
+            appointment: appt,
+          };
+          warnings.push(warnObj);
+
+          if (dispatch_emails === 'true' && appt.customer_email) {
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Overdue Appointment Alert ⚠️ (${appt.salon_name})`,
+              category: 'alert',
+              content_preview: `Your scheduled appointment for ${appt.service_name} at ${appt.salon_name} was set for ${appt.appointment_date} at ${appt.appointment_time}.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF1F2; border-radius: 12px; border: 1px solid #FECDD3;">
+                <h2 style="color: #BE123C;">Overdue Appointment Notice ⚠️</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>Your appointment for <strong>${appt.service_name}</strong> at <strong>${appt.salon_name}</strong> was scheduled for <strong>${appt.appointment_date} at ${appt.appointment_time}</strong> (${overdueMins} mins ago).</p>
+                <p>If you have already arrived or need to reschedule, please contact the salon or manage your booking in the dashboard.</p>
+              </div>`,
+            }).catch(() => {});
+          }
+        }
+      }
+
+      res.json({ success: true, count: warnings.length, warnings });
+    } catch (error) {
+      console.error('Schedule warnings error:', error);
+      res.status(500).json({ error: 'Failed to retrieve schedule warnings' });
+    }
+  });
+
+  // =========================================================================
+  // PRIVATE MESSAGING SYSTEM (Customer <-> Salon Owner & Vice Versa)
+  // =========================================================================
+  // List Conversation Threads
+  app.get('/api/messages/conversations', async (req, res) => {
+    const { user_id, user_type, salon_id } = req.query;
+    try {
+      const [allMessages] = await db.execute('SELECT * FROM messages');
+      const [allSalons] = await db.execute('SELECT id, salon_name, owner_id, phone, logo FROM salons');
+      const [allUsers] = await db.execute('SELECT id, fullname, email, phone, user_type FROM users');
+      const [allAppointments] = await db.execute('SELECT id, customer_id, salon_id, service_name, appointment_date, appointment_time, status FROM appointments');
+
+      const salonMap = new Map((allSalons as any[]).map((s) => [Number(s.id), s]));
+      const userMap = new Map((allUsers as any[]).map((u) => [Number(u.id), u]));
+
+      const convMap = new Map<string, any>();
+
+      for (const msg of (allMessages as any[])) {
+        const sId = Number(msg.salon_id);
+        const cId = Number(msg.customer_id);
+        const convId = msg.conversation_id || `salon_${sId}_cust_${cId}`;
+
+        // Role-based visibility filters
+        if (user_type === 'customer' && user_id && cId !== Number(user_id)) {
+          continue;
+        }
+        if (user_type === 'salon_owner') {
+          const salon = salonMap.get(sId);
+          if (salon_id && sId !== Number(salon_id)) continue;
+          if (!salon_id && user_id && Number(salon?.owner_id) !== Number(user_id)) continue;
+        }
+
+        const existing = convMap.get(convId);
+        const msgTime = new Date(msg.created_at || 0).getTime();
+        const salon = salonMap.get(sId);
+        const cust = userMap.get(cId);
+
+        const isUnreadForCurrent = Number(msg.recipient_id) === Number(user_id) && !msg.is_read;
+
+        if (!existing || msgTime > new Date(existing.last_timestamp || 0).getTime()) {
+          const activeAppt = (allAppointments as any[])
+            .filter((a) => Number(a.salon_id) === sId && Number(a.customer_id) === cId)
+            .sort((a, b) => new Date(b.appointment_date || 0).getTime() - new Date(a.appointment_date || 0).getTime())[0] || null;
+
+          convMap.set(convId, {
+            conversation_id: convId,
+            salon_id: sId,
+            salon_name: msg.salon_name || salon?.salon_name || 'Salon Atelier',
+            salon_logo: salon?.logo || null,
+            salon_phone: salon?.phone || null,
+            salon_owner_id: salon ? Number(salon.owner_id) : msg.sender_role === 'salon_owner' ? Number(msg.sender_id) : Number(msg.recipient_id),
+            customer_id: cId,
+            customer_name: msg.customer_name || cust?.fullname || 'Salon Client',
+            customer_phone: msg.customer_phone || cust?.phone || null,
+            customer_email: msg.customer_email || cust?.email || null,
+            last_message: msg.content,
+            last_timestamp: msg.created_at,
+            last_sender_id: Number(msg.sender_id),
+            last_sender_role: msg.sender_role,
+            unread_count: (existing?.unread_count || 0) + (isUnreadForCurrent ? 1 : 0),
+            active_appointment: activeAppt ? {
+              id: Number(activeAppt.id),
+              service_name: activeAppt.service_name,
+              appointment_date: activeAppt.appointment_date,
+              appointment_time: activeAppt.appointment_time,
+              status: activeAppt.status,
+            } : null,
+          });
+        } else if (isUnreadForCurrent) {
+          existing.unread_count = (existing.unread_count || 0) + 1;
+        }
+      }
+
+      // If user has no messages yet but has booked appointments, include starter conversation cards
+      if (convMap.size === 0 && user_id) {
+        const uId = Number(user_id);
+        if (user_type === 'customer') {
+          const userAppts = (allAppointments as any[]).filter((a) => Number(a.customer_id) === uId);
+          for (const appt of userAppts) {
+            const sId = Number(appt.salon_id);
+            const convId = `salon_${sId}_cust_${uId}`;
+            if (!convMap.has(convId)) {
+              const salon = salonMap.get(sId);
+              convMap.set(convId, {
+                conversation_id: convId,
+                salon_id: sId,
+                salon_name: salon?.salon_name || 'Salon Atelier',
+                salon_logo: salon?.logo || null,
+                salon_phone: salon?.phone || null,
+                salon_owner_id: salon ? Number(salon.owner_id) : 2,
+                customer_id: uId,
+                customer_name: userMap.get(uId)?.fullname || 'Customer',
+                last_message: 'Start a direct private chat with this salon.',
+                last_timestamp: new Date().toISOString(),
+                unread_count: 0,
+                active_appointment: {
+                  id: Number(appt.id),
+                  service_name: appt.service_name,
+                  appointment_date: appt.appointment_date,
+                  appointment_time: appt.appointment_time,
+                  status: appt.status,
+                },
+              });
+            }
+          }
+        }
+      }
+
+      const convList = Array.from(convMap.values()).sort(
+        (a, b) => new Date(b.last_timestamp || 0).getTime() - new Date(a.last_timestamp || 0).getTime()
+      );
+
+      res.json(convList);
+    } catch (error) {
+      console.error('Fetch conversations error:', error);
+      res.status(500).json({ error: 'Failed to retrieve message threads' });
+    }
+  });
+
+  // Get Messages for a Thread
+  app.get('/api/messages', async (req, res) => {
+    const { conversation_id, salon_id, customer_id } = req.query;
+    try {
+      let rows: any[] = [];
+      if (conversation_id) {
+        const [r] = await db.execute('SELECT * FROM messages WHERE conversation_id = ?', [String(conversation_id)]);
+        rows = r as any[];
+      } else if (salon_id && customer_id) {
+        const [r] = await db.execute(
+          'SELECT * FROM messages WHERE salon_id = ? AND customer_id = ?',
+          [Number(salon_id), Number(customer_id)]
+        );
+        rows = r as any[];
+      } else if (salon_id) {
+        const [r] = await db.execute('SELECT * FROM messages WHERE salon_id = ?', [Number(salon_id)]);
+        rows = r as any[];
+      } else if (customer_id) {
+        const [r] = await db.execute('SELECT * FROM messages WHERE customer_id = ?', [Number(customer_id)]);
+        rows = r as any[];
+      } else {
+        const [r] = await db.execute('SELECT * FROM messages');
+        rows = r as any[];
+      }
+
+      rows.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      res.json(rows);
+    } catch (error) {
+      console.error('Fetch messages error:', error);
+      res.status(500).json({ error: 'Failed to retrieve messages' });
+    }
+  });
+
+  // Send a Private Message
+  app.post('/api/messages', async (req, res) => {
+    const {
+      salon_id,
+      customer_id,
+      sender_id,
+      sender_name,
+      sender_role,
+      recipient_id,
+      recipient_name,
+      content,
+      appointment_id,
+    } = req.body;
+
+    if (!salon_id || !customer_id || !sender_id || !content?.trim()) {
+      return res.status(400).json({ error: 'Salon, customer, sender, and message content are required.' });
+    }
+
+    try {
+      const [salonRows] = await db.execute('SELECT id, salon_name, owner_id FROM salons WHERE id = ?', [Number(salon_id)]);
+      const salon = (salonRows as any[])[0];
+
+      const [userRows] = await db.execute('SELECT id, fullname, email, phone FROM users WHERE id = ?', [Number(customer_id)]);
+      const customer = (userRows as any[])[0];
+
+      const convId = `salon_${Number(salon_id)}_cust_${Number(customer_id)}`;
+      const effectiveRecipientId = recipient_id
+        ? Number(recipient_id)
+        : sender_role === 'customer'
+        ? Number(salon?.owner_id || 2)
+        : Number(customer_id);
+
+      const [result] = await db.execute(
+        `INSERT INTO messages (
+          conversation_id, salon_id, salon_name, customer_id, customer_name,
+          sender_id, sender_name, sender_role, recipient_id, recipient_name,
+          appointment_id, content, is_read, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+        [
+          convId,
+          Number(salon_id),
+          salon?.salon_name || 'Salon Atelier',
+          Number(customer_id),
+          customer?.fullname || sender_name || 'Customer',
+          Number(sender_id),
+          sender_name || 'User',
+          sender_role || 'customer',
+          effectiveRecipientId,
+          recipient_name || (sender_role === 'customer' ? salon?.salon_name || 'Salon Owner' : customer?.fullname || 'Customer'),
+          appointment_id ? Number(appointment_id) : null,
+          content.trim(),
+          new Date().toISOString(),
+        ]
+      );
+
+      const newId = (result as any).insertId;
+      const [msgRows] = await db.execute('SELECT * FROM messages WHERE id = ?', [newId]);
+      const createdMsg = (msgRows as any[])[0];
+
+      // Insert in-app system notification for the recipient
+      try {
+        await db.execute(
+          `INSERT INTO system_notifications (
+            category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+            priority, type, linkTab, linkTargetId, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            'alerts',
+            `New Message from ${sender_name || 'User'} 💬`,
+            content.trim().slice(0, 120),
+            sender_role === 'customer' ? 'salon_owner' : 'customer',
+            effectiveRecipientId,
+            Number(salon_id),
+            'normal',
+            'system_alert',
+            sender_role === 'customer' ? 'owner-messages' : 'customer-messages',
+            convId,
+            new Date().toISOString(),
+          ]
+        );
+      } catch (notifErr) {
+        console.warn('System notification insert note:', notifErr);
+      }
+
+      res.status(201).json({ success: true, message: createdMsg });
+    } catch (error) {
+      console.error('Send message error:', error);
+      res.status(500).json({ error: 'Failed to send message' });
+    }
+  });
+
+  // Mark Conversation Messages as Read
+  app.patch('/api/messages/mark-read', async (req, res) => {
+    const { conversation_id, salon_id, customer_id } = req.body;
+    try {
+      if (conversation_id) {
+        await db.execute('UPDATE messages SET is_read = 1 WHERE conversation_id = ?', [String(conversation_id)]);
+      } else if (salon_id && customer_id) {
+        await db.execute(
+          'UPDATE messages SET is_read = 1 WHERE salon_id = ? AND customer_id = ?',
+          [Number(salon_id), Number(customer_id)]
+        );
+      }
+      res.json({ success: true, message: 'Messages marked as read' });
+    } catch (error) {
+      console.error('Mark read error:', error);
+      res.status(500).json({ error: 'Failed to mark messages as read' });
+    }
+  });
+
+  // Get In-App System Notifications
+  app.get('/api/system-notifications', async (req, res) => {
+    const { user_id, role, salon_id } = req.query;
+    try {
+      const [rows] = await db.execute('SELECT * FROM system_notifications');
+      let filtered = rows as any[];
+      if (user_id) {
+        filtered = filtered.filter(
+          (n) => Number(n.recipient_user_id) === Number(user_id) || n.recipient_role === 'all' || (role && n.recipient_role === role)
+        );
+      } else if (role) {
+        filtered = filtered.filter((n) => n.recipient_role === role || n.recipient_role === 'all');
+      }
+      filtered.sort((a, b) => new Date(b.created_at || b.timestamp || 0).getTime() - new Date(a.created_at || a.timestamp || 0).getTime());
+      res.json(filtered);
+    } catch (error) {
+      console.error('System notifications error:', error);
+      res.status(500).json({ error: 'Failed to retrieve system notifications' });
+    }
+  });
+
   // Automated Performance Status & PDF Report for Salon Owners (Supports Daily, Weekly, Monthly, Yearly toggles)
   app.post('/api/email/reports/monthly', async (req, res) => {
     const { salon_id, owner_email, owner_name, time_grain = 'monthly' } = req.body;
@@ -1493,24 +1908,97 @@ async function startServer() {
         [salonId]
       );
 
-      // Validate foreign key relationships
-      const services = (serviceRows as any[]).map((s: any) => ({
+      // Validate foreign key relationships and ensure complete formatting
+      let validServices = (serviceRows as any[]).map((s: any) => ({
         ...s,
         salon_id: Number(s.salon_id),
+        category: s.category_name || s.category || 'Nail Care',
+        service_name: s.service_name || s.name || 'Signature Service',
         price: Number(s.price) || 0,
-        duration: Number(s.duration) || 30,
-      }));
+        duration: Number(s.duration || s.duration_minutes) || 45,
+        duration_minutes: Number(s.duration_minutes || s.duration) || 45,
+        image_url: s.image_url || s.image || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80',
+        is_active: s.is_active === undefined ? true : Boolean(s.is_active),
+      })).filter(s => s.salon_id === salonId);
 
-      const technicians = (technicianRows as any[]).map((t: any) => ({
+      let validTechnicians = (technicianRows as any[]).map((t: any) => ({
         ...t,
         salon_id: Number(t.salon_id),
-      }));
+        name: t.name || t.fullname || 'Master Specialist',
+        fullname: t.fullname || t.name || 'Master Specialist',
+        experience_years: Number(t.experience_years) || 4,
+        rating: Number(t.rating) || 4.9,
+        is_available: t.is_available === undefined ? true : Boolean(t.is_available),
+        avatar: t.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
+      })).filter(t => t.salon_id === salonId);
 
-      // Ensure all related data belongs to the correct salon
-      const validServices = services.filter(s => s.salon_id === salonId);
-      const validTechnicians = technicians.filter(t => t.salon_id === salonId);
+      // If salon has no custom services yet, generate and persist starter services
+      if (validServices.length === 0) {
+        const defaultServices = [
+          { service_name: 'Signature Russian Manicure & Japanese Gel', category: 'Manicure', duration: 75, price: 1850, description: 'Precision dry e-file cuticle care and structured gel overlay.' },
+          { service_name: 'Organic Botanical Spa Pedicure', category: 'Pedicure', duration: 60, price: 1450, description: 'Sea salt exfoliation, botanical massage, and non-toxic gel polish.' },
+          { service_name: 'Sculpted Gel-X Full Set with Chrome', category: 'Nail Extensions', duration: 90, price: 2400, description: 'Custom fitted soft-gel extensions with glazed chrome sheen.' },
+          { service_name: 'Avant-Garde 3D Nail Art & Cat-Eye', category: 'Nail Art', duration: 50, price: 1200, description: 'Magnetic dimension with hand-sculpted gel droplets.' },
+        ];
+        for (const ds of defaultServices) {
+          const [ins] = await db.execute(
+            `INSERT INTO services (salon_id, service_name, category_name, duration, price, description, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, 1)`,
+            [salonId, ds.service_name, ds.category, ds.duration, ds.price, ds.description]
+          );
+          validServices.push({
+            id: (ins as any).insertId,
+            salon_id: salonId,
+            ...ds,
+            category_name: ds.category,
+            duration_minutes: ds.duration,
+            is_active: true,
+            image_url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80',
+          } as any);
+        }
+      }
+
+      // If salon has no staff yet, generate and persist master artists
+      if (validTechnicians.length === 0) {
+        const defaultStaff = [
+          { fullname: 'Camille Villar', name: 'Camille Villar', specialties: 'Russian Manicure, Japanese Gel', experience_years: 6, rating: 4.9, avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80' },
+          { fullname: 'Alyssa Dizon', name: 'Alyssa Dizon', specialties: 'Gel-X Extensions, 3D Art', experience_years: 5, rating: 4.8, avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80' },
+        ];
+        for (const dt of defaultStaff) {
+          const [ins] = await db.execute(
+            `INSERT INTO technicians (salon_id, fullname, name, specialties, experience_years, rating, avatar, is_available)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+            [salonId, dt.fullname, dt.name, dt.specialties, dt.experience_years, dt.rating, dt.avatar]
+          );
+          validTechnicians.push({
+            id: (ins as any).insertId,
+            salon_id: salonId,
+            ...dt,
+            is_available: true,
+          } as any);
+        }
+      }
+
+      let validHours = hoursRows.filter((h: any) => h.salon_id === salonId);
+      if (validHours.length === 0) {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        for (const day of days) {
+          await db.execute(
+            `INSERT INTO working_hours (salon_id, day_of_week, opening_time, closing_time, is_closed)
+             VALUES (?, ?, '09:00', '20:00', 0)`,
+            [salonId, day]
+          );
+          validHours.push({
+            salon_id: salonId,
+            day_of_week: day,
+            opening_time: '09:00',
+            closing_time: '20:00',
+            is_closed: 0,
+          } as any);
+        }
+      }
+
       const validReviews = mappedReviews.filter(r => r.salon_id === salonId);
-      const validHours = hoursRows.filter((h: any) => h.salon_id === salonId);
 
       res.json({
         salon: {
@@ -2663,6 +3151,71 @@ async function startServer() {
       const [updatedRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
       const updated = (updatedRows as any[])[0];
 
+      // Automatically dispatch email notification & system alert for order status change
+      try {
+        const [salonRows] = await db.execute('SELECT salon_name, address, phone, email, owner_id FROM salons WHERE id = ?', [Number(updated.salon_id)]);
+        const salon = (salonRows as any[])[0];
+
+        const targetCustEmail = updated.customer_email;
+        const statusLabel =
+          status === 'ready_for_pickup'
+            ? 'Ready for In-Store Pickup! 🛍️'
+            : status === 'completed'
+            ? 'Completed & Picked Up! 🛍️'
+            : status === 'cancelled'
+            ? 'Reservation Cancelled ⚠️'
+            : status === 'unclaimed'
+            ? 'Marked as Unclaimed ⚠️'
+            : `Status Updated to ${status}`;
+
+        if (targetCustEmail) {
+          await logEmailRecord({
+            recipient_email: targetCustEmail,
+            recipient_name: updated.customer_name,
+            recipient_role: 'customer',
+            subject: `Order #${updated.order_number}: ${statusLabel} (${salon?.salon_name || 'Salon'})`,
+            category: 'order',
+            content_preview: `Product reservation #${updated.order_number} is now ${status}. Pickup at ${salon?.salon_name || 'salon'}.`,
+            html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+              <h2 style="color: #BE185D; margin-top: 0;">Product Reservation: ${statusLabel}</h2>
+              <p>Dear <strong>${updated.customer_name}</strong>,</p>
+              <p>Your product pickup reservation at <strong>${salon?.salon_name}</strong> has been updated:</p>
+              <div style="background: #fff; border: 1px solid #FCE7F3; border-radius: 8px; padding: 14px; margin: 16px 0;">
+                <p style="margin: 4px 0;"><strong>Order Number:</strong> #${updated.order_number}</p>
+                <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: #BE185D; font-weight: bold;">${status}</span></p>
+                <p style="margin: 4px 0;"><strong>Pickup Location:</strong> ${salon?.address}</p>
+                <p style="margin: 4px 0;"><strong>Salon Contact:</strong> ${salon?.phone}</p>
+                <p style="margin: 4px 0;"><strong>Total Amount:</strong> ₱${Number(updated.total_amount || 0).toLocaleString()}</p>
+                ${status === 'cancelled' && updated.cancellation_reason ? `<p style="margin: 4px 0; color: #DC2626;"><strong>Cancellation Reason:</strong> ${updated.cancellation_reason}</p>` : ''}
+              </div>
+            </div>`,
+          });
+        }
+
+        // Insert in-app system notification for the customer
+        await db.execute(
+          `INSERT INTO system_notifications (
+            category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+            priority, type, linkTab, linkTargetId, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            'orders',
+            `Order #${updated.order_number} ${status === 'ready_for_pickup' ? 'Ready for Pickup 🛍️' : status === 'completed' ? 'Completed 🎉' : 'Status Updated'}`,
+            `Your product reservation is ${status}. Total: ₱${Number(updated.total_amount || 0).toLocaleString()} at ${salon?.salon_name}.`,
+            'customer',
+            Number(updated.customer_id),
+            Number(updated.salon_id),
+            status === 'cancelled' || status === 'unclaimed' ? 'urgent' : 'normal',
+            'order_status',
+            'customer-orders',
+            `order-${updated.id}`,
+            new Date().toISOString(),
+          ]
+        );
+      } catch (orderEmailErr) {
+        console.warn('Product order status email dispatch warning:', orderEmailErr);
+      }
+
       res.json({
         success: true,
         order: {
@@ -3743,6 +4296,27 @@ async function startServer() {
               </ul>
             </div>`,
           });
+
+          // Insert in-app system notification for customer
+          await db.execute(
+            `INSERT INTO system_notifications (
+              category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+              priority, type, linkTab, linkTargetId, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              'bookings',
+              `Appointment ${statusLabel} 💅`,
+              `Your appointment for ${updatedAppt.service_name} on ${updatedAppt.appointment_date} is now ${statusLabel}.`,
+              'customer',
+              Number(updatedAppt.customer_id),
+              Number(updatedAppt.salon_id),
+              status === 'cancelled' ? 'urgent' : 'normal',
+              status === 'confirmed' ? 'booking_confirmed' : status === 'cancelled' ? 'booking_cancelled_by_owner' : 'system_alert',
+              'customer-dashboard',
+              `appt-${updatedAppt.id}`,
+              new Date().toISOString(),
+            ]
+          );
         }
       } catch (statusEmailErr) {
         console.warn('Status change email warning:', statusEmailErr);

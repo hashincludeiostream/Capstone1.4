@@ -105,11 +105,18 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
               <div className="relative h-44 bg-pink-50 overflow-hidden">
                 {service.image_url ? (
                   <img
-                    src={service.image_url}
+                    src={service.image_url || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80'}
                     alt={service.service_name}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80';
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                ) : null}
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-pink-100 to-rose-200 flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-pink-400" />
+                  </div>
+                )}
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/90 backdrop-blur-md text-pink-800 shadow-xs">
                     {service.category}
@@ -121,8 +128,9 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
                   )}
                 </div>
 
-                <div className="absolute bottom-3 right-3 bg-pink-900/80 backdrop-blur-md px-3 py-1 rounded-full text-white text-[11px] font-semibold shadow-md flex items-center gap-1">
-                  <span>Pay In-Store</span>
+                <div className="absolute bottom-3 right-3 bg-pink-950/85 backdrop-blur-md px-3 py-1 rounded-full text-white text-xs font-bold shadow-md flex items-center gap-1.5 border border-white/20">
+                  <span className="text-pink-200">₱{Number(service.price || 0).toLocaleString()}</span>
+                  <span className="text-[10px] text-pink-100/80 font-normal">· Pay In-Store</span>
                 </div>
               </div>
 
@@ -137,9 +145,13 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ salons, onBookSe
                 </div>
 
                 <div className="pt-4 mt-4 border-t border-pink-50 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Clock className="w-3.5 h-3.5 text-pink-500" />
-                    <span>{service.duration} mins</span>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-pink-500" />
+                      <span>{service.duration || 45} mins</span>
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span className="font-bold text-pink-700 text-sm">₱{Number(service.price || 0).toLocaleString()}</span>
                   </div>
 
                   <button

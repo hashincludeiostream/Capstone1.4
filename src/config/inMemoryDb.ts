@@ -52,10 +52,56 @@ class InMemoryDatabase {
     product_orders: JSON.parse(JSON.stringify(seedProductOrders)),
     transactions: [],
     email_logs: [],
+    messages: [
+      {
+        id: 1,
+        conversation_id: 'salon_1_cust_3',
+        salon_id: 1,
+        salon_name: 'Luxe Glow Nail & Spa Lounge',
+        customer_id: 3,
+        customer_name: 'Sophia Reyes',
+        customer_phone: '09171234567',
+        customer_email: 'sophia@example.com',
+        sender_id: 3,
+        sender_name: 'Sophia Reyes',
+        sender_role: 'customer',
+        recipient_id: 2,
+        recipient_name: 'Maria Clara Santos (Owner)',
+        recipient_role: 'salon_owner',
+        appointment_id: 1,
+        content: 'Hello! I wanted to check if I can request a custom chrome finish accent on my French manicure tomorrow?',
+        is_read: true,
+        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+        updated_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+      },
+      {
+        id: 2,
+        conversation_id: 'salon_1_cust_3',
+        salon_id: 1,
+        salon_name: 'Luxe Glow Nail & Spa Lounge',
+        customer_id: 3,
+        customer_name: 'Sophia Reyes',
+        customer_phone: '09171234567',
+        customer_email: 'sophia@example.com',
+        sender_id: 2,
+        sender_name: 'Maria Clara Santos (Luxe Glow)',
+        sender_role: 'salon_owner',
+        recipient_id: 3,
+        recipient_name: 'Sophia Reyes',
+        recipient_role: 'customer',
+        appointment_id: 1,
+        content: 'Hi Sophia! Yes, absolutely! Master Artist Bea has high-gloss liquid chrome in stock and will prepare the palette for your appointment.',
+        is_read: false,
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+        updated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      },
+    ],
+    system_notifications: [],
   };
 
   constructor() {
     this.loadFromDisk();
+    this.ensureSalonDefaults();
   }
 
   public reloadFromDisk(): boolean {
@@ -83,6 +129,158 @@ class InMemoryDatabase {
       console.warn('[Database] Failed to load persisted database from disk:', err);
     }
     return false;
+  }
+
+  public ensureSalonDefaults() {
+    const salons = this.tables['salons'] || [];
+    const defaultServices = [
+      {
+        service_name: 'Signature Russian Manicure & Japanese Gel',
+        category: 'Manicure',
+        category_name: 'Manicure',
+        duration: 75,
+        duration_minutes: 75,
+        price: 1850,
+        description: 'Precision e-file dry cuticle detailing followed by structured Japanese base gel reinforcement and high-shine top coat.',
+        image_url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80',
+        image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80',
+        difficulty_level: 'Intermediate',
+        is_active: true,
+      },
+      {
+        service_name: 'Organic Botanical Spa Pedicure',
+        category: 'Pedicure',
+        category_name: 'Pedicure',
+        duration: 60,
+        duration_minutes: 60,
+        price: 1450,
+        description: 'Aromatherapy sea-salt foot soak, volcanic pumice scrub, botanical massage, and non-toxic gel polish.',
+        image_url: 'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=500&auto=format&fit=crop&q=80',
+        image: 'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=500&auto=format&fit=crop&q=80',
+        difficulty_level: 'Beginner',
+        is_active: true,
+      },
+      {
+        service_name: 'Sculpted Gel-X Full Set with Chrome Finish',
+        category: 'Nail Extensions',
+        category_name: 'Nail Extensions',
+        duration: 90,
+        duration_minutes: 90,
+        price: 2400,
+        description: 'Full-cover soft gel tips tailored to nail bed geometry, finished with liquid glazed chrome sheen.',
+        image_url: 'https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=500&auto=format&fit=crop&q=80',
+        image: 'https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=500&auto=format&fit=crop&q=80',
+        difficulty_level: 'Advanced',
+        is_active: true,
+      },
+      {
+        service_name: 'Avant-Garde 3D Nail Art & Cat-Eye',
+        category: 'Nail Art',
+        category_name: 'Nail Art',
+        duration: 50,
+        duration_minutes: 50,
+        price: 1200,
+        description: 'Custom magnetic cat-eye dimension with hand-sculpted gel droplets and Japanese metallic accents.',
+        image_url: 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?w=500&auto=format&fit=crop&q=80',
+        image: 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?w=500&auto=format&fit=crop&q=80',
+        difficulty_level: 'Advanced',
+        is_active: true,
+      },
+    ];
+
+    const defaultTechnicians = [
+      {
+        fullname: 'Camille Villar',
+        name: 'Camille Villar',
+        specialties: 'Russian Manicure, Japanese Gel, E-File Detailing',
+        bio: 'Senior certified nail master trained in precision cuticle grooming and structural gel overlay.',
+        experience_years: 6,
+        rating: 4.9,
+        is_available: true,
+        is_active: true,
+        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
+      },
+      {
+        fullname: 'Alyssa Dizon',
+        name: 'Alyssa Dizon',
+        specialties: '3D Gel Art, Gel-X Extensions, Chrome Glaze',
+        bio: 'Editorial nail designer specializing in sculpted extensions and Japanese watercolor art.',
+        experience_years: 5,
+        rating: 4.8,
+        is_available: true,
+        is_active: true,
+        avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
+      },
+    ];
+
+    const defaultHours = [
+      { day_of_week: 'Monday', opening_time: '09:00', closing_time: '20:00', is_closed: 0 },
+      { day_of_week: 'Tuesday', opening_time: '09:00', closing_time: '20:00', is_closed: 0 },
+      { day_of_week: 'Wednesday', opening_time: '09:00', closing_time: '20:00', is_closed: 0 },
+      { day_of_week: 'Thursday', opening_time: '09:00', closing_time: '20:00', is_closed: 0 },
+      { day_of_week: 'Friday', opening_time: '09:00', closing_time: '21:00', is_closed: 0 },
+      { day_of_week: 'Saturday', opening_time: '09:00', closing_time: '21:00', is_closed: 0 },
+      { day_of_week: 'Sunday', opening_time: '10:00', closing_time: '19:00', is_closed: 0 },
+    ];
+
+    let modified = false;
+
+    for (const salon of salons) {
+      const salonId = Number(salon.id);
+      if (!salonId) continue;
+
+      if (!Array.isArray(this.tables['services'])) this.tables['services'] = [];
+      const existingServices = this.tables['services'].filter((s) => Number(s.salon_id) === salonId);
+      if (existingServices.length === 0) {
+        defaultServices.forEach((tpl) => {
+          const newId = this.getNextId('services');
+          this.tables['services'].push({
+            ...tpl,
+            id: newId,
+            salon_id: salonId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        });
+        modified = true;
+      }
+
+      if (!Array.isArray(this.tables['technicians'])) this.tables['technicians'] = [];
+      const existingTechs = this.tables['technicians'].filter((t) => Number(t.salon_id) === salonId);
+      if (existingTechs.length === 0) {
+        defaultTechnicians.forEach((tpl) => {
+          const newId = this.getNextId('technicians');
+          this.tables['technicians'].push({
+            ...tpl,
+            id: newId,
+            salon_id: salonId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        });
+        modified = true;
+      }
+
+      if (!Array.isArray(this.tables['working_hours'])) this.tables['working_hours'] = [];
+      const existingHours = this.tables['working_hours'].filter((h) => Number(h.salon_id) === salonId);
+      if (existingHours.length === 0) {
+        defaultHours.forEach((tpl) => {
+          const newId = this.getNextId('working_hours');
+          this.tables['working_hours'].push({
+            ...tpl,
+            id: newId,
+            salon_id: salonId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        });
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      this.saveToDisk();
+    }
   }
 
   private saveToDisk() {
@@ -117,6 +315,7 @@ class InMemoryDatabase {
       { table: 'product_orders', col: 'product_orders' },
       { table: 'transactions', col: 'transactions' },
       { table: 'email_logs', col: 'email_logs' },
+      { table: 'messages', col: 'messages' },
     ];
 
     let totalLoaded = 0;
@@ -140,36 +339,8 @@ class InMemoryDatabase {
       }
     }
 
-    // Cascade cleanup: purge any orphan records in subcollections/related tables
-    // (services, technicians, appointments, etc.) whose parent salon document was deleted in Firestore
-    const validSalonIds = new Set((this.tables['salons'] || []).map((s) => Number(s.id)));
-    const tablesWithSalonId = [
-      'services',
-      'technicians',
-      'working_hours',
-      'appointments',
-      'reviews',
-      'reels',
-      'promotions',
-      'products',
-      'product_orders',
-      'email_logs',
-    ];
-    for (const table of tablesWithSalonId) {
-      if (Array.isArray(this.tables[table])) {
-        const orphans = this.tables[table].filter(
-          (item) => item.salon_id !== undefined && item.salon_id !== null && !validSalonIds.has(Number(item.salon_id))
-        );
-        if (orphans.length > 0) {
-          this.tables[table] = this.tables[table].filter(
-            (item) => item.salon_id === undefined || item.salon_id === null || validSalonIds.has(Number(item.salon_id))
-          );
-          for (const item of orphans) {
-            this.syncToFirestore(table, 'delete', item.id);
-          }
-        }
-      }
-    }
+    // Protect core seed salons and ensure full services & staff for all branches
+    this.ensureSalonDefaults();
 
     console.log(`🔥 [Firestore] Successfully synchronized ${totalLoaded} live documents into database layer.`);
     this.saveToDisk();
@@ -354,7 +525,12 @@ class InMemoryDatabase {
       }
       if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
         const salonId = Number(params[0]);
-        return [table.filter((s) => Number(s.salon_id) === salonId), null];
+        let found = table.filter((s) => Number(s.salon_id) === salonId);
+        if (found.length === 0) {
+          this.ensureSalonDefaults();
+          found = (this.tables['services'] || []).filter((s) => Number(s.salon_id) === salonId);
+        }
+        return [found, null];
       }
       if (/WHERE salon_id\s+IN\s*\(([^)]+)\)/i.test(sql)) {
         const ids = params.map((p) => Number(p));
@@ -375,7 +551,12 @@ class InMemoryDatabase {
       }
       if (/WHERE salon_id\s*=\s*\?/i.test(sql)) {
         const salonId = Number(params[0]);
-        return [table.filter((t) => Number(t.salon_id) === salonId), null];
+        let found = table.filter((t) => Number(t.salon_id) === salonId);
+        if (found.length === 0) {
+          this.ensureSalonDefaults();
+          found = (this.tables['technicians'] || []).filter((t) => Number(t.salon_id) === salonId);
+        }
+        return [found, null];
       }
       if (/WHERE salon_id\s+IN\s*\(([^)]+)\)/i.test(sql)) {
         const ids = params.map((p) => Number(p));
@@ -580,6 +761,47 @@ class InMemoryDatabase {
       return [filtered, null];
     }
 
+    // 13. Messages
+    if (tableName === 'messages') {
+      let filtered = [...table];
+      if (/WHERE\s+conversation_id\s*=\s*\?/i.test(sql)) {
+        const cId = String(params[0]);
+        filtered = filtered.filter((m) => String(m.conversation_id) === cId);
+      } else if (/WHERE\s+salon_id\s*=\s*\?\s+AND\s+customer_id\s*=\s*\?/i.test(sql)) {
+        const sId = Number(params[0]);
+        const cId = Number(params[1]);
+        filtered = filtered.filter((m) => Number(m.salon_id) === sId && Number(m.customer_id) === cId);
+      } else if (/WHERE\s+salon_id\s*=\s*\?/i.test(sql)) {
+        const sId = Number(params[0]);
+        filtered = filtered.filter((m) => Number(m.salon_id) === sId);
+      } else if (/WHERE\s+customer_id\s*=\s*\?/i.test(sql)) {
+        const cId = Number(params[0]);
+        filtered = filtered.filter((m) => Number(m.customer_id) === cId);
+      } else if (/WHERE\s+recipient_id\s*=\s*\?/i.test(sql)) {
+        const rId = Number(params[0]);
+        filtered = filtered.filter((m) => Number(m.recipient_id) === rId);
+      } else if (/WHERE\s+sender_id\s*=\s*\?/i.test(sql)) {
+        const sId = Number(params[0]);
+        filtered = filtered.filter((m) => Number(m.sender_id) === sId);
+      }
+      filtered.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      return [filtered, null];
+    }
+
+    // 14. System Notifications
+    if (tableName === 'system_notifications') {
+      let filtered = [...table];
+      if (/WHERE\s+recipient_user_id\s*=\s*\?/i.test(sql)) {
+        const uId = Number(params[0]);
+        filtered = filtered.filter((n) => Number(n.recipient_user_id) === uId || n.recipient_role === 'all');
+      } else if (/WHERE\s+recipient_role\s*=\s*\?/i.test(sql)) {
+        const role = String(params[0]);
+        filtered = filtered.filter((n) => n.recipient_role === role || n.recipient_role === 'all');
+      }
+      filtered.sort((a, b) => new Date(b.created_at || b.timestamp || 0).getTime() - new Date(a.created_at || a.timestamp || 0).getTime());
+      return [filtered, null];
+    }
+
     // Fallback for sorting
     if (/ORDER BY\s+id\s+ASC/i.test(sql)) {
       results.sort((a, b) => a.id - b.id);
@@ -639,6 +861,9 @@ class InMemoryDatabase {
     }
 
     table.push(record);
+    if (tableName === 'salons') {
+      this.ensureSalonDefaults();
+    }
     this.saveToDisk();
     this.syncToFirestore(tableName, 'set', record.id, record);
     return [{ insertId: record.id, affectedRows: 1 }, null];
@@ -647,6 +872,37 @@ class InMemoryDatabase {
   private handleUpdate(sql: string, params: any[]): [{ affectedRows: number; changedRows: number }, null] {
     const tableName = this.getTableName(sql, /UPDATE\s+([`\w]+)/i);
     const table = this.tables[tableName] || [];
+
+    // Special batch mark-read for messages
+    if (tableName === 'messages' && /SET\s+is_read\s*=\s*1/i.test(sql)) {
+      let count = 0;
+      if (/WHERE\s+conversation_id\s*=\s*\?/i.test(sql)) {
+        const cId = String(params[0]);
+        for (const msg of table) {
+          if (msg.conversation_id === cId && !msg.is_read) {
+            msg.is_read = true;
+            msg.updated_at = new Date().toISOString();
+            this.syncToFirestore('messages', 'set', msg.id, msg);
+            count++;
+          }
+        }
+      } else if (/WHERE\s+salon_id\s*=\s*\?\s+AND\s+customer_id\s*=\s*\?/i.test(sql)) {
+        const sId = Number(params[0]);
+        const cId = Number(params[1]);
+        for (const msg of table) {
+          if (Number(msg.salon_id) === sId && Number(msg.customer_id) === cId && !msg.is_read) {
+            msg.is_read = true;
+            msg.updated_at = new Date().toISOString();
+            this.syncToFirestore('messages', 'set', msg.id, msg);
+            count++;
+          }
+        }
+      }
+      if (count > 0) {
+        this.saveToDisk();
+      }
+      return [{ affectedRows: count, changedRows: count }, null];
+    }
 
     // Check if updating by ID or transaction_reference
     const whereIdMatch = sql.match(/WHERE\s+(?:[`\w]+\.)?id\s*=\s*\?/i);

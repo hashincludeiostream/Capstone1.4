@@ -1622,6 +1622,8 @@ const AppContent: React.FC = () => {
                     ? 'cancellation-fees'
                     : activeTab === 'owner-emails'
                     ? 'emails'
+                    : activeTab === 'owner-messages'
+                    ? 'messages'
                     : 'overview'
                 }
                 onNavigateTab={(tab) => handleNavigate(tab)}
@@ -1946,6 +1948,16 @@ const AppContent: React.FC = () => {
           onOpenLeaveReview={(salon) => {
             setSelectedSalonForDetails(null);
             handleOpenLeaveReviewForSalon(salon);
+          }}
+          onOpenChatWithSalon={() => {
+            setSelectedSalonForDetails(null);
+            if (!currentUser) {
+              setAuthModalOpen(true);
+            } else if (currentUser.user_type === 'customer') {
+              setActiveTab('customer-dashboard');
+            } else if (currentUser.user_type === 'salon_owner') {
+              setActiveTab('owner-dashboard');
+            }
           }}
         />
       )}

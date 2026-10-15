@@ -397,3 +397,63 @@ export interface CartItem {
   product: Product;
   quantity: number;
 }
+
+export interface PrivateMessage {
+  id: number;
+  conversation_id: string;
+  salon_id: number;
+  salon_name?: string;
+  customer_id: number;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  sender_id: number;
+  sender_name: string;
+  sender_role: 'customer' | 'salon_owner' | 'admin';
+  recipient_id: number;
+  recipient_name: string;
+  recipient_role?: 'customer' | 'salon_owner' | 'admin';
+  appointment_id?: number | null;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ConversationChannel {
+  conversation_id: string;
+  salon_id: number;
+  salon_name: string;
+  salon_logo?: string | null;
+  salon_phone?: string | null;
+  salon_owner_id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  last_message: string;
+  last_timestamp: string;
+  last_sender_id: number;
+  last_sender_role: 'customer' | 'salon_owner' | 'admin';
+  unread_count: number;
+  active_appointment?: {
+    id: number;
+    service_name: string;
+    appointment_date: string;
+    appointment_time: string;
+    status: string;
+  } | null;
+}
+
+export interface ScheduleWarningAlert {
+  id: string;
+  appointment_id: number;
+  type: '24h_reminder' | '2h_urgent' | 'overdue_alert';
+  priority: 'normal' | 'urgent';
+  hours_remaining?: number;
+  minutes_remaining?: number;
+  overdue_minutes?: number;
+  title: string;
+  message: string;
+  appointment: Appointment;
+}

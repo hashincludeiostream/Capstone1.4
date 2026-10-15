@@ -20,6 +20,9 @@ import {
   ProductOrder,
   ProductOrderStatus,
   SalonCancellationPolicyConfig,
+  PrivateMessage,
+  ConversationChannel,
+  ScheduleWarningAlert,
 } from '../types';
 import {
   createFirestoreAppointment,
@@ -1302,6 +1305,139 @@ export async function sendChatMessage(params: SendChatParams): Promise<ChatApiRe
 
   return await res.json();
 }
+
+// =========================================================================
+// PRIVATE MESSAGING CLIENT API
+// =========================================================================
+
+export async function fetchConversations(params?: {
+  user_id?: number;
+  user_type?: string;
+  salon_id?: number;
+}): Promise<ConversationChannel[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.user_id) query.append('user_id', String(params.user_id));
+    if (params?.user_type) query.append('user_type', String(params.user_type));
+    if (params?.salon_id) query.append('salon_id', String(params.salon_id));
+
+    const url = query.toString() ? `${API_BASE}/messages/conversations?${query.toString()}` : `${API_BASE}/messages/conversations`;
+    const res = await ajax(url);
+    if (!res.ok) throw new Error('Failed to fetch conversation channels');
+    return await res.json();
+  } catch (err) {
+    console.warn('API fetchConversations fallback:', err);
+    return [];
+  }
+}
+
+export async function fetchMessages(params: {
+  conversation_id?: string;
+  salon_id?: number;
+  customer_id?: number;
+}): Promise<PrivateMessage[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params.conversation_id) query.append('conversation_id', params.conversation_id);
+    if (params.salon_id) query.append('salon_id', String(params.salon_id));
+    if (params.customer_id) query.append('customer_id', String(params.customer_id));
+
+    const res = await ajax(`${API_BASE}/messages?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch messages');
+    return await res.json();
+  } catch (err) {
+    console.warn('API fetchMessages fallback:', err);
+    return [];
+  }
+}
+
+export async function sendPrivateMessage(data: {
+  salon_id: number;
+  customer_id: number;
+  sender_id: number;
+  sender_name: string;
+  sender_role: 'customer' | 'salon_owner' | 'admin';
+  recipient_id?: number;
+  recipient_name?: string;
+  content: string;
+  appointment_id?: number | null;
+}): Promise<PrivateMessage> {
+  const res = await ajax(`${API_BASE}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to send message');
+  }
+
+  const result = await res.json();
+  return result.message;
+}
+
+export async function markMessagesRead(params: {
+  conversation_id?: string;
+  salon_id?: number;
+  customer_id?: number;
+}): Promise<void> {
+  try {
+    await ajax(`${API_BASE}/messages/mark-read`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+  } catch (err) {
+    console.warn('markMessagesRead note:', err);
+  }
+}
+
+// =========================================================================
+// APPOINTMENT SCHEDULE WARNINGS & ALERTS CLIENT API
+// =========================================================================
+
+export async function fetchScheduleWarnings(params?: {
+  customer_id?: number;
+  salon_id?: number;
+  dispatch_emails?: boolean;
+}): Promise<ScheduleWarningAlert[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.customer_id) query.append('customer_id', String(params.customer_id));
+    if (params?.salon_id) query.append('salon_id', String(params.salon_id));
+    if (params?.dispatch_emails) query.append('dispatch_emails', 'true');
+
+    const res = await ajax(`${API_BASE}/appointments/schedule-warnings?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch schedule warnings');
+    const data = await res.json();
+    return data.warnings || [];
+  } catch (err) {
+    console.warn('API fetchScheduleWarnings fallback:', err);
+    return [];
+  }
+}
+
+export async function fetchSystemNotifications(params?: {
+  user_id?: number;
+  role?: string;
+  salon_id?: number;
+}): Promise<any[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.user_id) query.append('user_id', String(params.user_id));
+    if (params?.role) query.append('role', String(params.role));
+    if (params?.salon_id) query.append('salon_id', String(params.salon_id));
+
+    const res = await ajax(`${API_BASE}/system-notifications?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch system notifications');
+    return await res.json();
+  } catch (err) {
+    console.warn('API fetchSystemNotifications fallback:', err);
+    return [];
+  }
+}
+
 
 
 
