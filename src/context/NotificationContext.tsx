@@ -306,6 +306,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         const warnParams = new URLSearchParams();
         if (currentUser.user_type === 'customer') {
           warnParams.append('customer_id', String(currentUser.id));
+        } else if (currentUser.user_type === 'salon_owner') {
+          warnParams.append('owner_id', String(currentUser.id));
         }
         warnParams.append('dispatch_emails', 'true');
 

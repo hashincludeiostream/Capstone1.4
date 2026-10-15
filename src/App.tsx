@@ -1483,11 +1483,17 @@ const AppContent: React.FC = () => {
           )}
 
           {/* 5. CUSTOMER DASHBOARD */}
-          {activeTab === 'customer-dashboard' && (
+          {(activeTab === 'customer-dashboard' || activeTab === 'customer-messages') && (
             currentUser?.user_type === 'customer' ? (
               <CustomerDashboard
                 currentUser={currentUser}
                 salons={salons}
+                initialTab={activeTab === 'customer-messages' ? 'messages' : 'appointments'}
+                initialConversationId={
+                  targetElementId && !targetElementId.startsWith('customer-appointment-')
+                    ? targetElementId
+                    : undefined
+                }
                 onOpenBooking={() => {
                   setBookingSalon(salons[0] || null);
                   setBookingService(null);

@@ -685,15 +685,21 @@ async function startServer() {
   // APPOINTMENT SCHEDULE WARNINGS & DEADLINE ALERTS (24h, 2h, Overdue)
   // =========================================================================
   app.get('/api/appointments/schedule-warnings', async (req, res) => {
-    const { customer_id, salon_id, dispatch_emails } = req.query;
+    const { customer_id, salon_id, owner_id, dispatch_emails } = req.query;
     try {
       const now = new Date();
       const [allAppts] = await db.execute("SELECT * FROM appointments WHERE status IN ('pending', 'confirmed')");
+      let ownerSalonIds: Set<number> | null = null;
+      if (owner_id) {
+        const [ownerSalons] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(owner_id)]);
+        ownerSalonIds = new Set((ownerSalons as any[]).map((s) => Number(s.id)));
+      }
       const warnings: any[] = [];
 
       for (const appt of (allAppts as any[])) {
         if (customer_id && Number(appt.customer_id) !== Number(customer_id)) continue;
         if (salon_id && Number(appt.salon_id) !== Number(salon_id)) continue;
+        if (ownerSalonIds && !ownerSalonIds.has(Number(appt.salon_id))) continue;
 
         // Parse scheduled appointment datetime
         const datePart = appt.appointment_date;
