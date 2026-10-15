@@ -93,6 +93,29 @@ class AjaxClient {
       headers.set('Accept', 'application/json, text/plain, */*');
     }
 
+    // Automatically inject verified session authentication headers for internal API calls
+    if (isInternal && !headers.has('Authorization') && typeof window !== 'undefined') {
+      try {
+        const rawUser = window.localStorage.getItem('nailglamhub_user');
+        if (rawUser) {
+          const parsed = JSON.parse(rawUser);
+          if (parsed && parsed.id && parsed.email) {
+            const sessionPayload = btoa(unescape(encodeURIComponent(JSON.stringify({
+              id: parsed.id,
+              email: parsed.email,
+              user_type: parsed.user_type,
+            }))));
+            headers.set('Authorization', `Bearer session_${sessionPayload}`);
+            headers.set('X-User-Id', String(parsed.id));
+            headers.set('X-User-Role', String(parsed.user_type));
+            headers.set('X-User-Email', String(parsed.email));
+          }
+        }
+      } catch {
+        // quiet fallback
+      }
+    }
+
     // If body is a plain object or array, serialize to JSON
     let body = fetchOptions.body;
     if (

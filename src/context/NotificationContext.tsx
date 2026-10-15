@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { Announcement, Appointment, ProductOrder, Salon, User } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
+import { ajax } from '../lib/ajax';
 
 export type NotificationPriority = 'urgent' | 'normal' | 'low';
 
@@ -289,7 +290,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         queryParams.append('user_id', String(currentUser.id));
         queryParams.append('user_type', currentUser.user_type);
 
-        const res = await fetch(`/api/messages/conversations?${queryParams.toString()}`);
+        const res = await ajax(`/api/messages/conversations?${queryParams.toString()}`);
         if (res.ok && isMounted) {
           const channels = await res.json();
           if (Array.isArray(channels)) {
@@ -301,7 +302,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         // quiet fallback
       }
 
-      // 2. Fetch schedule warnings
+      // 2. Fetch schedule warnings for display ONLY (server-side worker handles email dispatch)
       try {
         const warnParams = new URLSearchParams();
         if (currentUser.user_type === 'customer') {
@@ -309,9 +310,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         } else if (currentUser.user_type === 'salon_owner') {
           warnParams.append('owner_id', String(currentUser.id));
         }
-        warnParams.append('dispatch_emails', 'true');
 
-        const warnRes = await fetch(`/api/appointments/schedule-warnings?${warnParams.toString()}`);
+        const warnRes = await ajax(`/api/appointments/schedule-warnings?${warnParams.toString()}`);
         if (warnRes.ok && isMounted) {
           const data = await warnRes.json();
           const warnings = data.warnings || [];

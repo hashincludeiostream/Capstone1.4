@@ -14,6 +14,7 @@ import {
   Send,
   Check,
   AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { EmailLog, User, UserRole } from '../../types';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
@@ -107,6 +108,48 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
         return <Shield className="w-4 h-4 text-indigo-500" />;
       default:
         return <Mail className="w-4 h-4 text-pink-500" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'sent':
+      case 'delivered':
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+            <CheckCircle2 className="w-3 h-3 mr-0.5" /> Sent
+          </span>
+        );
+      case 'sending':
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 shrink-0 animate-pulse">
+            <RefreshCw className="w-3 h-3 mr-0.5 animate-spin" /> Sending
+          </span>
+        );
+      case 'queued':
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 shrink-0">
+            <Clock className="w-3 h-3 mr-0.5" /> Queued
+          </span>
+        );
+      case 'failed':
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 shrink-0">
+            <AlertCircle className="w-3 h-3 mr-0.5" /> Failed
+          </span>
+        );
+      case 'skipped':
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 shrink-0">
+            Skipped
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 shrink-0">
+            {status || 'Unknown'}
+          </span>
+        );
     }
   };
 
@@ -229,7 +272,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
 
                       <div className="text-[10px] text-gray-400 flex items-center justify-between pt-0.5">
                         <span className="truncate pr-1">To: {log.recipient_email}</span>
-                        <span className="text-emerald-600 font-medium shrink-0">Delivered</span>
+                        {getStatusBadge(log.status)}
                       </div>
                     </button>
                   );
@@ -247,11 +290,20 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                 <div className="bg-gray-50 rounded-xl p-3.5 sm:p-4 border border-gray-200">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
                     <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-bold text-gray-900 break-words">{selectedLog.subject}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-sm sm:text-base font-bold text-gray-900 break-words">{selectedLog.subject}</h3>
+                        {getStatusBadge(selectedLog.status)}
+                      </div>
                       <div className="text-xs text-gray-500 mt-1 space-y-0.5">
                         <p className="truncate"><strong>From:</strong> {selectedLog.sender_email || 'notifications@nailglamhub.com'}</p>
                         <p className="truncate"><strong>To:</strong> {selectedLog.recipient_email} ({selectedLog.recipient_name || selectedLog.recipient_role})</p>
-                        <p><strong>Date Sent:</strong> {new Date(selectedLog.sent_at).toLocaleString()}</p>
+                        <p><strong>Date:</strong> {new Date(selectedLog.sent_at).toLocaleString()}</p>
+                        {selectedLog.provider_message_id && (
+                          <p className="font-mono text-[11px] text-gray-400"><strong>Provider ID:</strong> {selectedLog.provider_message_id}</p>
+                        )}
+                        {selectedLog.last_error && (
+                          <p className="text-[11px] text-rose-600 font-medium"><strong>Delivery Notice:</strong> {selectedLog.last_error}</p>
+                        )}
                       </div>
                     </div>
 

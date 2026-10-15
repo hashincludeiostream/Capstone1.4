@@ -52,6 +52,8 @@ class InMemoryDatabase {
     product_orders: JSON.parse(JSON.stringify(seedProductOrders)),
     transactions: [],
     email_logs: [],
+    email_jobs: [],
+    appointment_reminders: [],
     messages: [
       {
         id: 1,
@@ -747,24 +749,61 @@ class InMemoryDatabase {
       return [filtered, null];
     }
 
-    // 12. Email logs
+    // 12. Email logs & jobs
     if (tableName === 'email_logs') {
       let filtered = [...table];
-      if (/WHERE LOWER\(recipient_email\)\s*=\s*LOWER\(\?\)/i.test(sql)) {
+      if (/WHERE\s+idempotency_key\s*=\s*\?/i.test(sql)) {
+        const key = String(params[0]);
+        filtered = filtered.filter((l) => l.idempotency_key === key);
+      } else if (/WHERE LOWER\(recipient_email\)\s*=\s*LOWER\(\?\)/i.test(sql)) {
         const email = String(params[0]).toLowerCase();
         filtered = filtered.filter((l) => (l.recipient_email || '').toLowerCase() === email);
       } else if (/WHERE recipient_role\s*=\s*\?/i.test(sql)) {
         const role = String(params[0]);
         filtered = filtered.filter((l) => l.recipient_role === role);
       }
-      filtered.sort((a, b) => new Date(b.sent_at || 0).getTime() - new Date(a.sent_at || 0).getTime());
+      filtered.sort((a, b) => new Date(b.sent_at || b.created_at || 0).getTime() - new Date(a.sent_at || a.created_at || 0).getTime());
+      return [filtered, null];
+    }
+
+    if (tableName === 'email_jobs') {
+      let filtered = [...table];
+      if (/WHERE\s+idempotency_key\s*=\s*\?/i.test(sql)) {
+        const key = String(params[0]);
+        filtered = filtered.filter((j) => j.idempotency_key === key);
+      } else if (/WHERE\s+status\s*=\s*\?/i.test(sql)) {
+        const st = String(params[0]);
+        filtered = filtered.filter((j) => j.status === st);
+      } else if (/WHERE\s+id\s*=\s*\?/i.test(sql)) {
+        const jId = Number(params[0]);
+        filtered = filtered.filter((j) => Number(j.id) === jId);
+      }
+      return [filtered, null];
+    }
+
+    if (tableName === 'appointment_reminders') {
+      let filtered = [...table];
+      if (/WHERE\s+deduplication_key\s*=\s*\?/i.test(sql)) {
+        const key = String(params[0]);
+        filtered = filtered.filter((r) => r.deduplication_key === key);
+      } else if (/WHERE\s+appointment_id\s*=\s*\?/i.test(sql)) {
+        const aId = Number(params[0]);
+        filtered = filtered.filter((r) => Number(r.appointment_id) === aId);
+      }
       return [filtered, null];
     }
 
     // 13. Messages
     if (tableName === 'messages') {
       let filtered = [...table];
-      if (/WHERE\s+conversation_id\s*=\s*\?/i.test(sql)) {
+      if (/WHERE\s+id\s*=\s*\?/i.test(sql)) {
+        const mId = Number(params[0]);
+        filtered = filtered.filter((m) => Number(m.id) === mId);
+      } else if (/WHERE\s+conversation_id\s*=\s*\?\s+AND\s+recipient_id\s*=\s*\?/i.test(sql)) {
+        const cId = String(params[0]);
+        const rId = Number(params[1]);
+        filtered = filtered.filter((m) => String(m.conversation_id) === cId && Number(m.recipient_id) === rId);
+      } else if (/WHERE\s+conversation_id\s*=\s*\?/i.test(sql)) {
         const cId = String(params[0]);
         filtered = filtered.filter((m) => String(m.conversation_id) === cId);
       } else if (/WHERE\s+salon_id\s*=\s*\?\s+AND\s+customer_id\s*=\s*\?/i.test(sql)) {
@@ -828,11 +867,55 @@ class InMemoryDatabase {
 
     if (colMatch) {
       const columns = colMatch[1].split(',').map((c) => c.trim().replace(/[`]/g, ''));
-      columns.forEach((col, index) => {
-        if (index < params.length) {
-          record[col] = params[index];
-        }
-      });
+      const valMatch = sql.match(/VALUES\s*\(([\s\S]+?)\)/i);
+      if (valMatch) {
+        const rawValues = valMatch[1].match(/(?:'[^']*'|[^,])+/g)?.map((s) => s.trim()) || [];
+        let paramIdx = 0;
+        columns.forEach((col, index) => {
+          const rawVal = rawValues[index];
+          if (rawVal === undefined || rawVal === '?') {
+            if (paramIdx < params.length) {
+              record[col] = params[paramIdx++];
+            }
+          } else if (/^'([^']*)'$/.test(rawVal)) {
+            record[col] = rawVal.slice(1, -1);
+          } else if (/^\d+$/.test(rawVal)) {
+            record[col] = Number(rawVal);
+          } else if (rawVal.toLowerCase() === 'null') {
+            record[col] = null;
+          } else if (rawVal.toLowerCase() === 'true') {
+            record[col] = 1;
+          } else if (rawVal.toLowerCase() === 'false') {
+            record[col] = 0;
+          } else {
+            if (paramIdx < params.length) {
+              record[col] = params[paramIdx++];
+            }
+          }
+        });
+      } else {
+        columns.forEach((col, index) => {
+          if (index < params.length) {
+            record[col] = params[index];
+          }
+        });
+      }
+    }
+
+    // Guard against duplicate reminder insertions (UNIQUE constraint on deduplication_key)
+    if (tableName === 'appointment_reminders' && record.deduplication_key) {
+      const existing = table.find((r) => r.deduplication_key === record.deduplication_key);
+      if (existing) {
+        return [{ insertId: Number(existing.id), affectedRows: 0 }, null];
+      }
+    }
+
+    // Guard against duplicate email job insertions (UNIQUE constraint on idempotency_key)
+    if (tableName === 'email_jobs' && record.idempotency_key) {
+      const existing = table.find((j) => j.idempotency_key === record.idempotency_key);
+      if (existing) {
+        return [{ insertId: Number(existing.id), affectedRows: 0 }, null];
+      }
     }
 
     // Guard against duplicate appointment insertions
@@ -876,7 +959,18 @@ class InMemoryDatabase {
     // Special batch mark-read for messages
     if (tableName === 'messages' && /SET\s+is_read\s*=\s*1/i.test(sql)) {
       let count = 0;
-      if (/WHERE\s+conversation_id\s*=\s*\?/i.test(sql)) {
+      if (/WHERE\s+conversation_id\s*=\s*\?\s+AND\s+recipient_id\s*=\s*\?/i.test(sql)) {
+        const cId = String(params[0]);
+        const rId = Number(params[1]);
+        for (const msg of table) {
+          if (msg.conversation_id === cId && Number(msg.recipient_id) === rId && !msg.is_read) {
+            msg.is_read = true;
+            msg.updated_at = new Date().toISOString();
+            this.syncToFirestore('messages', 'set', msg.id, msg);
+            count++;
+          }
+        }
+      } else if (/WHERE\s+conversation_id\s*=\s*\?/i.test(sql)) {
         const cId = String(params[0]);
         for (const msg of table) {
           if (msg.conversation_id === cId && !msg.is_read) {
