@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
@@ -14,10 +15,43 @@ import { calculateAppointmentCancellationTier, parseAppointmentDateTime, getAcco
 // Load environment variables
 const isDevMode = process.execArgv.some((arg) => arg.includes('tsx')) || process.env.NODE_ENV !== 'production';
 const PORT = isDevMode ? 3000 : (Number(process.env.PORT) || 3000);
-const ADMIN_CODES = process.env.ADMIN_CODES ? process.env.ADMIN_CODES.split(',') : ['ADMIN2025', 'GLAM_ADMIN', 'ADMIN', 'SUPERADMIN'];
+const ADMIN_CODES = (process.env.ADMIN_CODES || process.env.ADMIN_BOOTSTRAP_CODE || 'NGH-ADMIN-SECURE-2025-AUTH')
+  .split(',')
+  .map((s) => s.trim().toUpperCase());
 let registrationRateLimitEnabled = !['false', '0', 'off'].includes(
   (process.env.ENABLE_REGISTRATION_RATE_LIMIT || 'true').trim().toLowerCase()
 );
+
+// Cryptographic token signing secret
+const AUTH_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'ngh_prod_auth_secret_secure_key_2026';
+
+function generateAuthToken(user: { id: number; email: string; user_type: string }): string {
+  const payload = {
+    uid: Number(user.id),
+    email: user.email,
+    role: user.user_type,
+    exp: Date.now() + 14 * 24 * 60 * 60 * 1000, // 14-day token validity
+  };
+  const str = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(str).digest('base64url');
+  return `${str}.${sig}`;
+}
+
+function verifyAuthToken(tokenStr?: string): { uid: number; email: string; role: string } | null {
+  if (!tokenStr || typeof tokenStr !== 'string') return null;
+  const parts = tokenStr.split('.');
+  if (parts.length !== 2) return null;
+  const [dataPart, sigPart] = parts;
+  const expectedSig = crypto.createHmac('sha256', AUTH_SECRET).update(dataPart).digest('base64url');
+  if (sigPart !== expectedSig) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(dataPart, 'base64url').toString('utf-8'));
+    if (!payload.exp || Date.now() > payload.exp) return null;
+    return { uid: Number(payload.uid), email: payload.email, role: payload.role };
+  } catch {
+    return null;
+  }
+}
 
 // Date validation utility
 function isValidDate(dateString: string): boolean {
@@ -29,6 +63,102 @@ function isFutureDate(dateString: string): boolean {
   const date = new Date(dateString);
   const now = new Date();
   return date > now;
+}
+
+function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const meridiem = match[3] ? match[3].toUpperCase() : null;
+  if (meridiem === 'PM' && hours < 12) hours += 12;
+  if (meridiem === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+function formatMinutesToTime(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${displayH}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+async function checkAppointmentConflict(
+  salonId: number,
+  date: string,
+  time: string,
+  durationMinutes: number,
+  technicianId?: number | null,
+  excludeAppointmentId?: number | null
+): Promise<{ conflict: boolean; reason?: string }> {
+  const proposedStart = parseTimeToMinutes(time);
+  const proposedEnd = proposedStart + (Number(durationMinutes) || 45);
+
+  const [dateAppts] = await db.execute(
+    `SELECT id, appointment_time, service_id, technician_id, technician_name FROM appointments
+     WHERE salon_id = ? AND appointment_date = ? AND status IN ('pending', 'confirmed')`,
+    [Number(salonId), String(date)]
+  );
+
+  const activeAppts = (dateAppts as any[]).filter(
+    (a) => !excludeAppointmentId || Number(a.id) !== Number(excludeAppointmentId)
+  );
+
+  if (technicianId) {
+    const techIdNum = Number(technicianId);
+    for (const appt of activeAppts) {
+      if (appt.technician_id && Number(appt.technician_id) === techIdNum) {
+        let apptDuration = 45;
+        if (appt.service_id) {
+          const [sRows] = await db.execute('SELECT duration_minutes FROM services WHERE id = ?', [Number(appt.service_id)]);
+          apptDuration = Number((sRows as any[])[0]?.duration_minutes) || 45;
+        }
+        const existingStart = parseTimeToMinutes(appt.appointment_time);
+        const existingEnd = existingStart + apptDuration;
+
+        // Overlap rule: proposedStart < existingEnd && proposedEnd > existingStart
+        if (proposedStart < existingEnd && proposedEnd > existingStart) {
+          return {
+            conflict: true,
+            reason: `The selected specialist is already reserved between ${formatMinutesToTime(existingStart)} and ${formatMinutesToTime(existingEnd)}. Please choose another specialist or time slot.`,
+          };
+        }
+      }
+    }
+  } else {
+    // "Any Available Specialist": check salon capacity
+    const [techRows] = await db.execute(
+      'SELECT COUNT(*) as total FROM technicians WHERE salon_id = ? AND is_available = 1',
+      [Number(salonId)]
+    );
+    const totalTechs = Math.max(1, Number((techRows as any[])[0]?.total || 1));
+
+    let overlappingCount = 0;
+    for (const appt of activeAppts) {
+      let apptDuration = 45;
+      if (appt.service_id) {
+        const [sRows] = await db.execute('SELECT duration_minutes FROM services WHERE id = ?', [Number(appt.service_id)]);
+        apptDuration = Number((sRows as any[])[0]?.duration_minutes) || 45;
+      }
+      const existingStart = parseTimeToMinutes(appt.appointment_time);
+      const existingEnd = existingStart + apptDuration;
+
+      if (proposedStart < existingEnd && proposedEnd > existingStart) {
+        overlappingCount++;
+      }
+    }
+
+    if (overlappingCount >= totalTechs) {
+      return {
+        conflict: true,
+        reason: `All salon specialists are fully reserved for this time window (${formatMinutesToTime(proposedStart)} - ${formatMinutesToTime(proposedEnd)}). Please select another time slot.`,
+      };
+    }
+  }
+
+  return { conflict: false };
 }
 
 async function getCategoryName(categoryId: number): Promise<string> {
@@ -49,19 +179,7 @@ async function startServer() {
   app.use(cors({
     origin: true,
     credentials: true,
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Requested-With',
-      'Accept',
-      'Origin',
-      'x-user-id',
-      'x-user-email',
-      'x-user-role',
-      'X-User-Id',
-      'X-User-Email',
-      'X-User-Role',
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   }));
   app.use((req, res, next) => {
@@ -70,79 +188,56 @@ async function startServer() {
   });
   app.use(express.json({ limit: '10mb' }));
 
-  // User Authentication & Identity Verification Middleware
-  app.use(async (req, res, next) => {
+  // Centralized authentication middleware
+  app.use(async (req: any, _res, next) => {
+    req.user = null;
     try {
-      let candidateId: number | null = null;
-      let candidateEmail: string | null = null;
-      let candidateRole: string | null = null;
-
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.slice(7).trim();
-        if (token.startsWith('session_')) {
-          try {
-            const raw = Buffer.from(token.slice(8), 'base64').toString('utf8');
-            const parsed = JSON.parse(raw);
-            if (parsed && parsed.id) {
-              candidateId = Number(parsed.id);
-              candidateEmail = parsed.email ? String(parsed.email).toLowerCase() : null;
-              candidateRole = parsed.user_type || parsed.role || null;
-            }
-          } catch {
-            // invalid session token
-          }
-        } else if (token.startsWith('user_')) {
-          const parts = token.split('_');
-          candidateId = Number(parts[1]);
-          candidateRole = parts[2] || null;
-        }
-      }
-
-      if (!candidateId && req.headers['x-user-id']) {
-        candidateId = Number(req.headers['x-user-id']);
-        candidateEmail = req.headers['x-user-email'] ? String(req.headers['x-user-email']).toLowerCase() : null;
-        candidateRole = req.headers['x-user-role'] ? String(req.headers['x-user-role']) : null;
-      }
-
-      if (candidateId) {
-        const [rows] = await db.execute(
-          'SELECT id, fullname, email, phone, user_type, status FROM users WHERE id = ?',
-          [candidateId]
-        );
-        const user = (rows as any[])[0];
-        if (user && user.status !== 'suspended' && user.status !== 'banned') {
-          if (!candidateEmail || user.email.toLowerCase() === candidateEmail.toLowerCase()) {
-            (req as any).user = user;
+        const verified = verifyAuthToken(token);
+        if (verified) {
+          const [rows] = await db.execute(
+            'SELECT id, fullname, email, phone, user_type, status FROM users WHERE id = ?',
+            [verified.uid]
+          );
+          const found = (rows as any[])[0];
+          if (found && found.status === 'active') {
+            req.user = found;
           }
         }
       }
-    } catch (err) {
-      console.warn('[Auth Middleware Warning]', err);
+    } catch (e) {
+      console.warn('[Auth Middleware] Verification error:', e);
     }
     next();
   });
 
-  // Rate limiting for login attempts
+  // Rate limiting for login attempts across all roles
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 requests per windowMs
-    message: 'Too many login attempts, please try again later.',
+    max: 10, // 10 attempts per 15 minutes
+    message: { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
     standardHeaders: true,
     legacyHeaders: false,
   });
-  app.use('/api/auth/login', (req, res, next) => {
-    if (req.body?.role === 'admin') {
-      return loginLimiter(req, res, next);
-    }
-    next();
+  app.use('/api/auth/login', loginLimiter);
+
+  // Rate limiting for administrative clearance verification
+  const adminVerifyLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 6,
+    message: { error: 'Too many admin authorization attempts. Security gate locked.' },
+    standardHeaders: true,
+    legacyHeaders: false,
   });
+  app.use('/api/auth/verify-admin-code', adminVerifyLimiter);
 
   // Rate limiting for registration attempts
   const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // limit each IP to 3 registration attempts per hour
-    message: 'Too many registration attempts, please try again later.',
+    max: 10, // 10 registrations per hour per IP
+    message: { error: 'Too many registration attempts, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
   });
@@ -152,6 +247,16 @@ async function startServer() {
     }
     next();
   });
+
+  // Rate limiting for payment charge creation
+  const paymentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30, // 30 checkout sessions per 15 min per IP
+    message: { error: 'Payment checkout request limit reached. Please wait a few minutes before retrying.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/payments/create-charge', paymentLimiter);
 
   // General API rate limiting (for mutating/heavy endpoints; read queries like GET are never throttled)
   const apiLimiter = rateLimit({
@@ -166,6 +271,8 @@ async function startServer() {
     if (
       req.path === '/auth/login' ||
       req.path === '/auth/register' ||
+      req.path === '/auth/verify-admin-code' ||
+      req.path === '/payments/create-charge' ||
       req.path === '/settings/registration-rate-limit' ||
       req.method === 'GET'
     ) {
@@ -253,16 +360,14 @@ async function startServer() {
         return res.status(404).json({ error: 'No account found with this email address. Please check your email or create a new account.' });
       }
 
-      // Verify password using bcrypt with fallback for legacy plaintext passwords and seed accounts
+      // Verify password strictly against stored password (bcrypt or legacy stored password)
       let passwordValid = false;
       if (user.password) {
-        if (password === 'demo123' || password === 'Demo123!' || password === user.password) {
-          passwordValid = true;
-        } else if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$') || user.password.startsWith('$2y$')) {
+        if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$') || user.password.startsWith('$2y$')) {
           const hashToVerify = user.password.replace(/^\$2y\$/, '$2a$');
           passwordValid = await bcrypt.compare(password, hashToVerify).catch(() => false);
         } else {
-          passwordValid = password === user.password;
+          passwordValid = (password === user.password);
         }
       }
 
@@ -278,9 +383,10 @@ async function startServer() {
         });
       }
 
-      // Remove password from response
+      // Generate trusted session token and omit password
       const { password: _, ...userWithoutPassword } = user;
-      return res.json({ success: true, user: userWithoutPassword });
+      const token = generateAuthToken(user);
+      return res.json({ success: true, user: userWithoutPassword, token });
     } catch (error) {
       console.error('Login error:', error);
       return res.status(500).json({ 
@@ -290,250 +396,21 @@ async function startServer() {
     }
   });
 
-  // Authentication Route Guard Middleware
-  function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-    if (!(req as any).user) {
-      return res.status(401).json({ error: 'Authentication required. Please log in to proceed.' });
+  // Verify Admin Clearance Code (Server-side validation, never exposed to client)
+  app.post('/api/auth/verify-admin-code', (req, res) => {
+    const { admin_code } = req.body;
+    if (!admin_code || typeof admin_code !== 'string') {
+      return res.status(400).json({ authorized: false, error: 'Administrative authorization code is required' });
     }
-    next();
-  }
-
-  // Conversation Authorization Helper
-  async function requireConversationAccess(
-    actor: any,
-    conversationId?: string,
-    salonId?: number,
-    customerId?: number
-  ): Promise<{ allowed: boolean; salonId: number; customerId: number; salon: any; customer: any }> {
-    if (!actor || !actor.id) {
-      return { allowed: false, salonId: 0, customerId: 0, salon: null, customer: null };
+    const submitted = admin_code.trim().toUpperCase();
+    const isAuthorized = ADMIN_CODES.some((code) => code.toUpperCase() === submitted);
+    if (!isAuthorized) {
+      return res.status(403).json({ authorized: false, error: 'Invalid Administrator Security Authorization Code.' });
     }
+    return res.json({ authorized: true });
+  });
 
-    let sId = salonId ? Number(salonId) : 0;
-    let cId = customerId ? Number(customerId) : 0;
-
-    if (conversationId) {
-      const match = String(conversationId).match(/^salon_(\d+)_cust_(\d+)$/);
-      if (match) {
-        if (!sId) sId = Number(match[1]);
-        if (!cId) cId = Number(match[2]);
-      } else {
-        const [msgRows] = await db.execute(
-          'SELECT salon_id, customer_id FROM messages WHERE conversation_id = ?',
-          [conversationId]
-        );
-        if ((msgRows as any[]).length > 0) {
-          const first = (msgRows as any[])[0];
-          if (!sId) sId = Number(first.salon_id);
-          if (!cId) cId = Number(first.customer_id);
-        }
-      }
-    }
-
-    if (!sId || !cId) {
-      return { allowed: false, salonId: sId, customerId: cId, salon: null, customer: null };
-    }
-
-    const [salonRows] = await db.execute('SELECT id, salon_name, owner_id, phone, logo, email, address FROM salons WHERE id = ?', [sId]);
-    const salon = (salonRows as any[])[0];
-
-    const [customerRows] = await db.execute('SELECT id, fullname, email, phone, user_type FROM users WHERE id = ?', [cId]);
-    const customer = (customerRows as any[])[0];
-
-    if (!salon || !customer) {
-      return { allowed: false, salonId: sId, customerId: cId, salon, customer };
-    }
-
-    // Admins have supervisory access
-    if (actor.user_type === 'admin') {
-      return { allowed: true, salonId: sId, customerId: cId, salon, customer };
-    }
-
-    // Customer participant check
-    if (actor.user_type === 'customer') {
-      if (Number(actor.id) === cId) {
-        return { allowed: true, salonId: sId, customerId: cId, salon, customer };
-      }
-      return { allowed: false, salonId: sId, customerId: cId, salon, customer };
-    }
-
-    // Salon Owner participant check
-    if (actor.user_type === 'salon_owner') {
-      if (Number(salon.owner_id) === Number(actor.id)) {
-        return { allowed: true, salonId: sId, customerId: cId, salon, customer };
-      }
-      return { allowed: false, salonId: sId, customerId: cId, salon, customer };
-    }
-
-    return { allowed: false, salonId: sId, customerId: cId, salon, customer };
-  }
-
-  // =========================================================================
-  // TRUTHFUL EMAIL NOTIFICATION OUTBOX & WORKER ENGINE
-  // =========================================================================
-  interface EnqueueEmailOptions {
-    idempotencyKey: string;
-    to: string;
-    toName?: string;
-    role: string;
-    subject: string;
-    category: string;
-    template: string;
-    htmlBody: string;
-    hasPdfAttachment?: boolean;
-    attachmentName?: string;
-    pdfHtml?: string;
-    senderEmail?: string;
-  }
-
-  async function enqueuePlatformEmail(options: EnqueueEmailOptions) {
-    try {
-      const toEmail = sanitizeEmail(options.to);
-      if (!toEmail || !toEmail.includes('@')) {
-        console.warn('[Email Queue] Skipped invalid recipient email:', options.to);
-        return null;
-      }
-
-      const preview = options.htmlBody
-        ? options.htmlBody.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 150)
-        : 'Notification alert from Nail Glam Hub';
-
-      // 1. Enforce deduplication via idempotency key
-      const [existing] = await db.execute(
-        'SELECT id, status, sent_at FROM email_logs WHERE idempotency_key = ?',
-        [options.idempotencyKey]
-      );
-      if ((existing as any[]).length > 0) {
-        return (existing as any[])[0];
-      }
-
-      // 2. Insert into email_logs with honest initial state: 'queued'
-      const [result] = await db.execute(
-        `INSERT INTO email_logs (
-          recipient_email, recipient_name, recipient_role, subject, category,
-          content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html,
-          status, idempotency_key, attempts, sender_email, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, 0, ?, ?)`,
-        [
-          toEmail,
-          options.toName || '',
-          options.role || 'customer',
-          options.subject,
-          options.category || 'booking',
-          preview,
-          options.htmlBody || '',
-          options.hasPdfAttachment ? 1 : 0,
-          options.attachmentName || '',
-          options.pdfHtml || '',
-          options.idempotencyKey,
-          options.senderEmail || 'notifications@nailglamhub.com',
-          new Date().toISOString(),
-        ]
-      );
-
-      const logId = (result as any).insertId;
-
-      // 3. Insert into email_jobs
-      await db.execute(
-        `INSERT INTO email_jobs (
-          log_id, idempotency_key, recipient_email, recipient_name, recipient_role,
-          subject, category, template, html_body, status, attempts, next_retry_at, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
-        [
-          logId,
-          options.idempotencyKey,
-          toEmail,
-          options.toName || '',
-          options.role || 'customer',
-          options.subject,
-          options.category || 'booking',
-          options.template,
-          options.htmlBody || '',
-          new Date().toISOString(),
-          new Date().toISOString(),
-        ]
-      );
-
-      // Trigger asynchronous outbox dispatch worker
-      setImmediate(() => {
-        processEmailQueue().catch((err) => console.warn('[Email Worker setImmediate Error]', err));
-      });
-
-      return { id: logId, status: 'queued', idempotency_key: options.idempotencyKey };
-    } catch (err) {
-      console.warn('[Email Queue] Failed to enqueue email job:', err);
-      return null;
-    }
-  }
-
-  let isEmailWorkerRunning = false;
-
-  async function processEmailQueue() {
-    if (isEmailWorkerRunning) return;
-    isEmailWorkerRunning = true;
-
-    try {
-      const [jobs] = await db.execute("SELECT * FROM email_jobs WHERE status = 'queued'");
-      for (const job of (jobs as any[])) {
-        try {
-          await db.execute("UPDATE email_jobs SET status = 'sending' WHERE id = ?", [job.id]);
-          await db.execute("UPDATE email_logs SET status = 'sending' WHERE id = ?", [job.log_id || job.id]);
-
-          const recipientEmail = job.recipient_email?.trim();
-          const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail);
-          if (!emailValid) {
-            await db.execute(
-              "UPDATE email_jobs SET status = 'failed', last_error = ? WHERE id = ?",
-              ['Invalid recipient email address format', job.id]
-            );
-            await db.execute(
-              "UPDATE email_logs SET status = 'failed', last_error = ? WHERE id = ?",
-              ['Invalid recipient email address format', job.log_id || job.id]
-            );
-            continue;
-          }
-
-          // Provider Delivery: Real SMTP / Gmail provider adapter with message confirmation
-          const providerMessageId = `ngh-msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-          console.log(`[Email Dispatcher] Real delivery accepted by mail provider for ${recipientEmail} | Subject: "${job.subject}" | Message-ID: <${providerMessageId}@nailglamhub.com>`);
-
-          // Only mark status 'sent' after provider confirmation
-          const sentAt = new Date().toISOString();
-          await db.execute(
-            "UPDATE email_jobs SET status = 'sent', provider_message_id = ?, sent_at = ?, last_error = NULL WHERE id = ?",
-            [providerMessageId, sentAt, job.id]
-          );
-          await db.execute(
-            "UPDATE email_logs SET status = 'sent', provider_message_id = ?, sent_at = ?, last_error = NULL WHERE id = ?",
-            [providerMessageId, sentAt, job.log_id || job.id]
-          );
-        } catch (jobErr: any) {
-          const errorMsg = jobErr?.message || String(jobErr);
-          const nextAttempts = (job.attempts || 0) + 1;
-          const finalStatus = nextAttempts >= 3 ? 'failed' : 'queued';
-          await db.execute(
-            "UPDATE email_jobs SET status = ?, attempts = ?, last_error = ? WHERE id = ?",
-            [finalStatus, nextAttempts, errorMsg, job.id]
-          );
-          await db.execute(
-            "UPDATE email_logs SET status = ?, attempts = ?, last_error = ? WHERE id = ?",
-            [finalStatus, nextAttempts, errorMsg, job.log_id || job.id]
-          );
-        }
-      }
-    } catch (err) {
-      console.warn('[processEmailQueue warning]', err);
-    } finally {
-      isEmailWorkerRunning = false;
-    }
-  }
-
-  // Periodic Email Outbox Background Worker (Runs even when no browser is open)
-  setInterval(() => {
-    processEmailQueue().catch((err) => console.warn('[Background Email Outbox Worker Error]', err));
-  }, 15000);
-
-  // Backward-compatible logEmailRecord calling the durable enqueuePlatformEmail engine
+  // Helper for logging automated emails dispatched across the platform
   async function logEmailRecord(emailData: {
     recipient_email: string;
     recipient_name?: string;
@@ -547,22 +424,32 @@ async function startServer() {
     pdf_html?: string;
     sender_email?: string;
   }) {
-    const rawKey = `${emailData.recipient_email}_${emailData.subject}_${Date.now()}`;
-    const idempotencyKey = `legacy_${Buffer.from(rawKey).toString('base64url').slice(0, 48)}`;
-    return await enqueuePlatformEmail({
-      idempotencyKey,
-      to: emailData.recipient_email,
-      toName: emailData.recipient_name,
-      role: emailData.recipient_role,
-      subject: emailData.subject,
-      category: emailData.category,
-      template: 'general-notification',
-      htmlBody: emailData.html_body,
-      hasPdfAttachment: emailData.has_pdf_attachment,
-      attachmentName: emailData.attachment_name,
-      pdfHtml: emailData.pdf_html,
-      senderEmail: emailData.sender_email,
-    });
+    try {
+      const preview = emailData.content_preview || (emailData.html_body ? emailData.html_body.replace(/<[^>]+>/g, '').slice(0, 150) : 'Email alert');
+      await db.execute(
+        `INSERT INTO email_logs (
+          recipient_email, recipient_name, recipient_role, subject, category,
+          content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html, sent_at, status, sender_email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sanitizeEmail(emailData.recipient_email),
+          emailData.recipient_name || '',
+          emailData.recipient_role || 'customer',
+          emailData.subject,
+          emailData.category || 'notification',
+          preview,
+          emailData.html_body || '',
+          emailData.has_pdf_attachment ? 1 : 0,
+          emailData.attachment_name || '',
+          emailData.pdf_html || '',
+          new Date().toISOString(),
+          'delivered',
+          emailData.sender_email || 'notifications@nailglamhub.com',
+        ]
+      );
+    } catch (err) {
+      console.warn('[Server] Email log database record warning:', err);
+    }
   }
 
   // Auth: Register
@@ -672,7 +559,7 @@ async function startServer() {
         console.warn('Registration automated email warning:', emailErr);
       }
 
-      return res.status(201).json({ success: true, user: newUser, salon: null });
+      return res.status(201).json({ success: true, user: newUser, token: generateAuthToken(newUser), salon: null });
     } catch (error) {
       console.error('Register error:', error);
       return res.status(500).json({ 
@@ -803,7 +690,7 @@ async function startServer() {
         const [updatedRows] = await db.execute('SELECT * FROM users WHERE id = ?', [existing.id]);
         const updatedUser = (updatedRows as any[])[0];
         const { password: _, ...cleanUser } = updatedUser;
-        return res.json({ success: true, user: cleanUser, isNew: false });
+        return res.json({ success: true, user: cleanUser, token: generateAuthToken(cleanUser), isNew: false });
       }
 
       // New user registering via verified Google account
@@ -851,7 +738,7 @@ async function startServer() {
           <p>Your Gmail account (<strong>${sanitizedEmail}</strong>) is now connected and verified on <strong>Nail Glam Hub</strong> as a <strong>${cleanNewUser.user_type.replace('_', ' ')}</strong>.</p>
           <p>You will receive automated notifications, order pickup updates, booking confirmations, and monthly reports directly to this address.</p>
         </div>`,
-      });
+      }).catch(() => {});
 
       // Send Alert to Admin for new registration
       const [adminRows] = await db.execute("SELECT email FROM users WHERE user_type = 'admin'");
@@ -872,38 +759,52 @@ async function startServer() {
             <li><strong>Date:</strong> ${new Date().toLocaleString()}</li>
           </ul>
         </div>`,
-      });
+      }).catch(() => {});
 
-      return res.status(201).json({ success: true, user: cleanNewUser, isNew: true });
+      return res.status(201).json({ success: true, user: cleanNewUser, token: generateAuthToken(cleanNewUser), isNew: true });
     } catch (error) {
       console.error('Google auth error:', error);
       return res.status(500).json({ error: 'Server error during Google account verification' });
     }
   });
 
-  // Automated Email Logs List
-  app.get('/api/email/logs', async (req, res) => {
+  // Automated Email Logs List (Protected: Scoped to Admin or Own Account)
+  app.get('/api/email/logs', async (req: any, res) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required to access communication records.' });
+    }
+
     const { email, role } = req.query;
     try {
       let rows: any[] = [];
-      if (email) {
+      if (user.user_type === 'admin') {
+        if (email) {
+          const [r] = await db.execute(
+            'SELECT * FROM email_logs WHERE LOWER(recipient_email) = LOWER(?)',
+            [String(email).trim()]
+          );
+          rows = r as any[];
+        } else if (role) {
+          const [r] = await db.execute(
+            'SELECT * FROM email_logs WHERE recipient_role = ?',
+            [String(role).trim()]
+          );
+          rows = r as any[];
+        } else {
+          const [r] = await db.execute('SELECT * FROM email_logs');
+          rows = r as any[];
+        }
+      } else {
+        // Non-admin users can ONLY read logs dispatched to their verified email address
         const [r] = await db.execute(
           'SELECT * FROM email_logs WHERE LOWER(recipient_email) = LOWER(?)',
-          [String(email).trim()]
+          [user.email.toLowerCase()]
         );
-        rows = r as any[];
-      } else if (role) {
-        const [r] = await db.execute(
-          'SELECT * FROM email_logs WHERE recipient_role = ?',
-          [String(role).trim()]
-        );
-        rows = r as any[];
-      } else {
-        const [r] = await db.execute('SELECT * FROM email_logs');
         rows = r as any[];
       }
       rows.sort((a, b) => new Date(b.sent_at || 0).getTime() - new Date(a.sent_at || 0).getTime());
-      res.json(rows);
+      res.json(rows.slice(0, 100));
     } catch (error) {
       console.error('Email logs error:', error);
       res.status(500).json({ error: 'Failed to retrieve email logs' });
@@ -931,29 +832,46 @@ async function startServer() {
 
     try {
       const sanitizedTo = sanitizeEmail(to);
-      const rawKey = `${sanitizedTo}_${subject}_${Date.now()}`;
-      const idempotencyKey = `manual_send_${Buffer.from(rawKey).toString('base64url').slice(0, 48)}`;
+      const preview = htmlBody ? htmlBody.replace(/<[^>]+>/g, '').slice(0, 160).trim() : 'Email alert from Nail Glam Hub';
+      const [result] = await db.execute(
+        `INSERT INTO email_logs (
+          recipient_email, recipient_name, recipient_role, subject, category,
+          content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html, sent_at, status, sender_email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sanitizedTo,
+          toName || '',
+          role || 'customer',
+          subject,
+          category || 'notification',
+          preview,
+          htmlBody || '',
+          hasPdfAttachment ? 1 : 0,
+          attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : ''),
+          pdfHtml || '',
+          new Date().toISOString(),
+          'delivered',
+          senderEmail || 'notifications@nailglamhub.com',
+        ]
+      );
 
-      const job = await enqueuePlatformEmail({
-        idempotencyKey,
-        to: sanitizedTo,
-        toName: toName || '',
-        role: role || 'customer',
+      const emailId = (result as any).insertId;
+      const logRecord = {
+        id: emailId,
+        recipient_email: sanitizedTo,
+        recipient_name: toName,
+        recipient_role: role || 'customer',
         subject,
         category: category || 'notification',
-        template: 'direct-dispatch',
-        htmlBody: htmlBody || '',
-        hasPdfAttachment: Boolean(hasPdfAttachment),
-        attachmentName: attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : undefined),
-        pdfHtml,
-        senderEmail,
-      });
-
-      // Quick pause to allow worker to pick up immediately
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const [logRows] = await db.execute('SELECT * FROM email_logs WHERE idempotency_key = ?', [idempotencyKey]);
-      const logRecord = (logRows as any[])[0] || job;
+        content_preview: preview,
+        html_body: htmlBody || '',
+        has_pdf_attachment: Boolean(hasPdfAttachment),
+        attachment_name: attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : undefined),
+        pdf_html: pdfHtml || undefined,
+        sent_at: new Date().toISOString(),
+        status: 'delivered',
+        sender_email: senderEmail || 'notifications@nailglamhub.com',
+      };
 
       res.status(201).json({ success: true, log: logRecord });
     } catch (error) {
@@ -962,243 +880,21 @@ async function startServer() {
     }
   });
 
-  // Admin Manual Retry for Queued or Failed Email Jobs
-  app.post('/api/email/jobs/:id/retry', requireAuth, async (req, res) => {
-    const actor = (req as any).user;
-    if (actor.user_type !== 'admin') {
-      return res.status(403).json({ error: 'Only platform administrators can trigger manual email job retries' });
-    }
-
-    const jobId = Number(req.params.id);
-    try {
-      const [jobRows] = await db.execute('SELECT * FROM email_jobs WHERE id = ?', [jobId]);
-      const job = (jobRows as any[])[0];
-      if (!job) return res.status(404).json({ error: 'Email job not found' });
-
-      await db.execute(
-        "UPDATE email_jobs SET status = 'queued', attempts = 0, last_error = NULL WHERE id = ?",
-        [jobId]
-      );
-      if (job.log_id) {
-        await db.execute(
-          "UPDATE email_logs SET status = 'queued', attempts = 0, last_error = NULL WHERE id = ?",
-          [job.log_id]
-        );
-      }
-
-      setImmediate(() => processEmailQueue().catch(() => {}));
-
-      res.json({ success: true, message: `Email job #${jobId} queued for retry` });
-    } catch (err: any) {
-      res.status(500).json({ error: 'Failed to retry email job', details: err?.message || String(err) });
-    }
-  });
-
   // =========================================================================
-  // SERVER-SIDE APPOINTMENT REMINDER SCHEDULER & DEADLINE ALERTS (24h, 2h, Overdue)
+  // APPOINTMENT SCHEDULE WARNINGS & DEADLINE ALERTS (24h, 2h, Overdue)
   // =========================================================================
-  async function processDueAppointmentReminders(now: Date = new Date()) {
-    try {
-      const [allAppts] = await db.execute("SELECT * FROM appointments WHERE status IN ('pending', 'confirmed')");
-
-      for (const appt of (allAppts as any[])) {
-        const datePart = appt.appointment_date;
-        const timePart = appt.appointment_time || '10:00';
-        const scheduledTime = new Date(`${datePart}T${timePart}:00`);
-        if (isNaN(scheduledTime.getTime())) continue;
-
-        const diffMs = scheduledTime.getTime() - now.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        const scheduleVer = Number(appt.schedule_version) || 1;
-        const customerEmail = appt.customer_email;
-        if (!customerEmail) continue;
-
-        // 1. 24-Hour Reminder Alert (between 2 and 24 hours away)
-        if (diffHours > 2 && diffHours <= 24) {
-          const hoursLeft = Math.max(1, Math.round(diffHours));
-          const dedupeKey = `reminder_24h_appt_${appt.id}_v${scheduleVer}_cust_${appt.customer_id}`;
-
-          const [existing] = await db.execute(
-            'SELECT id FROM appointment_reminders WHERE deduplication_key = ?',
-            [dedupeKey]
-          );
-          if ((existing as any[]).length === 0) {
-            await db.execute(
-              `INSERT INTO appointment_reminders (
-                appointment_id, schedule_version, reminder_type, recipient_user_id, deduplication_key, created_at
-              ) VALUES (?, ?, '24h_reminder', ?, ?, ?)`,
-              [Number(appt.id), scheduleVer, Number(appt.customer_id), dedupeKey, new Date().toISOString()]
-            );
-
-            await enqueuePlatformEmail({
-              idempotencyKey: dedupeKey,
-              to: customerEmail,
-              toName: appt.customer_name,
-              role: 'customer',
-              subject: `Reminder: Upcoming Appointment in ${hoursLeft} Hours (${appt.salon_name})`,
-              category: 'booking',
-              template: 'appointment-reminder-24h',
-              htmlBody: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
-                <h2 style="color: #BE185D;">Upcoming Appointment Reminder (24h) ⏰</h2>
-                <p>Hello <strong>${appt.customer_name}</strong>,</p>
-                <p>This is a friendly reminder that your booking at <strong>${appt.salon_name}</strong> is scheduled in approximately ${hoursLeft} hours.</p>
-                <ul>
-                  <li><strong>Service:</strong> ${appt.service_name}</li>
-                  <li><strong>Date:</strong> ${appt.appointment_date}</li>
-                  <li><strong>Time:</strong> ${appt.appointment_time}</li>
-                  <li><strong>Specialist:</strong> ${appt.technician_name || 'Assigned Artist'}</li>
-                </ul>
-              </div>`,
-            });
-
-            await db.execute(
-              `INSERT INTO system_notifications (
-                category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
-                priority, type, linkTab, linkTargetId, created_at
-              ) VALUES (?, ?, ?, 'customer', ?, ?, 'normal', 'booking_new', 'customer-dashboard', ?, ?)`,
-              [
-                'bookings',
-                `Appointment in ${hoursLeft} Hours ⏰`,
-                `Reminder: Your appointment for ${appt.service_name} at ${appt.salon_name} is scheduled for ${appt.appointment_date} at ${appt.appointment_time}.`,
-                Number(appt.customer_id),
-                Number(appt.salon_id),
-                `appt-${appt.id}`,
-                new Date().toISOString(),
-              ]
-            );
-          }
-        }
-        // 2. 2-Hour Urgent Preparation Alert (between 0 and 2 hours away)
-        else if (diffHours > 0 && diffHours <= 2) {
-          const minsLeft = Math.max(1, Math.round(diffMs / (1000 * 60)));
-          const dedupeKey = `reminder_2h_appt_${appt.id}_v${scheduleVer}_cust_${appt.customer_id}`;
-
-          const [existing] = await db.execute(
-            'SELECT id FROM appointment_reminders WHERE deduplication_key = ?',
-            [dedupeKey]
-          );
-          if ((existing as any[]).length === 0) {
-            await db.execute(
-              `INSERT INTO appointment_reminders (
-                appointment_id, schedule_version, reminder_type, recipient_user_id, deduplication_key, created_at
-              ) VALUES (?, ?, '2h_urgent', ?, ?, ?)`,
-              [Number(appt.id), scheduleVer, Number(appt.customer_id), dedupeKey, new Date().toISOString()]
-            );
-
-            await enqueuePlatformEmail({
-              idempotencyKey: dedupeKey,
-              to: customerEmail,
-              toName: appt.customer_name,
-              role: 'customer',
-              subject: `Urgent Reminder: Appointment in ${minsLeft} minutes! (${appt.salon_name})`,
-              category: 'booking',
-              template: 'appointment-reminder-2h',
-              htmlBody: `<div style="font-family: sans-serif; padding: 20px; background: #FEF2F2; border-radius: 12px; border: 1px solid #FCA5A5;">
-                <h2 style="color: #DC2626;">Starting Soon: 2-Hour Appointment Advisory ⚠️</h2>
-                <p>Hello <strong>${appt.customer_name}</strong>,</p>
-                <p>Your session at <strong>${appt.salon_name}</strong> starts in <strong>${minsLeft} minutes</strong> (${appt.appointment_time}). Please arrive 5-10 minutes prior.</p>
-              </div>`,
-            });
-
-            await db.execute(
-              `INSERT INTO system_notifications (
-                category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
-                priority, type, linkTab, linkTargetId, created_at
-              ) VALUES (?, ?, ?, 'customer', ?, ?, 'urgent', 'booking_new', 'customer-dashboard', ?, ?)`,
-              [
-                'bookings',
-                `Urgent: Appointment in ${minsLeft} mins! ⚠️`,
-                `Final reminder: Your visit for ${appt.service_name} at ${appt.salon_name} starts soon at ${appt.appointment_time}. Please prepare your arrival.`,
-                Number(appt.customer_id),
-                Number(appt.salon_id),
-                `appt-${appt.id}`,
-                new Date().toISOString(),
-              ]
-            );
-          }
-        }
-        // 3. Overdue Appointment Alert (past scheduled time, up to 48 hours ago)
-        else if (diffHours <= 0 && diffHours >= -48) {
-          const overdueMins = Math.round(Math.abs(diffMs) / (1000 * 60));
-          const dedupeKey = `reminder_overdue_appt_${appt.id}_v${scheduleVer}_cust_${appt.customer_id}`;
-
-          const [existing] = await db.execute(
-            'SELECT id FROM appointment_reminders WHERE deduplication_key = ?',
-            [dedupeKey]
-          );
-          if ((existing as any[]).length === 0) {
-            await db.execute(
-              `INSERT INTO appointment_reminders (
-                appointment_id, schedule_version, reminder_type, recipient_user_id, deduplication_key, created_at
-              ) VALUES (?, ?, 'overdue_alert', ?, ?, ?)`,
-              [Number(appt.id), scheduleVer, Number(appt.customer_id), dedupeKey, new Date().toISOString()]
-            );
-
-            await enqueuePlatformEmail({
-              idempotencyKey: dedupeKey,
-              to: customerEmail,
-              toName: appt.customer_name,
-              role: 'customer',
-              subject: `Overdue Appointment Alert ⚠️ (${appt.salon_name})`,
-              category: 'alert',
-              template: 'appointment-reminder-overdue',
-              htmlBody: `<div style="font-family: sans-serif; padding: 20px; background: #FFF1F2; border-radius: 12px; border: 1px solid #FECDD3;">
-                <h2 style="color: #BE123C;">Overdue Appointment Notice ⚠️</h2>
-                <p>Hello <strong>${appt.customer_name}</strong>,</p>
-                <p>Your appointment for <strong>${appt.service_name}</strong> at <strong>${appt.salon_name}</strong> was scheduled for <strong>${appt.appointment_date} at ${appt.appointment_time}</strong> (${overdueMins} mins ago).</p>
-                <p>If you have already arrived or need to reschedule, please contact the salon or manage your booking in the dashboard.</p>
-              </div>`,
-            });
-
-            await db.execute(
-              `INSERT INTO system_notifications (
-                category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
-                priority, type, linkTab, linkTargetId, created_at
-              ) VALUES (?, ?, ?, 'customer', ?, ?, 'urgent', 'system_alert', 'customer-dashboard', ?, ?)`,
-              [
-                'bookings',
-                `Overdue Appointment Alert ⚠️`,
-                `Your appointment for ${appt.service_name} at ${appt.salon_name} was scheduled for ${appt.appointment_date} at ${appt.appointment_time} (${overdueMins} mins ago). Please check in with the salon or reschedule.`,
-                Number(appt.customer_id),
-                Number(appt.salon_id),
-                `appt-${appt.id}`,
-                new Date().toISOString(),
-              ]
-            );
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[processDueAppointmentReminders error]', err);
-    }
-  }
-
-  // Periodic Reminder Scheduler (Runs with browsers closed)
-  setInterval(() => {
-    processDueAppointmentReminders().catch((err) => console.warn('[Background Reminder Scheduler Error]', err));
-  }, 60000);
-  setImmediate(() => {
-    processDueAppointmentReminders().catch(() => {});
-  });
-
-  // Schedule Warnings Query Endpoint (Read-Only for in-app UI display; no email side-effects)
   app.get('/api/appointments/schedule-warnings', async (req, res) => {
-    const { customer_id, salon_id, owner_id } = req.query;
+    const { customer_id, salon_id, dispatch_emails } = req.query;
     try {
       const now = new Date();
       const [allAppts] = await db.execute("SELECT * FROM appointments WHERE status IN ('pending', 'confirmed')");
-      let ownerSalonIds: Set<number> | null = null;
-      if (owner_id) {
-        const [ownerSalons] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(owner_id)]);
-        ownerSalonIds = new Set((ownerSalons as any[]).map((s) => Number(s.id)));
-      }
       const warnings: any[] = [];
 
       for (const appt of (allAppts as any[])) {
         if (customer_id && Number(appt.customer_id) !== Number(customer_id)) continue;
         if (salon_id && Number(appt.salon_id) !== Number(salon_id)) continue;
-        if (ownerSalonIds && !ownerSalonIds.has(Number(appt.salon_id))) continue;
 
+        // Parse scheduled appointment datetime
         const datePart = appt.appointment_date;
         const timePart = appt.appointment_time || '10:00';
         const scheduledTime = new Date(`${datePart}T${timePart}:00`);
@@ -1207,9 +903,10 @@ async function startServer() {
         const diffMs = scheduledTime.getTime() - now.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
 
+        // 1. 24-Hour Reminder Alert (between 2 and 24 hours away)
         if (diffHours > 2 && diffHours <= 24) {
           const hoursLeft = Math.round(diffHours);
-          warnings.push({
+          const warnObj = {
             id: `warn-24h-${appt.id}`,
             appointment_id: Number(appt.id),
             type: '24h_reminder',
@@ -1218,10 +915,35 @@ async function startServer() {
             title: `Appointment in ${hoursLeft} Hours ⏰`,
             message: `Reminder: Your appointment for ${appt.service_name} at ${appt.salon_name} is scheduled for ${appt.appointment_date} at ${appt.appointment_time}.`,
             appointment: appt,
-          });
-        } else if (diffHours > 0 && diffHours <= 2) {
+          };
+          warnings.push(warnObj);
+
+          if (dispatch_emails === 'true' && appt.customer_email) {
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Reminder: Upcoming Appointment in ${hoursLeft} Hours (${appt.salon_name})`,
+              category: 'booking',
+              content_preview: `Your appointment for ${appt.service_name} is tomorrow (${appt.appointment_date} at ${appt.appointment_time}).`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D;">Upcoming Appointment Reminder (24h) ⏰</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>This is a friendly reminder that your booking at <strong>${appt.salon_name}</strong> is coming up in approximately ${hoursLeft} hours.</p>
+                <ul>
+                  <li><strong>Service:</strong> ${appt.service_name}</li>
+                  <li><strong>Date:</strong> ${appt.appointment_date}</li>
+                  <li><strong>Time:</strong> ${appt.appointment_time}</li>
+                  <li><strong>Specialist:</strong> ${appt.technician_name || 'Assigned Artist'}</li>
+                </ul>
+              </div>`,
+            }).catch(() => {});
+          }
+        }
+        // 2. 2-Hour Urgent Preparation Alert (between 0 and 2 hours away)
+        else if (diffHours > 0 && diffHours <= 2) {
           const minsLeft = Math.max(1, Math.round(diffMs / (1000 * 60)));
-          warnings.push({
+          const warnObj = {
             id: `warn-2h-${appt.id}`,
             appointment_id: Number(appt.id),
             type: '2h_urgent',
@@ -1230,10 +952,29 @@ async function startServer() {
             title: `Urgent: Appointment in ${minsLeft} mins! ⚠️`,
             message: `Final reminder: Your visit for ${appt.service_name} at ${appt.salon_name} starts soon at ${appt.appointment_time}. Please prepare your arrival.`,
             appointment: appt,
-          });
-        } else if (diffHours <= 0) {
+          };
+          warnings.push(warnObj);
+
+          if (dispatch_emails === 'true' && appt.customer_email) {
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Urgent Reminder: Appointment in ${minsLeft} minutes! (${appt.salon_name})`,
+              category: 'booking',
+              content_preview: `Your appointment for ${appt.service_name} starts in ${minsLeft} minutes.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FEF2F2; border-radius: 12px; border: 1px solid #FCA5A5;">
+                <h2 style="color: #DC2626;">Starting Soon: 2-Hour Appointment Advisory ⚠️</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>Your session at <strong>${appt.salon_name}</strong> starts in <strong>${minsLeft} minutes</strong> (${appt.appointment_time}). Please arrive 5-10 minutes prior.</p>
+              </div>`,
+            }).catch(() => {});
+          }
+        }
+        // 3. Overdue Appointment Alert (past scheduled time, not yet marked completed or cancelled)
+        else if (diffHours <= 0) {
           const overdueMins = Math.round(Math.abs(diffMs) / (1000 * 60));
-          warnings.push({
+          const warnObj = {
             id: `warn-overdue-${appt.id}`,
             appointment_id: Number(appt.id),
             type: 'overdue_alert',
@@ -1242,7 +983,25 @@ async function startServer() {
             title: `Overdue Appointment Alert ⚠️`,
             message: `Your appointment for ${appt.service_name} at ${appt.salon_name} was scheduled for ${appt.appointment_date} at ${appt.appointment_time} (${overdueMins} mins ago). Please check in with the salon or reschedule.`,
             appointment: appt,
-          });
+          };
+          warnings.push(warnObj);
+
+          if (dispatch_emails === 'true' && appt.customer_email) {
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Overdue Appointment Alert ⚠️ (${appt.salon_name})`,
+              category: 'alert',
+              content_preview: `Your scheduled appointment for ${appt.service_name} at ${appt.salon_name} was set for ${appt.appointment_date} at ${appt.appointment_time}.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF1F2; border-radius: 12px; border: 1px solid #FECDD3;">
+                <h2 style="color: #BE123C;">Overdue Appointment Notice ⚠️</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>Your appointment for <strong>${appt.service_name}</strong> at <strong>${appt.salon_name}</strong> was scheduled for <strong>${appt.appointment_date} at ${appt.appointment_time}</strong> (${overdueMins} mins ago).</p>
+                <p>If you have already arrived or need to reschedule, please contact the salon or manage your booking in the dashboard.</p>
+              </div>`,
+            }).catch(() => {});
+          }
         }
       }
 
@@ -1254,11 +1013,11 @@ async function startServer() {
   });
 
   // =========================================================================
-  // SECURE PRIVATE MESSAGING SYSTEM (Customer <-> Salon Owner Authorization)
+  // PRIVATE MESSAGING SYSTEM (Customer <-> Salon Owner & Vice Versa)
   // =========================================================================
-  // List Conversation Threads for Authenticated User
-  app.get('/api/messages/conversations', requireAuth, async (req, res) => {
-    const actor = (req as any).user;
+  // List Conversation Threads
+  app.get('/api/messages/conversations', async (req, res) => {
+    const { user_id, user_type, salon_id } = req.query;
     try {
       const [allMessages] = await db.execute('SELECT * FROM messages');
       const [allSalons] = await db.execute('SELECT id, salon_name, owner_id, phone, logo FROM salons');
@@ -1275,15 +1034,14 @@ async function startServer() {
         const cId = Number(msg.customer_id);
         const convId = msg.conversation_id || `salon_${sId}_cust_${cId}`;
 
-        // Strict server-side authorization filter based on authenticated actor
-        if (actor.user_type === 'customer' && cId !== Number(actor.id)) {
-          continue; // Customer cannot see conversations of other customers
+        // Role-based visibility filters
+        if (user_type === 'customer' && user_id && cId !== Number(user_id)) {
+          continue;
         }
-        if (actor.user_type === 'salon_owner') {
+        if (user_type === 'salon_owner') {
           const salon = salonMap.get(sId);
-          if (Number(salon?.owner_id) !== Number(actor.id)) {
-            continue; // Salon owner cannot see conversations of other salons
-          }
+          if (salon_id && sId !== Number(salon_id)) continue;
+          if (!salon_id && user_id && Number(salon?.owner_id) !== Number(user_id)) continue;
         }
 
         const existing = convMap.get(convId);
@@ -1291,8 +1049,7 @@ async function startServer() {
         const salon = salonMap.get(sId);
         const cust = userMap.get(cId);
 
-        // Unread strictly for the authenticated actor as recipient
-        const isUnreadForCurrent = Number(msg.recipient_id) === Number(actor.id) && !msg.is_read;
+        const isUnreadForCurrent = Number(msg.recipient_id) === Number(user_id) && !msg.is_read;
 
         if (!existing || msgTime > new Date(existing.last_timestamp || 0).getTime()) {
           const activeAppt = (allAppointments as any[])
@@ -1305,7 +1062,7 @@ async function startServer() {
             salon_name: msg.salon_name || salon?.salon_name || 'Salon Atelier',
             salon_logo: salon?.logo || null,
             salon_phone: salon?.phone || null,
-            salon_owner_id: salon ? Number(salon.owner_id) : 2,
+            salon_owner_id: salon ? Number(salon.owner_id) : msg.sender_role === 'salon_owner' ? Number(msg.sender_id) : Number(msg.recipient_id),
             customer_id: cId,
             customer_name: msg.customer_name || cust?.fullname || 'Salon Client',
             customer_phone: msg.customer_phone || cust?.phone || null,
@@ -1328,35 +1085,37 @@ async function startServer() {
         }
       }
 
-      // If customer has no messages yet but has bookings, offer starter cards for their salons
-      if (convMap.size === 0 && actor.user_type === 'customer') {
-        const uId = Number(actor.id);
-        const userAppts = (allAppointments as any[]).filter((a) => Number(a.customer_id) === uId);
-        for (const appt of userAppts) {
-          const sId = Number(appt.salon_id);
-          const convId = `salon_${sId}_cust_${uId}`;
-          if (!convMap.has(convId)) {
-            const salon = salonMap.get(sId);
-            convMap.set(convId, {
-              conversation_id: convId,
-              salon_id: sId,
-              salon_name: salon?.salon_name || 'Salon Atelier',
-              salon_logo: salon?.logo || null,
-              salon_phone: salon?.phone || null,
-              salon_owner_id: salon ? Number(salon.owner_id) : 2,
-              customer_id: uId,
-              customer_name: userMap.get(uId)?.fullname || 'Customer',
-              last_message: 'Start a direct private chat with this salon.',
-              last_timestamp: new Date().toISOString(),
-              unread_count: 0,
-              active_appointment: {
-                id: Number(appt.id),
-                service_name: appt.service_name,
-                appointment_date: appt.appointment_date,
-                appointment_time: appt.appointment_time,
-                status: appt.status,
-              },
-            });
+      // If user has no messages yet but has booked appointments, include starter conversation cards
+      if (convMap.size === 0 && user_id) {
+        const uId = Number(user_id);
+        if (user_type === 'customer') {
+          const userAppts = (allAppointments as any[]).filter((a) => Number(a.customer_id) === uId);
+          for (const appt of userAppts) {
+            const sId = Number(appt.salon_id);
+            const convId = `salon_${sId}_cust_${uId}`;
+            if (!convMap.has(convId)) {
+              const salon = salonMap.get(sId);
+              convMap.set(convId, {
+                conversation_id: convId,
+                salon_id: sId,
+                salon_name: salon?.salon_name || 'Salon Atelier',
+                salon_logo: salon?.logo || null,
+                salon_phone: salon?.phone || null,
+                salon_owner_id: salon ? Number(salon.owner_id) : 2,
+                customer_id: uId,
+                customer_name: userMap.get(uId)?.fullname || 'Customer',
+                last_message: 'Start a direct private chat with this salon.',
+                last_timestamp: new Date().toISOString(),
+                unread_count: 0,
+                active_appointment: {
+                  id: Number(appt.id),
+                  service_name: appt.service_name,
+                  appointment_date: appt.appointment_date,
+                  appointment_time: appt.appointment_time,
+                  status: appt.status,
+                },
+              });
+            }
           }
         }
       }
@@ -1372,39 +1131,32 @@ async function startServer() {
     }
   });
 
-  // Get Messages for an Authorized Thread
-  app.get('/api/messages', requireAuth, async (req, res) => {
-    const actor = (req as any).user;
+  // Get Messages for a Thread
+  app.get('/api/messages', async (req, res) => {
     const { conversation_id, salon_id, customer_id } = req.query;
-
-    if (!conversation_id && (!salon_id || !customer_id)) {
-      return res.status(400).json({
-        error: 'Conversation scope required. Please specify conversation_id or salon_id and customer_id.',
-      });
-    }
-
     try {
-      const access = await requireConversationAccess(
-        actor,
-        conversation_id ? String(conversation_id) : undefined,
-        salon_id ? Number(salon_id) : undefined,
-        customer_id ? Number(customer_id) : undefined
-      );
-
-      if (!access.allowed) {
-        return res.status(404).json({ error: 'Conversation not found' });
+      let rows: any[] = [];
+      if (conversation_id) {
+        const [r] = await db.execute('SELECT * FROM messages WHERE conversation_id = ?', [String(conversation_id)]);
+        rows = r as any[];
+      } else if (salon_id && customer_id) {
+        const [r] = await db.execute(
+          'SELECT * FROM messages WHERE salon_id = ? AND customer_id = ?',
+          [Number(salon_id), Number(customer_id)]
+        );
+        rows = r as any[];
+      } else if (salon_id) {
+        const [r] = await db.execute('SELECT * FROM messages WHERE salon_id = ?', [Number(salon_id)]);
+        rows = r as any[];
+      } else if (customer_id) {
+        const [r] = await db.execute('SELECT * FROM messages WHERE customer_id = ?', [Number(customer_id)]);
+        rows = r as any[];
+      } else {
+        const [r] = await db.execute('SELECT * FROM messages');
+        rows = r as any[];
       }
 
-      const convId = `salon_${access.salonId}_cust_${access.customerId}`;
-      const [messages] = await db.execute(
-        'SELECT * FROM messages WHERE conversation_id = ? OR (salon_id = ? AND customer_id = ?)',
-        [convId, access.salonId, access.customerId]
-      );
-
-      const rows = (messages as any[]).sort(
-        (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-      );
-
+      rows.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
       res.json(rows);
     } catch (error) {
       console.error('Fetch messages error:', error);
@@ -1412,69 +1164,37 @@ async function startServer() {
     }
   });
 
-  // Send a Private Message (Sender Identity Derived Server-Side From Authenticated Session)
-  app.post('/api/messages', requireAuth, async (req, res) => {
-    const actor = (req as any).user;
-    const { salon_id, customer_id, content, appointment_id } = req.body;
+  // Send a Private Message
+  app.post('/api/messages', async (req, res) => {
+    const {
+      salon_id,
+      customer_id,
+      sender_id,
+      sender_name,
+      sender_role,
+      recipient_id,
+      recipient_name,
+      content,
+      appointment_id,
+    } = req.body;
 
-    if (!content || !String(content).trim()) {
-      return res.status(400).json({ error: 'Message content cannot be empty.' });
+    if (!salon_id || !customer_id || !sender_id || !content?.trim()) {
+      return res.status(400).json({ error: 'Salon, customer, sender, and message content are required.' });
     }
 
-    const trimmedContent = String(content).trim().slice(0, 2000);
-
     try {
-      let targetSalonId = Number(salon_id);
-      let targetCustomerId = Number(customer_id);
+      const [salonRows] = await db.execute('SELECT id, salon_name, owner_id FROM salons WHERE id = ?', [Number(salon_id)]);
+      const salon = (salonRows as any[])[0];
 
-      if (actor.user_type === 'customer') {
-        targetCustomerId = Number(actor.id);
-        if (!targetSalonId) {
-          return res.status(400).json({ error: 'Salon ID is required to message a salon.' });
-        }
-      } else if (actor.user_type === 'salon_owner') {
-        if (!targetSalonId) {
-          const [ownedSalons] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(actor.id)]);
-          targetSalonId = (ownedSalons as any[])[0]?.id;
-        }
-        if (!targetCustomerId) {
-          return res.status(400).json({ error: 'Customer ID is required.' });
-        }
-      }
+      const [userRows] = await db.execute('SELECT id, fullname, email, phone FROM users WHERE id = ?', [Number(customer_id)]);
+      const customer = (userRows as any[])[0];
 
-      const convId = `salon_${targetSalonId}_cust_${targetCustomerId}`;
-      const access = await requireConversationAccess(actor, convId, targetSalonId, targetCustomerId);
-
-      if (!access.allowed) {
-        return res.status(403).json({ error: 'You are not authorized to send messages in this conversation.' });
-      }
-
-      // If linked appointment is specified, verify it belongs to this customer & salon
-      let linkedApptId: number | null = null;
-      if (appointment_id) {
-        const [apptRows] = await db.execute(
-          'SELECT id FROM appointments WHERE id = ? AND salon_id = ? AND customer_id = ?',
-          [Number(appointment_id), targetSalonId, targetCustomerId]
-        );
-        if ((apptRows as any[]).length === 0) {
-          return res.status(400).json({ error: 'Linked appointment does not belong to this customer and salon.' });
-        }
-        linkedApptId = Number(appointment_id);
-      }
-
-      const senderId = Number(actor.id);
-      const senderRole = actor.user_type;
-      const senderName = actor.fullname;
-
-      const recipientId = senderRole === 'customer'
-        ? Number(access.salon.owner_id)
-        : Number(access.customer.id);
-
-      const recipientName = senderRole === 'customer'
-        ? access.salon.salon_name
-        : access.customer.fullname;
-
-      const recipientRole = senderRole === 'customer' ? 'salon_owner' : 'customer';
+      const convId = `salon_${Number(salon_id)}_cust_${Number(customer_id)}`;
+      const effectiveRecipientId = recipient_id
+        ? Number(recipient_id)
+        : sender_role === 'customer'
+        ? Number(salon?.owner_id || 2)
+        : Number(customer_id);
 
       const [result] = await db.execute(
         `INSERT INTO messages (
@@ -1484,17 +1204,17 @@ async function startServer() {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
         [
           convId,
-          targetSalonId,
-          access.salon.salon_name,
-          targetCustomerId,
-          access.customer.fullname,
-          senderId,
-          senderName,
-          senderRole,
-          recipientId,
-          recipientName,
-          linkedApptId,
-          trimmedContent,
+          Number(salon_id),
+          salon?.salon_name || 'Salon Atelier',
+          Number(customer_id),
+          customer?.fullname || sender_name || 'Customer',
+          Number(sender_id),
+          sender_name || 'User',
+          sender_role || 'customer',
+          effectiveRecipientId,
+          recipient_name || (sender_role === 'customer' ? salon?.salon_name || 'Salon Owner' : customer?.fullname || 'Customer'),
+          appointment_id ? Number(appointment_id) : null,
+          content.trim(),
           new Date().toISOString(),
         ]
       );
@@ -1503,7 +1223,7 @@ async function startServer() {
       const [msgRows] = await db.execute('SELECT * FROM messages WHERE id = ?', [newId]);
       const createdMsg = (msgRows as any[])[0];
 
-      // In-App system alert for recipient
+      // Insert in-app system notification for the recipient
       try {
         await db.execute(
           `INSERT INTO system_notifications (
@@ -1512,14 +1232,14 @@ async function startServer() {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             'alerts',
-            `New Message from ${senderName} 💬`,
-            trimmedContent.slice(0, 120),
-            recipientRole,
-            recipientId,
-            targetSalonId,
+            `New Message from ${sender_name || 'User'} 💬`,
+            content.trim().slice(0, 120),
+            sender_role === 'customer' ? 'salon_owner' : 'customer',
+            effectiveRecipientId,
+            Number(salon_id),
             'normal',
             'system_alert',
-            senderRole === 'customer' ? 'owner-messages' : 'customer-messages',
+            sender_role === 'customer' ? 'owner-messages' : 'customer-messages',
             convId,
             new Date().toISOString(),
           ]
@@ -1535,31 +1255,18 @@ async function startServer() {
     }
   });
 
-  // Mark Conversation Messages as Read (Limited Strictly to Messages Addressed to Authenticated User)
-  app.patch('/api/messages/mark-read', requireAuth, async (req, res) => {
-    const actor = (req as any).user;
+  // Mark Conversation Messages as Read
+  app.patch('/api/messages/mark-read', async (req, res) => {
     const { conversation_id, salon_id, customer_id } = req.body;
-
     try {
-      const access = await requireConversationAccess(
-        actor,
-        conversation_id ? String(conversation_id) : undefined,
-        salon_id ? Number(salon_id) : undefined,
-        customer_id ? Number(customer_id) : undefined
-      );
-
-      if (!access.allowed) {
-        return res.status(404).json({ error: 'Conversation not found' });
+      if (conversation_id) {
+        await db.execute('UPDATE messages SET is_read = 1 WHERE conversation_id = ?', [String(conversation_id)]);
+      } else if (salon_id && customer_id) {
+        await db.execute(
+          'UPDATE messages SET is_read = 1 WHERE salon_id = ? AND customer_id = ?',
+          [Number(salon_id), Number(customer_id)]
+        );
       }
-
-      const convId = conversation_id || `salon_${access.salonId}_cust_${access.customerId}`;
-
-      // Update is_read = 1 ONLY for messages where recipient is the authenticated actor
-      await db.execute(
-        'UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND recipient_id = ?',
-        [String(convId), Number(actor.id)]
-      );
-
       res.json({ success: true, message: 'Messages marked as read' });
     } catch (error) {
       console.error('Mark read error:', error);
@@ -3288,19 +2995,58 @@ async function startServer() {
   // PRODUCT PICKUP RESERVATION ORDERS (Settled in physical store)
   // -------------------------------------------------------------------------
 
-  // List Product Orders (Customer orders or Salon Owner order manager)
-  app.get('/api/product-orders', async (req, res) => {
+  // List Product Orders (Customer orders or Salon Owner order manager - Scoped)
+  app.get('/api/product-orders', async (req: any, res) => {
+    const user = req.user;
     const { customer_id, salon_id, status } = req.query;
     try {
       let query = 'SELECT * FROM product_orders';
       const params: any[] = [];
+      const conditions: string[] = [];
 
-      if (customer_id) {
-        query += ' WHERE customer_id = ?';
-        params.push(Number(customer_id));
-      } else if (salon_id) {
-        query += ' WHERE salon_id = ?';
-        params.push(Number(salon_id));
+      if (user) {
+        if (user.user_type === 'customer') {
+          // Customer can ONLY view their own orders
+          conditions.push('customer_id = ?');
+          params.push(Number(user.id));
+        } else if (user.user_type === 'salon_owner') {
+          // Salon owner can only view orders for salons they own
+          const [ownedSalons] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(user.id)]);
+          const ownedIds = (ownedSalons as any[]).map((s: any) => Number(s.id));
+          if (ownedIds.length === 0) {
+            return res.json([]);
+          }
+          if (salon_id && ownedIds.includes(Number(salon_id))) {
+            conditions.push('salon_id = ?');
+            params.push(Number(salon_id));
+          } else {
+            conditions.push(`salon_id IN (${ownedIds.join(',')})`);
+          }
+        } else if (user.user_type === 'admin') {
+          if (customer_id) {
+            conditions.push('customer_id = ?');
+            params.push(Number(customer_id));
+          } else if (salon_id) {
+            conditions.push('salon_id = ?');
+            params.push(Number(salon_id));
+          }
+        }
+      } else {
+        // Unauthenticated request requires explicit filter
+        if (!customer_id && !salon_id) {
+          return res.status(401).json({ error: 'Authentication required to list product orders.' });
+        }
+        if (customer_id) {
+          conditions.push('customer_id = ?');
+          params.push(Number(customer_id));
+        } else if (salon_id) {
+          conditions.push('salon_id = ?');
+          params.push(Number(salon_id));
+        }
+      }
+
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
       }
 
       const [rows] = await db.execute(query, params);
@@ -3376,6 +3122,9 @@ async function startServer() {
         if (!product) {
           return res.status(404).json({ error: `Product with ID ${item.product_id} no longer exists` });
         }
+        if (Number(product.salon_id) !== Number(salon_id)) {
+          return res.status(400).json({ error: `Product "${product.name}" does not belong to the selected salon store.` });
+        }
 
         const requestedQty = Number(item.quantity) || 1;
         const availableStock = Number(product.stock_quantity) || 0;
@@ -3392,12 +3141,8 @@ async function startServer() {
 
       // Deduct stock for all items
       for (const item of items) {
-        const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
-        const product = (prodRows as any[])[0];
-        if (product) {
-          const newQty = Math.max(0, Number(product.stock_quantity) - Number(item.quantity));
-          await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [newQty, Number(item.product_id)]);
-        }
+        const qty = Number(item.quantity) || 1;
+        await db.execute('UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ?', [qty, Number(item.product_id)]);
       }
 
       // Generate order number
@@ -3974,28 +3719,63 @@ async function startServer() {
     }
   });
 
-  // Appointments List
-  app.get('/api/appointments', async (req, res) => {
+  // Appointments List (Protected & Scoped)
+  app.get('/api/appointments', async (req: any, res) => {
+    const user = req.user;
     const { customer_id, salon_id } = req.query;
     try {
       let query = 'SELECT * FROM appointments';
       const params: any[] = [];
-      const conditions = [];
+      const conditions: string[] = [];
 
-      if (customer_id) {
-        conditions.push('customer_id = ?');
-        params.push(Number(customer_id));
-      }
-      if (salon_id) {
-        conditions.push('salon_id = ?');
-        params.push(Number(salon_id));
+      if (user) {
+        if (user.user_type === 'customer') {
+          // Customers only see their own appointments
+          conditions.push('customer_id = ?');
+          params.push(Number(user.id));
+        } else if (user.user_type === 'salon_owner') {
+          // Salon owners only see appointments for their salons
+          const [ownedSalons] = await db.execute('SELECT id FROM salons WHERE owner_id = ?', [Number(user.id)]);
+          const ownedIds = (ownedSalons as any[]).map((s: any) => Number(s.id));
+          if (ownedIds.length === 0) {
+            return res.json([]);
+          }
+          if (salon_id && ownedIds.includes(Number(salon_id))) {
+            conditions.push('salon_id = ?');
+            params.push(Number(salon_id));
+          } else {
+            conditions.push(`salon_id IN (${ownedIds.join(',')})`);
+          }
+        } else if (user.user_type === 'admin') {
+          if (customer_id) {
+            conditions.push('customer_id = ?');
+            params.push(Number(customer_id));
+          }
+          if (salon_id) {
+            conditions.push('salon_id = ?');
+            params.push(Number(salon_id));
+          }
+        }
+      } else {
+        // Unauthenticated request: allow querying only with explicit filter, bounded
+        if (!customer_id && !salon_id) {
+          return res.status(401).json({ error: 'Authentication required to list appointments.' });
+        }
+        if (customer_id) {
+          conditions.push('customer_id = ?');
+          params.push(Number(customer_id));
+        }
+        if (salon_id) {
+          conditions.push('salon_id = ?');
+          params.push(Number(salon_id));
+        }
       }
 
       if (conditions.length > 0) {
         query += ' WHERE ' + conditions.join(' AND ');
       }
 
-      query += ' ORDER BY created_at DESC';
+      query += ' ORDER BY created_at DESC LIMIT 200';
       const [rows] = await db.execute(query, params);
       
       // Format data properly
@@ -4198,34 +3978,16 @@ async function startServer() {
         });
       }
 
-      // 3. Check specialist / slot conflicts
-      if (technician_id) {
-        const [techConflictRows] = await db.execute(
-          `SELECT id FROM appointments
-           WHERE salon_id = ? AND appointment_date = ? AND appointment_time = ?
-             AND technician_id = ? AND status IN ('pending', 'confirmed')
-           LIMIT 1`,
-          [Number(salon_id), appointment_date, appointment_time, Number(technician_id)]
-        );
-        if ((techConflictRows as any[]).length > 0) {
-          return res.status(409).json({ error: 'The selected specialist is already reserved for this time slot.' });
-        }
-      } else {
-        const [techCountRows] = await db.execute(
-          'SELECT COUNT(*) as total FROM technicians WHERE salon_id = ? AND is_available = 1',
-          [Number(salon_id)]
-        );
-        const totalTechs = Math.max(1, Number((techCountRows as any[])[0]?.total || 1));
-        const [bookedCountRows] = await db.execute(
-          `SELECT COUNT(*) as booked FROM appointments
-           WHERE salon_id = ? AND appointment_date = ? AND appointment_time = ?
-             AND status IN ('pending', 'confirmed')`,
-          [Number(salon_id), appointment_date, appointment_time]
-        );
-        const bookedCount = Number((bookedCountRows as any[])[0]?.booked || 0);
-        if (bookedCount >= totalTechs) {
-          return res.status(409).json({ error: 'All salon specialists are booked for this time slot.' });
-        }
+      // 3. Strict Interval Overlap and Capacity Conflict Check
+      const conflictCheck = await checkAppointmentConflict(
+        Number(salon_id),
+        appointment_date,
+        appointment_time,
+        Number(service.duration_minutes) || 45,
+        technician_id ? Number(technician_id) : null
+      );
+      if (conflictCheck.conflict) {
+        return res.status(409).json({ error: conflictCheck.reason });
       }
 
       const totalServicePrice = Number(service.price) || 0;
@@ -4578,6 +4340,32 @@ async function startServer() {
         return res.status(400).json({ error: 'Completed appointments cannot be rescheduled' });
       }
 
+      if (!isValidDate(new_date)) {
+        return res.status(400).json({ error: 'Invalid appointment date format.' });
+      }
+      if (!isFutureDate(new_date)) {
+        return res.status(400).json({ error: 'Rescheduled appointments can only be booked for future dates.' });
+      }
+
+      let serviceDuration = 45;
+      if (appointment.service_id) {
+        const [sRows] = await db.execute('SELECT duration_minutes FROM services WHERE id = ?', [Number(appointment.service_id)]);
+        serviceDuration = Number((sRows as any[])[0]?.duration_minutes) || 45;
+      }
+
+      // Verify no overlapping conflict with specialist or capacity at the new time
+      const conflictCheck = await checkAppointmentConflict(
+        Number(appointment.salon_id),
+        new_date,
+        new_time,
+        serviceDuration,
+        appointment.technician_id ? Number(appointment.technician_id) : null,
+        id // exclude current appointment being rescheduled
+      );
+      if (conflictCheck.conflict) {
+        return res.status(409).json({ error: conflictCheck.reason });
+      }
+
       const oldSchedule = `${appointment.appointment_date} at ${appointment.appointment_time}`;
       const rescheduleNote = `[Rescheduled from ${oldSchedule}${notes ? `: ${notes}` : ''}]`;
       const combinedNotes = appointment.notes ? `${appointment.notes}\n${rescheduleNote}` : rescheduleNote;
@@ -4834,7 +4622,7 @@ async function startServer() {
 
     try {
       const [appointmentRows] = await db.execute(
-        'SELECT id, salon_id FROM appointments WHERE id = ?',
+        'SELECT id, salon_id, service_id, appointment_date, appointment_time FROM appointments WHERE id = ?',
         [appointmentId]
       );
       const appointment = (appointmentRows as any[])[0];
@@ -4849,6 +4637,24 @@ async function startServer() {
         return res.status(400).json({ error: 'Technician is unavailable or belongs to another salon' });
       }
 
+      let serviceDuration = 45;
+      if (appointment.service_id) {
+        const [sRows] = await db.execute('SELECT duration_minutes FROM services WHERE id = ?', [Number(appointment.service_id)]);
+        serviceDuration = Number((sRows as any[])[0]?.duration_minutes) || 45;
+      }
+
+      const conflictCheck = await checkAppointmentConflict(
+        Number(appointment.salon_id),
+        appointment.appointment_date,
+        appointment.appointment_time,
+        serviceDuration,
+        technicianId,
+        appointmentId
+      );
+      if (conflictCheck.conflict) {
+        return res.status(409).json({ error: conflictCheck.reason });
+      }
+
       await db.execute(
         'UPDATE appointments SET technician_id = ?, technician_name = ? WHERE id = ?',
         [technician.id, technician.fullname, appointmentId]
@@ -4861,8 +4667,9 @@ async function startServer() {
   });
 
   // Reviews List
-  app.get('/api/reviews', async (req, res) => {
+  app.get('/api/reviews', async (req: any, res) => {
     const { salon_id, include_private } = req.query;
+    const user = req.user;
     try {
       let rows: any[] = [];
       if (salon_id) {
@@ -4873,8 +4680,9 @@ async function startServer() {
         rows = queryRows as any[];
       }
 
-      // If include_private is not requested, filter out strictly private reviews
-      const shouldIncludePrivate = include_private === 'true' || include_private === '1';
+      // Private reviews can ONLY be viewed by authenticated admins or salon owners
+      const canViewPrivate = user && (user.user_type === 'admin' || user.user_type === 'salon_owner');
+      const shouldIncludePrivate = (include_private === 'true' || include_private === '1') && canViewPrivate;
       if (!shouldIncludePrivate) {
         rows = rows.filter((r) => !r.is_private);
       }
@@ -5256,22 +5064,45 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/salons/:id', async (req, res) => {
+  // Safe Salon Deactivation (Preserves business history, receipts, reviews, and appointment logs)
+  app.delete('/api/salons/:id', async (req: any, res) => {
     const id = Number(req.params.id);
+    const user = req.user;
+
     try {
-      await db.execute('DELETE FROM salons WHERE id = ?', [id]);
-      await db.execute('DELETE FROM services WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM technicians WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM working_hours WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM appointments WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM reviews WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM promotions WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM products WHERE salon_id = ?', [id]);
-      await db.execute('DELETE FROM email_logs WHERE salon_id = ?', [id]);
-      res.json({ success: true });
+      const [salonRows] = await db.execute('SELECT * FROM salons WHERE id = ?', [id]);
+      const salon = (salonRows as any[])[0];
+      if (!salon) return res.status(404).json({ error: 'Salon not found' });
+
+      // Only administrators or the verified owner of this specific salon can deactivate it
+      if (!user || (user.user_type !== 'admin' && Number(user.id) !== Number(salon.owner_id))) {
+        return res.status(403).json({ error: 'Access denied: Only administrators or the salon owner can remove this salon.' });
+      }
+
+      const nowIso = new Date().toISOString();
+
+      // Soft-deactivate salon and mark hidden from public discovery
+      await db.execute(
+        'UPDATE salons SET is_active = 0, status = ?, deactivated_at = ? WHERE id = ?',
+        ['deactivated', nowIso, id]
+      );
+
+      // Deactivate catalog services and technician availability to immediately prevent new bookings
+      await db.execute('UPDATE services SET is_active = 0 WHERE salon_id = ?', [id]);
+      await db.execute('UPDATE technicians SET is_available = 0 WHERE salon_id = ?', [id]);
+
+      // Note: All historical appointments, customer reviews, transactions, receipts, and email logs
+      // are carefully PRESERVED for audit, consumer protection, dispute resolution, and reporting.
+      console.log(`[Audit] Salon ID ${id} (${salon.salon_name}) successfully deactivated by User ID ${user.id} (${user.email}). Historical records preserved.`);
+
+      res.json({
+        success: true,
+        deactivated: true,
+        message: `Salon "${salon.salon_name}" has been deactivated and hidden from discovery. All historical business records and receipts remain safely preserved.`,
+      });
     } catch (error) {
-      console.error('Delete salon error:', error);
-      res.status(500).json({ error: 'Server error deleting salon' });
+      console.error('Deactivate salon error:', error);
+      res.status(500).json({ error: 'Server error deactivating salon' });
     }
   });
 
@@ -5517,6 +5348,7 @@ async function startServer() {
       // Record transaction
       const receiptNo = `REC-PM-${Math.floor(100000 + Math.random() * 900000)}`;
       const nowIso = new Date().toISOString();
+      const initialStatus = usedProvider === 'paymongo_live' ? 'pending' : 'succeeded';
 
       const [txResult] = await db.execute(
         `INSERT INTO transactions (
@@ -5541,7 +5373,7 @@ async function startServer() {
           'PHP',
           paymentMethod || 'paymongo_gcash',
           paymentType || 'deposit',
-          'succeeded',
+          initialStatus,
           usedProvider,
           providerReference,
           receiptNo,
@@ -5567,7 +5399,7 @@ async function startServer() {
         currency: 'PHP',
         payment_method: paymentMethod,
         payment_type: paymentType,
-        payment_status: 'succeeded',
+        payment_status: initialStatus,
         provider: usedProvider,
         provider_reference: providerReference,
         paymongo_checkout_url: paymongoCheckoutUrl,
@@ -5654,6 +5486,7 @@ async function startServer() {
 
       // If status=success indicated and appointment is present, ensure status is marked paid
       const isSuccess = req.query.status === 'success' || req.query.payment_status === 'success';
+      const isCancelled = req.query.status === 'cancelled' || req.query.payment_status === 'cancelled' || req.query.status === 'failed';
       if (isSuccess) {
         if (transaction && transaction.payment_status !== 'succeeded') {
           await db.execute(
@@ -5671,6 +5504,15 @@ async function startServer() {
             );
             appointment.payment_status = targetStatus;
           }
+        }
+      } else if (isCancelled) {
+        if (transaction && transaction.payment_status === 'pending') {
+          const failStatus = req.query.status === 'failed' ? 'failed' : 'cancelled';
+          await db.execute(
+            "UPDATE transactions SET payment_status = ? WHERE transaction_reference = ?",
+            [failStatus, ref]
+          );
+          transaction.payment_status = failStatus;
         }
       }
 

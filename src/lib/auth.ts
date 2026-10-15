@@ -34,7 +34,7 @@ export interface RegisterData {
   admin_code?: string;
 }
 
-async function readAuthResponse(response: Response): Promise<{ error?: string; details?: string; user?: User }> {
+async function readAuthResponse(response: Response): Promise<{ error?: string; details?: string; user?: User; token?: string }> {
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
     return await response.json();
@@ -67,6 +67,10 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
           ? 'Please wait and try again later.'
           : data.details || 'Please check your credentials and try again',
       };
+    }
+
+    if (data.token && typeof window !== 'undefined') {
+      window.localStorage.setItem('nailglamhub_auth_token', data.token);
     }
 
     return {
@@ -106,6 +110,10 @@ export async function register(userData: RegisterData): Promise<AuthResponse> {
           ? 'Please wait up to an hour before trying again.'
           : data.details || 'Please check your information and try again',
       };
+    }
+
+    if (data.token && typeof window !== 'undefined') {
+      window.localStorage.setItem('nailglamhub_auth_token', data.token);
     }
 
     return {
@@ -161,6 +169,9 @@ export async function loginWithGoogle(
 
     if (typeof window !== 'undefined' && firebaseUser.email) {
       window.localStorage.setItem(`last_google_${preferredRole}_email`, firebaseUser.email);
+      if (data.token) {
+        window.localStorage.setItem('nailglamhub_auth_token', data.token);
+      }
     }
 
     return {
@@ -168,37 +179,11 @@ export async function loginWithGoogle(
       user: data.user,
     };
   } catch (err: any) {
-    console.error('Google login caught unexpected error:', err);
-    if (err?.message && (err.message.includes('403') || err.message.includes('Administrator') || err.message.includes('denied'))) {
-      return {
-        success: false,
-        error: err.message,
-      };
-    }
-
-    const roleDefaultEmail =
-      preferredRole === 'admin'
-        ? 'hasincludeionull@gmail.com'
-        : preferredRole === 'salon_owner'
-        ? 'testowner@gmail.com'
-        : 'claire.delacruz@gmail.com';
-
-    const targetEmail = preferredEmail && preferredEmail.includes('@') ? preferredEmail : roleDefaultEmail;
-    const fallbackUser: User = {
-      id: Date.now(),
-      fullname: preferredName || targetEmail.split('@')[0],
-      email: targetEmail,
-      phone: '',
-      user_type: preferredRole,
-      status: 'active',
-      avatar: undefined,
-      email_verified: true,
-      google_verified: true,
-      created_at: new Date().toISOString(),
-    };
+    console.error('Google login caught error:', err);
     return {
-      success: true,
-      user: fallbackUser,
+      success: false,
+      error: err?.message || 'Google authentication was not completed or failed verification.',
+      details: 'Please check your connection and try signing in with Google again.',
     };
   }
 }

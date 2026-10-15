@@ -38,13 +38,8 @@ export interface EmailLog {
   attachment_name?: string;
   pdf_html?: string;
   sent_at: string;
-  status: 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'skipped';
+  status: 'sent' | 'delivered' | 'failed';
   sender_email?: string;
-  idempotency_key?: string;
-  provider_message_id?: string;
-  last_error?: string;
-  attempts?: number;
-  template?: string;
 }
 
 export interface Salon {
@@ -198,7 +193,6 @@ export interface Appointment {
   cancelled_by?: 'customer' | 'salon_owner' | 'admin';
   rescheduled_from_id?: number;
   reschedule_count?: number;
-  schedule_version?: number;
   created_at: string;
   updated_at?: string;
 }

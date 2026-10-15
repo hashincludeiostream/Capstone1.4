@@ -99,21 +99,6 @@ export const getPasswordStrengthChecklist = (password: string): PasswordStrength
     };
   }
 
-  // If using recognized demo accounts
-  if (password === 'Demo123!' || password === 'demo123') {
-    return {
-      minLength: true,
-      hasUppercase: true,
-      hasLowercase: true,
-      hasNumber: true,
-      hasSpecial: true,
-      score: 5,
-      percentage: 100,
-      label: 'Strong',
-      isValid: true,
-    };
-  }
-
   const minLength = password.length >= 8 && password.length <= 128;
   const hasUppercase = /[A-Z]/.test(password);
   const hasLowercase = /[a-z]/.test(password);
@@ -148,11 +133,6 @@ export const getPasswordStrengthChecklist = (password: string): PasswordStrength
 export const validatePassword = (password: string): { isValid: boolean; error?: string } => {
   if (!password || password.trim() === '') {
     return { isValid: false, error: 'Password is required' };
-  }
-
-  // Allow recognized testing / demo accounts
-  if (password === 'Demo123!' || password === 'demo123') {
-    return { isValid: true };
   }
 
   if (password.length < 8) {

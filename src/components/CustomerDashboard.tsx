@@ -38,8 +38,6 @@ interface CustomerDashboardProps {
   onRefreshAppointments?: () => void;
   targetAppointmentId?: number | null;
   onViewReceipt?: (appointment: Appointment) => void;
-  initialTab?: 'appointments' | 'messages';
-  initialConversationId?: string;
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
@@ -51,8 +49,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   onRefreshAppointments,
   targetAppointmentId,
   onViewReceipt,
-  initialTab = 'appointments',
-  initialConversationId,
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,22 +56,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
-  const [activePortalTab, setActivePortalTab] = useState<'appointments' | 'messages'>(initialTab);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
+  const [activePortalTab, setActivePortalTab] = useState<'appointments' | 'messages'>('appointments');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const { addNotification, unreadMessagesCount } = useNotifications();
-
-  useEffect(() => {
-    if (initialTab) {
-      setActivePortalTab(initialTab);
-    }
-  }, [initialTab]);
-
-  useEffect(() => {
-    if (initialConversationId) {
-      setSelectedConversationId(initialConversationId);
-      setActivePortalTab('messages');
-    }
-  }, [initialConversationId]);
 
   useEffect(() => {
     if (targetAppointmentId) {

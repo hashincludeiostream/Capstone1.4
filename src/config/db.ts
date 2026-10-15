@@ -1,6 +1,11 @@
 import { inMemoryDb } from './inMemoryDb';
 
-let isFirestoreConnected = false;
+export type PersistenceStatus = 'connected' | 'degraded' | 'unavailable';
+
+let persistenceStatus: PersistenceStatus = 'degraded';
+let lastSyncTimestamp: string | null = null;
+let lastSyncError: string | null = null;
+let syncedRecordsCount = 0;
 
 /**
  * Initializes and validates connection to Google Cloud Firestore database.
@@ -12,26 +17,43 @@ export async function testConnection(): Promise<boolean> {
   // Trigger sync in background with a quick race so the web server binds immediately
   Promise.race([
     inMemoryDb.syncFromFirestore(),
-    new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 8000)),
+    new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Firestore sync initial handshake timeout')), 8000)),
   ])
     .then((totalDocs) => {
-      isFirestoreConnected = true;
-      console.log(`✅ Connected to Google Cloud Firestore successfully (${totalDocs} live records loaded). Zero XAMPP / MySQL dependencies.`);
+      persistenceStatus = 'connected';
+      syncedRecordsCount = Number(totalDocs) || 0;
+      lastSyncTimestamp = new Date().toISOString();
+      lastSyncError = null;
+      console.log(`✅ Connected to Google Cloud Firestore successfully (${totalDocs} live records loaded).`);
     })
     .catch((err: any) => {
-      console.warn('⚠️ Google Cloud Firestore sync note:', err?.message || err);
-      isFirestoreConnected = true;
+      persistenceStatus = 'degraded';
+      lastSyncError = err?.message || String(err);
+      console.warn('⚠️ Google Cloud Firestore sync note (operating in degraded local-disk mode):', lastSyncError);
     });
 
   return true;
 }
 
-export async function healthCheck(): Promise<{ connected: boolean; message: string }> {
+export async function healthCheck(): Promise<{
+  status: PersistenceStatus;
+  connected: boolean;
+  message: string;
+  syncedDocs: number;
+  lastSyncAt: string | null;
+  error?: string | null;
+}> {
   return {
-    connected: isFirestoreConnected,
-    message: isFirestoreConnected
+    status: persistenceStatus,
+    connected: persistenceStatus === 'connected',
+    message: persistenceStatus === 'connected'
       ? 'Google Cloud Firestore connected and healthy (ai-studio-capstone14-f7575340-b666-4d9b-b5f4-cffdf3c32bbc)'
-      : 'Google Cloud Firestore connecting...',
+      : persistenceStatus === 'degraded'
+      ? 'Persistence operating in degraded mode (local disk storage active; cloud sync pending/retrying)'
+      : 'Database storage unavailable',
+    syncedDocs: syncedRecordsCount,
+    lastSyncAt: lastSyncTimestamp,
+    error: lastSyncError,
   };
 }
 
@@ -48,5 +70,4 @@ const db = {
   },
 };
 
-export { db };
 export default db;

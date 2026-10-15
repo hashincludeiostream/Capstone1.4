@@ -7,7 +7,6 @@ interface AdminGateModalProps {
   onAuthorized: () => void;
 }
 
-const AUTHORIZED_ADMIN_CODES = ['ADMIN2025', 'GLAM_ADMIN', 'ADMIN', 'SUPERADMIN'];
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 30000;
 
@@ -46,7 +45,7 @@ export const AdminGateModal: React.FC<AdminGateModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutRemaining > 0) return;
 
@@ -59,13 +58,15 @@ export const AdminGateModal: React.FC<AdminGateModalProps> = ({
     setIsAuthorizing(true);
     setError('');
 
-    // Simulate verification delay for security feel
-    setTimeout(() => {
-      const isAuthorized = AUTHORIZED_ADMIN_CODES.some(
-        (code) => code.toUpperCase() === trimmed.toUpperCase()
-      );
+    try {
+      const res = await fetch('/api/auth/verify-admin-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_code: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-      if (isAuthorized) {
+      if (res.ok && data.authorized) {
         setIsSuccess(true);
         setError('');
         sessionStorage.setItem('nailglamhub_admin_unlocked', 'true');
@@ -81,14 +82,15 @@ export const AdminGateModal: React.FC<AdminGateModalProps> = ({
 
         if (nextAttempts >= MAX_ATTEMPTS) {
           setLockoutRemaining(Math.round(LOCKOUT_DURATION_MS / 1000));
-          setError(`Too many invalid attempts. Security gate locked for 30 seconds.`);
+          setError('Too many invalid attempts. Security gate locked for 30 seconds.');
         } else {
-          setError(
-            `Invalid clearance code. (${MAX_ATTEMPTS - nextAttempts} attempts remaining)`
-          );
+          setError(data.error || `Access denied. Incorrect security authorization code. (${MAX_ATTEMPTS - nextAttempts} attempts remaining)`);
         }
       }
-    }, 450);
+    } catch {
+      setIsAuthorizing(false);
+      setError('Connection error verifying administrator authorization code. Please try again.');
+    }
   };
 
   return (

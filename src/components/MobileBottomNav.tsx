@@ -45,7 +45,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const isCustomer = currentUser?.user_type === 'customer';
   const isOwner = currentUser?.user_type === 'salon_owner';
   const isAdmin = currentUser?.user_type === 'admin';
-  const { categoryUnread, unreadBookingsCount, unreadOrdersCount, unreadMessagesCount } = useNotifications();
+  const { categoryUnread, unreadBookingsCount, unreadOrdersCount } = useNotifications();
 
   // 1. ADMIN BOTTOM NAVIGATION
   if (isAdmin) {
@@ -153,18 +153,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             onClick={() => onNavigate('owner-appointments')}
             className={`relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'owner-appointments' || activeTab === 'owner-messages'
+              activeTab === 'owner-appointments'
                 ? 'text-purple-700 font-bold scale-105'
                 : 'text-gray-500 hover:text-purple-600'
             }`}
           >
             <Calendar className="w-5 h-5" />
-            {(ownerPendingAppointmentsCount > 0 || unreadMessagesCount > 0) && (
+            {ownerPendingAppointmentsCount > 0 && (
               <NotificationBadge
-                count={ownerPendingAppointmentsCount + unreadMessagesCount}
+                count={ownerPendingAppointmentsCount}
                 variant="amber"
-                priority={ownerPendingAppointmentsCount > 0 || unreadMessagesCount > 0 ? 'urgent' : 'normal'}
-                isUnread={(ownerPendingAppointmentsCount > 0 && categoryUnread.bookings) || unreadMessagesCount > 0}
+                priority={ownerPendingAppointmentsCount > 0 ? 'urgent' : 'normal'}
+                isUnread={ownerPendingAppointmentsCount > 0 && categoryUnread.bookings}
                 showPing={false}
                 size="badge-overlay"
                 className="absolute top-1 right-2.5"
@@ -301,18 +301,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             id="mobile-bottom-nav-dashboard"
             onClick={() => onNavigate('customer-dashboard')}
             className={`relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'customer-dashboard' || activeTab === 'customer-messages' || activeTab === 'profile'
+              activeTab === 'customer-dashboard' || activeTab === 'profile'
                 ? 'text-pink-600 font-bold scale-105'
                 : 'text-gray-500 hover:text-pink-600'
             }`}
           >
             <Calendar className="w-5 h-5" />
-            {bookingsCount + ordersCount + unreadMessagesCount > 0 && (
+            {bookingsCount + ordersCount > 0 && (
               <NotificationBadge
-                count={bookingsCount + ordersCount + unreadMessagesCount}
+                count={bookingsCount + ordersCount}
                 variant="pink"
-                priority={unreadMessagesCount > 0 ? 'urgent' : 'normal'}
-                isUnread={unreadBookingsCount + unreadOrdersCount + unreadMessagesCount > 0}
+                priority="normal"
+                isUnread={unreadBookingsCount + unreadOrdersCount > 0}
                 showPing={false}
                 size="badge-overlay"
                 className="absolute top-1 right-2.5"
