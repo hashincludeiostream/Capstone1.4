@@ -35,7 +35,6 @@ export interface EmailDispatchOptions {
 }
 
 const BRAND_NAME = 'Nail Glam Hub';
-const DEFAULT_SENDER = 'notifications@nailglamhub.com';
 
 /**
  * Encodes string to UTF-8 Base64 (RFC 4648 safe, no Latin1 DOMException errors)
@@ -522,7 +521,7 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
             subject: options.subject,
             category: options.category,
             hasPdf: Boolean(options.hasPdfAttachment),
-            sender: data.sender || `Nail Glam Hub System <${DEFAULT_SENDER}>`,
+            sender: data.sender || 'Nail Glam Hub System Central Mailer',
             deliveredViaSystemMailbox: Boolean(data.smtpAccepted),
             status: data.status,
           },

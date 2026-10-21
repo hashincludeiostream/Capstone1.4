@@ -18,6 +18,9 @@ import {
   X,
   Loader2,
   AlertCircle,
+  Server,
+  Key,
+  Info,
 } from 'lucide-react';
 import { User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
@@ -106,6 +109,133 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
     showToast(newVal ? 'Monthly automated platform PDF reports enabled' : 'Monthly automated platform PDF reports disabled');
   };
 
+  // Central System Mailer Configuration & Diagnostic Status
+  const [systemStatus, setSystemStatus] = useState<{
+    configured: boolean;
+    configuredCentralSender: boolean;
+    senderEmail: string;
+    senderName: string;
+    senderFormatted: string;
+    senderUserMatch: boolean;
+    senderUserNotice: string;
+    smtpHost: string;
+    smtpPort: number;
+    smtpSecure: boolean;
+    smtpAuthUser: string;
+    validationErrors: string[];
+    status: string;
+    message: string;
+  } | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+
+  // Connection Verification state
+  const [isVerifyingSmtp, setIsVerifyingSmtp] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{
+    success: boolean;
+    connected?: boolean;
+    message?: string;
+    response?: string;
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    senderFormatted?: string;
+    senderUserMatch?: boolean;
+    senderUserNotice?: string;
+  } | null>(null);
+
+  // Test Email state
+  const [testRecipient, setTestRecipient] = useState(defaultAdminEmail);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message?: string;
+    messageId?: string;
+    sender?: string;
+    recipient?: string;
+    auditLogged?: boolean;
+  } | null>(null);
+
+  const fetchSystemStatus = async () => {
+    setLoadingStatus(true);
+    try {
+      const res = await ajax('/api/email/system-status');
+      if (res.ok) {
+        const data = await res.json();
+        setSystemStatus(data);
+      }
+    } catch (err) {
+      console.error('Failed to load system email status:', err);
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const handleVerifySmtp = async () => {
+    setIsVerifyingSmtp(true);
+    setVerifyResult(null);
+    try {
+      const res = await ajax('/api/email/verify-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Role': currentUser?.user_type || 'admin',
+        },
+      });
+      const data = await res.json();
+      setVerifyResult(data);
+      if (data.success && data.connected) {
+        showToast('✅ SMTP server connection verified successfully!');
+      } else {
+        showToast(`⚠️ Connection test: ${data.message || 'Verification failed'}`);
+      }
+    } catch (err: any) {
+      setVerifyResult({
+        success: false,
+        connected: false,
+        message: err?.message || 'Network error verifying SMTP connection',
+      });
+      showToast('❌ Failed to reach SMTP verification endpoint');
+    } finally {
+      setIsVerifyingSmtp(false);
+      fetchSystemStatus();
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testRecipient.trim()) {
+      showToast('Please enter a recipient email address');
+      return;
+    }
+    setIsSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await ajax('/api/email/send-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Role': currentUser?.user_type || 'admin',
+        },
+        body: JSON.stringify({ recipientEmail: testRecipient.trim() }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+      if (data.success) {
+        showToast(`✅ Test email dispatched to ${testRecipient.trim()}!`);
+        fetchEmailLogs();
+      } else {
+        showToast(`⚠️ Dispatch error: ${data.message || 'Failed to send test email'}`);
+      }
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err?.message || 'Network error sending test email',
+      });
+      showToast('❌ Test email dispatch failed');
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   const fetchEmailLogs = async () => {
     setLoadingLogs(true);
     try {
@@ -126,6 +256,7 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
 
   useEffect(() => {
     fetchEmailLogs();
+    fetchSystemStatus();
   }, []);
 
   const handleInitiatePlatformReport = () => {
@@ -289,24 +420,256 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
 
   return (
     <div className="space-y-6">
-      {/* Specialized System Email Dispatcher Banner */}
-      <div className="p-4 rounded-2xl border bg-emerald-50/90 border-emerald-200 text-emerald-950">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Central System Sender & SMTP Configuration Diagnostic Panel */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden">
+        {/* Header bar */}
+        <div className="p-5 sm:p-6 border-b border-stone-100 bg-stone-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start sm:items-center gap-3">
-            <div className="p-2 rounded-xl shrink-0 bg-emerald-100 text-emerald-700">
-              <CheckCircle2 className="w-5 h-5" />
+            <div className="p-2.5 rounded-2xl bg-indigo-100 text-indigo-700 shadow-sm shrink-0">
+              <Server className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-sm flex items-center gap-2">
-                <span>Specialized System Email Dispatcher</span>
-                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900">
-                  Active System Mailer
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-stone-900 text-base">
+                  Central System Mailer &amp; SMTP Diagnostics
+                </h3>
+                <span
+                  className={`text-[11px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full ${
+                    systemStatus?.configured
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}
+                >
+                  {systemStatus?.configured ? 'Active Central Sender' : 'Config Incomplete'}
                 </span>
               </div>
-              <p className="text-xs mt-0.5 opacity-90 leading-relaxed">
-                Official sender: <strong>Nail Glam Hub System &lt;notifications@nailglamhub.com&gt;</strong>. All partner studio alerts, platform executive audits, and user notifications are dispatched centrally from this specialized system address to your recipient inbox (<strong>{adminEmail}</strong>) without sending from personal accounts.
+              <p className="text-xs text-stone-500 mt-0.5">
+                Single centralized Nodemailer transporter &amp; identity enforcing consistent dispatch across all booking, cancellation, review, and report workflows.
               </p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                fetchSystemStatus();
+                fetchEmailLogs();
+              }}
+              disabled={loadingStatus}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
+              title="Refresh central mailer status"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingStatus ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Configuration Overview Grid */}
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
+              <div className="text-[11px] font-bold uppercase text-stone-500 tracking-wider">
+                Configured Central Sender
+              </div>
+              <div className="font-semibold text-sm text-stone-900 mt-1 truncate" title={systemStatus?.senderFormatted}>
+                {systemStatus?.senderFormatted || (systemStatus?.senderEmail ? `${systemStatus.senderName} <${systemStatus.senderEmail}>` : 'Not Configured')}
+              </div>
+              <div className="text-[11px] text-stone-500 mt-0.5">
+                Env: <code>SYSTEM_SENDER_EMAIL</code>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
+              <div className="text-[11px] font-bold uppercase text-stone-500 tracking-wider">
+                SMTP Server &amp; Security
+              </div>
+              <div className="font-semibold text-sm text-stone-900 mt-1 truncate">
+                {systemStatus?.smtpHost ? `${systemStatus.smtpHost}:${systemStatus.smtpPort}` : 'Not Configured'}
+              </div>
+              <div className="text-[11px] text-stone-500 mt-0.5">
+                {systemStatus?.smtpSecure ? 'Direct SSL/TLS (Port 465)' : 'STARTTLS (Port 587)'}
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
+              <div className="text-[11px] font-bold uppercase text-stone-500 tracking-wider">
+                Authenticated User Account
+              </div>
+              <div className="font-semibold text-sm text-stone-900 mt-1 truncate" title={systemStatus?.smtpAuthUser}>
+                {systemStatus?.smtpAuthUser || 'Unauthenticated / Not Set'}
+              </div>
+              <div className="text-[11px] text-stone-500 mt-0.5 flex items-center gap-1">
+                <Key className="w-3 h-3 text-stone-400" />
+                <span>Password securely hidden</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
+              <div className="text-[11px] font-bold uppercase text-stone-500 tracking-wider">
+                Provider Sender Alignment
+              </div>
+              <div className="font-semibold text-sm text-stone-900 mt-1 flex items-center gap-1.5">
+                {systemStatus?.senderUserMatch ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="text-emerald-700">Direct User Match</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="text-amber-700">Custom Sender / Alias</span>
+                  </>
+                )}
+              </div>
+              <div className="text-[11px] text-stone-500 mt-0.5">
+                {systemStatus?.senderUserMatch
+                  ? 'Authorized by authenticated login'
+                  : 'Requires provider sender authorization'}
+              </div>
+            </div>
+          </div>
+
+          {/* Sender user notice (domain mismatch / aliasing) */}
+          {systemStatus && !systemStatus.senderUserMatch && (
+            <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 text-blue-950 text-xs flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">SMTP Provider Authorization Note:</span>{' '}
+                {systemStatus.senderUserNotice ||
+                  'The configured SYSTEM_SENDER_EMAIL differs from SMTP_USER. Ensure your SMTP provider (Gmail, SendGrid, Amazon SES, or custom mailer) has authorized this sender address or configured alias permissions.'}
+              </div>
+            </div>
+          )}
+
+          {/* Validation errors */}
+          {systemStatus?.validationErrors && systemStatus.validationErrors.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Configuration Validation Diagnostics:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 pl-1 text-rose-800">
+                {systemStatus.validationErrors.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Diagnostic Action Controls: Test Connection & Test Send */}
+          <div className="pt-2 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Tool 1: Verify Connection */}
+            <div className="p-4 rounded-2xl bg-stone-50/90 border border-stone-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-stone-800">
+                    Live SMTP Connection Verification
+                  </h4>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Tests socket handshake and authentication with {systemStatus?.smtpHost || 'configured server'}
+                  </p>
+                </div>
+                <button
+                  onClick={handleVerifySmtp}
+                  disabled={isVerifyingSmtp}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  <Server className={`w-3.5 h-3.5 ${isVerifyingSmtp ? 'animate-spin' : ''}`} />
+                  <span>{isVerifyingSmtp ? 'Verifying Handshake...' : 'Test Connection'}</span>
+                </button>
+              </div>
+
+              {verifyResult && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs ${
+                    verifyResult.success && verifyResult.connected
+                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                      : 'bg-rose-100 text-rose-900 border border-rose-200'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    {verifyResult.success && verifyResult.connected ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                    )}
+                    <span>
+                      {verifyResult.connected
+                        ? 'SMTP Server Connected & Ready'
+                        : 'SMTP Connection Failed'}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] font-mono break-all opacity-90">
+                    {verifyResult.response || verifyResult.message}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tool 2: Dispatch Central Test Email */}
+            <div className="p-4 rounded-2xl bg-stone-50/90 border border-stone-200 space-y-3">
+              <div>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-stone-800">
+                  Send Centralized Test Message
+                </h4>
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Sends an end-to-end test dispatch using the configured central sender identity
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={testRecipient}
+                  onChange={(e) => setTestRecipient(e.target.value)}
+                  placeholder="recipient@example.com"
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-stone-300 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                />
+                <button
+                  onClick={handleSendTestEmail}
+                  disabled={isSendingTest}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  <Send className={`w-3.5 h-3.5 ${isSendingTest ? 'animate-spin' : ''}`} />
+                  <span>{isSendingTest ? 'Dispatching...' : 'Send Test'}</span>
+                </button>
+              </div>
+
+              {testResult && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs ${
+                    testResult.success
+                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                      : 'bg-rose-100 text-rose-900 border border-rose-200'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    {testResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                    )}
+                    <span>{testResult.success ? 'Test Email Delivered' : 'Test Dispatch Failed'}</span>
+                  </div>
+                  <div className="mt-1 text-[11px] opacity-90">
+                    {testResult.message}
+                    {testResult.messageId && (
+                      <span className="block font-mono text-[10px] mt-0.5 text-stone-600">
+                        ID: {testResult.messageId}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Secure config guidance */}
+          <div className="text-[11px] text-stone-500 pt-1 flex items-center justify-between border-t border-stone-100">
+            <span>
+              🔒 SMTP credentials and central sender addresses are managed via backend environment variables (<code>.env</code>). Passwords are never saved in database tables or exposed in client bundles.
+            </span>
+            <span className="text-stone-400">Restart backend after updating .env</span>
           </div>
         </div>
       </div>

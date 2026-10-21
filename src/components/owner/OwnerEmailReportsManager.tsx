@@ -88,6 +88,18 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [senderInfo, setSenderInfo] = useState<{ senderFormatted?: string; configured?: boolean } | null>(null);
+
+  useEffect(() => {
+    ajax('/api/email/system-status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.senderFormatted) {
+          setSenderInfo({ senderFormatted: data.senderFormatted, configured: Boolean(data.configured) });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Instant direct PDF download
   const handleDownloadDirectPdf = async () => {
@@ -294,13 +306,15 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
             </div>
             <div>
               <div className="font-bold text-sm flex items-center gap-2">
-                <span>Specialized System Email Dispatcher</span>
-                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900">
-                  Active System Mailer
+                <span>Centralized System Email Mailer</span>
+                <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${
+                  senderInfo?.configured ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                }`}>
+                  {senderInfo?.configured ? 'Active Central Sender' : 'Configured Central Mailer'}
                 </span>
               </div>
               <p className="text-xs mt-0.5 opacity-90 leading-relaxed">
-                Official sender: <strong>Nail Glam Hub System &lt;notifications@nailglamhub.com&gt;</strong>. All booking updates, pickup notices, and certified PDF master reports are delivered centrally from this specialized address to your recipient inbox (<strong>{targetEmail}</strong>) without sending from personal accounts.
+                Central system sender: <strong>{senderInfo?.senderFormatted || 'Configured Central System Mailer'}</strong>. All booking updates, pickup notices, and certified PDF master reports are delivered centrally from this specialized address to your recipient inbox (<strong>{targetEmail}</strong>) without sending from personal accounts.
               </p>
             </div>
           </div>

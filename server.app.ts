@@ -89,21 +89,33 @@ export type DispatchResult = {
 export interface SmtpConfigValidation {
   configured: boolean;
   missing: string[];
+  validationErrors: string[];
   host?: string;
   port?: number;
   user?: string;
-  senderEmail: string;
+  senderEmail?: string;
   senderName: string;
+  isSecure: boolean;
+  senderUserMatch: boolean;
+  senderUserNotice?: string;
+}
+
+export function isValidEmailAddress(email?: string | null): boolean {
+  if (!email || typeof email !== 'string') return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email.trim());
 }
 
 export function getSmtpConfigValidation(): SmtpConfigValidation {
   const missing: string[] = [];
+  const validationErrors: string[] = [];
+
   const host = process.env.SMTP_HOST?.trim();
   const portStr = process.env.SMTP_PORT?.trim();
   const user = process.env.SMTP_USER?.trim();
   const pass = process.env.SMTP_PASS;
-  const senderEmail = process.env.SYSTEM_SENDER_EMAIL?.trim() || user || 'notifications@nailglamhub.com';
-  const senderName = process.env.SYSTEM_SENDER_NAME?.trim() || 'Nail Glam Hub System';
+  const rawSenderEmail = process.env.SYSTEM_SENDER_EMAIL?.trim();
+  const senderName = process.env.SYSTEM_SENDER_NAME?.trim() || 'Nail Glam Hub';
 
   if (!host) missing.push('SMTP_HOST');
   if (!portStr) {
@@ -111,20 +123,56 @@ export function getSmtpConfigValidation(): SmtpConfigValidation {
   } else {
     const portNum = Number(portStr);
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-      missing.push('SMTP_PORT (must be an integer between 1 and 65535)');
+      validationErrors.push('SMTP_PORT must be an integer between 1 and 65535');
     }
   }
   if (!user) missing.push('SMTP_USER');
   if (!pass) missing.push('SMTP_PASS');
 
+  // SYSTEM_SENDER_EMAIL is strictly required without any hardcoded fallback
+  if (!rawSenderEmail) {
+    missing.push('SYSTEM_SENDER_EMAIL');
+  } else if (!isValidEmailAddress(rawSenderEmail)) {
+    validationErrors.push(`SYSTEM_SENDER_EMAIL ("${rawSenderEmail}") is not a valid email address format`);
+  }
+
+  const port = portStr ? Number(portStr) : undefined;
+  const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
+
+  // Consistency check between SYSTEM_SENDER_EMAIL and SMTP_USER
+  let senderUserMatch = true;
+  let senderUserNotice: string | undefined = undefined;
+
+  if (rawSenderEmail && user) {
+    const normSender = rawSenderEmail.toLowerCase();
+    const normUser = user.toLowerCase();
+    if (normSender !== normUser) {
+      senderUserMatch = false;
+      const senderDomain = normSender.split('@')[1];
+      const userDomain = normUser.includes('@') ? normUser.split('@')[1] : null;
+
+      if (userDomain && senderDomain !== userDomain) {
+        senderUserNotice = `Sender email domain (@${senderDomain}) differs from SMTP authentication domain (@${userDomain}). Ensure your SMTP provider (e.g., SendGrid, AWS SES, Mailgun, or Google Workspace) has authorized this sender address or domain; otherwise messages may be rejected or rewritten.`;
+      } else {
+        senderUserNotice = `Sender email (${rawSenderEmail}) differs from SMTP authentication account (${user}). Ensure this sender alias is authorized by your SMTP provider.`;
+      }
+    }
+  }
+
+  const configured = missing.length === 0 && validationErrors.length === 0;
+
   return {
-    configured: missing.length === 0,
+    configured,
     missing,
+    validationErrors,
     host,
-    port: portStr ? Number(portStr) : undefined,
+    port,
     user,
-    senderEmail,
+    senderEmail: rawSenderEmail,
     senderName,
+    isSecure,
+    senderUserMatch,
+    senderUserNotice,
   };
 }
 
@@ -138,15 +186,15 @@ let lastTransporterHash = '';
 
 export function getSystemTransporter(): any {
   const val = getSmtpConfigValidation();
-  if (!val.configured || !val.host || !val.port || !val.user) {
+  if (!val.configured || !val.host || !val.port || !val.user || !val.senderEmail) {
     cachedTransporter = null;
     lastTransporterHash = '';
     return null;
   }
 
   const port = val.port;
-  const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
-  const configHash = `${val.host}:${port}:${val.user}:${isSecure}:${process.env.SMTP_PASS ? 'set' : 'none'}`;
+  const isSecure = val.isSecure;
+  const configHash = `${val.host}:${port}:${val.user}:${val.senderEmail}:${val.senderName}:${isSecure}:${process.env.SMTP_PASS ? 'set' : 'none'}:${process.env.SMTP_IGNORE_TLS_ERRORS || 'false'}`;
 
   if (cachedTransporter && lastTransporterHash === configHash) {
     return cachedTransporter;
@@ -169,10 +217,10 @@ export function getSystemTransporter(): any {
       },
     });
     lastTransporterHash = configHash;
-    console.log(`📧 [System Mailer] Transporter initialized for ${val.host}:${port} (${val.senderName} <${val.senderEmail}>)`);
+    console.log(`📧 [Central Mailer] Transporter initialized for ${val.host}:${port} as "${val.senderName}" <${val.senderEmail}> (auth: ${val.user})`);
     return cachedTransporter;
   } catch (err: any) {
-    console.warn('⚠️ [System Mailer] Failed to initialize SMTP transporter:', err?.message || err);
+    console.warn('⚠️ [Central Mailer] Failed to initialize SMTP transporter:', err?.message || err);
     cachedTransporter = null;
     lastTransporterHash = '';
     return null;
@@ -190,10 +238,15 @@ export async function checkSmtpHealth(): Promise<{
   smtpVerified: boolean | null;
   deliveryMode: string;
   missing?: string[];
+  validationErrors?: string[];
   host?: string;
   port?: number;
-  senderEmail: string;
+  user?: string;
+  senderEmail?: string;
   senderName: string;
+  isSecure: boolean;
+  senderUserMatch: boolean;
+  senderUserNotice?: string;
 }> {
   const val = getSmtpConfigValidation();
   if (!val.configured) {
@@ -203,8 +256,15 @@ export async function checkSmtpHealth(): Promise<{
       smtpVerified: null,
       deliveryMode: 'unconfigured',
       missing: val.missing,
+      validationErrors: val.validationErrors,
+      host: val.host,
+      port: val.port,
+      user: val.user,
       senderEmail: val.senderEmail,
       senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   }
 
@@ -215,8 +275,16 @@ export async function checkSmtpHealth(): Promise<{
       transporterCreated: false,
       smtpVerified: false,
       deliveryMode: 'transporter_error',
+      missing: val.missing,
+      validationErrors: val.validationErrors,
+      host: val.host,
+      port: val.port,
+      user: val.user,
       senderEmail: val.senderEmail,
       senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   }
 
@@ -229,8 +297,12 @@ export async function checkSmtpHealth(): Promise<{
       deliveryMode: cachedSmtpVerified ? 'live_smtp' : 'transporter_unverified',
       host: val.host,
       port: val.port,
+      user: val.user,
       senderEmail: val.senderEmail,
       senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   }
 
@@ -242,7 +314,7 @@ export async function checkSmtpHealth(): Promise<{
     await Promise.race([verifyPromise, timeoutPromise]);
     cachedSmtpVerified = true;
   } catch (err: any) {
-    console.warn('⚠️ [System Mailer] SMTP transporter verification failed:', err?.message || err);
+    console.warn('⚠️ [Central Mailer] SMTP transporter verification failed:', err?.message || err);
     cachedSmtpVerified = false;
   }
   lastSmtpVerifyTimestamp = Date.now();
@@ -254,8 +326,12 @@ export async function checkSmtpHealth(): Promise<{
     deliveryMode: cachedSmtpVerified ? 'live_smtp' : 'transporter_unverified',
     host: val.host,
     port: val.port,
+    user: val.user,
     senderEmail: val.senderEmail,
     senderName: val.senderName,
+    isSecure: val.isSecure,
+    senderUserMatch: val.senderUserMatch,
+    senderUserNotice: val.senderUserNotice,
   };
 }
 
@@ -264,22 +340,38 @@ export async function verifySmtpConnection(): Promise<{
   connected: boolean;
   message: string;
   missing?: string[];
+  validationErrors?: string[];
   host?: string;
   port?: number;
   user?: string;
   senderEmail?: string;
   senderName?: string;
+  isSecure?: boolean;
+  senderUserMatch?: boolean;
+  senderUserNotice?: string;
   errorCode?: string;
 }> {
   const val = getSmtpConfigValidation();
   if (!val.configured) {
+    const errorDetails = [
+      ...val.missing.map((m) => `Missing ${m}`),
+      ...val.validationErrors,
+    ].join('; ');
+
     return {
       configured: false,
       connected: false,
-      message: `SMTP not configured. Missing required settings: ${val.missing.join(', ')}`,
+      message: `SMTP not configured. ${errorDetails}`,
       missing: val.missing,
+      validationErrors: val.validationErrors,
+      host: val.host,
+      port: val.port,
+      user: val.user,
       senderEmail: val.senderEmail,
       senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   }
 
@@ -288,10 +380,15 @@ export async function verifySmtpConnection(): Promise<{
     return {
       configured: true,
       connected: false,
-      message: 'Failed to create SMTP transporter instance.',
+      message: 'Failed to create SMTP transporter instance with configured settings.',
       host: val.host,
       port: val.port,
       user: val.user,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   }
 
@@ -306,12 +403,15 @@ export async function verifySmtpConnection(): Promise<{
     return {
       configured: true,
       connected: true,
-      message: `Successfully connected and authenticated with SMTP server ${val.host}:${val.port}`,
+      message: `Successfully connected and authenticated with SMTP server ${val.host}:${val.port} as "${val.senderName}" <${val.senderEmail}>.`,
       host: val.host,
       port: val.port,
       user: val.user,
       senderEmail: val.senderEmail,
       senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   } catch (err: any) {
     cachedSmtpVerified = false;
@@ -326,6 +426,11 @@ export async function verifySmtpConnection(): Promise<{
       host: val.host,
       port: val.port,
       user: val.user,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: val.senderUserNotice,
     };
   }
 }
@@ -413,12 +518,16 @@ async function dispatchViaSystemMailbox(options: {
   attachments?: Array<{ filename: string; content?: any; contentType?: string }>;
 }): Promise<DispatchResult> {
   const val = getSmtpConfigValidation();
-  if (!val.configured) {
+  if (!val.configured || !val.senderEmail) {
+    const errorDetails = [
+      ...val.missing.map((m) => `Missing ${m}`),
+      ...val.validationErrors,
+    ].join('; ');
     return {
       sent: false,
       configured: false,
       errorCode: 'SMTP_NOT_CONFIGURED',
-      error: `System SMTP mailbox is unconfigured. Missing: ${val.missing.join(', ')}`,
+      error: `Central system email sender is unconfigured or invalid. ${errorDetails}`,
     };
   }
 
@@ -428,7 +537,7 @@ async function dispatchViaSystemMailbox(options: {
       sent: false,
       configured: true,
       errorCode: 'TRANSPORTER_UNAVAILABLE',
-      error: 'SMTP transporter instance could not be created.',
+      error: 'SMTP transporter instance could not be created with configured settings.',
     };
   }
 
@@ -449,7 +558,7 @@ async function dispatchViaSystemMailbox(options: {
       html: options.html,
       attachments: options.attachments,
     });
-    console.log(`📧 [System Mailer] Successfully accepted by SMTP server for ${options.to} (Message ID: ${info.messageId})`);
+    console.log(`📧 [Central Mailer] Successfully accepted by SMTP server for ${options.to} from "${cleanSenderName}" <${cleanSenderEmail}> (Message ID: ${info.messageId})`);
     return {
       sent: true,
       configured: true,
@@ -458,12 +567,12 @@ async function dispatchViaSystemMailbox(options: {
   } catch (err: any) {
     const code = err?.code || 'SMTP_DISPATCH_FAILED';
     const message = err?.message || String(err);
-    console.warn(`⚠️ [System Mailer] SMTP dispatch failed (${code}):`, message);
+    console.warn(`⚠️ [Central Mailer] SMTP dispatch failed (${code}):`, message);
     return {
       sent: false,
       configured: true,
       errorCode: code,
-      error: `SMTP delivery failed: ${message.slice(0, 160)}`,
+      error: `SMTP delivery failed: ${message.slice(0, 200)}`,
     };
   }
 }
@@ -883,9 +992,9 @@ async function startServer() {
     const cleanSubject = sanitizeHeaderString(emailData.subject);
     const cleanHtml = sanitizeEmailHtml(emailData.html_body || '');
     const preview = emailData.content_preview || (cleanHtml ? cleanHtml.replace(/<[^>]+>/g, '').slice(0, 150) : 'Email alert');
-    const sender = val.senderEmail;
+    const sender = val.senderEmail || 'unconfigured_central_sender';
 
-    // Dispatch via specialized system mailbox if SMTP is configured
+    // Dispatch via central system mailbox if SMTP is configured
     const dispatchResult = await dispatchViaSystemMailbox({
       to: emailData.recipient_email,
       toName: emailData.recipient_name,
@@ -1288,20 +1397,25 @@ async function startServer() {
     }
   });
 
-  // Query specialized system email status (Real configuration & Nodemailer verification)
+  // Query central system email status (Configuration, validation, & Nodemailer verification)
   app.get('/api/email/system-status', async (_req, res) => {
     try {
       const health = await checkSmtpHealth();
       res.json({
         senderName: health.senderName,
-        senderEmail: health.senderEmail,
+        senderEmail: health.senderEmail || null,
         configured: health.configured,
         transporterCreated: health.transporterCreated,
         smtpVerified: health.smtpVerified,
         deliveryMode: health.deliveryMode,
         missing: health.missing || [],
+        validationErrors: health.validationErrors || [],
         host: health.host || null,
         port: health.port || null,
+        user: health.user || null,
+        isSecure: health.isSecure,
+        senderUserMatch: health.senderUserMatch,
+        senderUserNotice: health.senderUserNotice || null,
       });
     } catch (error) {
       console.error('[Server] System email health check error:', error);
@@ -1321,6 +1435,111 @@ async function startServer() {
     } catch (error: any) {
       console.error('[Server] Manual SMTP verification error:', error);
       res.status(500).json({ error: 'SMTP verification check encountered an unexpected error.' });
+    }
+  });
+
+  // Send live test email to verify end-to-end sender delivery & provider authorization (admin-only)
+  app.post('/api/email/send-test', async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (!user || user.user_type !== 'admin') {
+        return res.status(403).json({ error: 'Administrator clearance required to dispatch test email.' });
+      }
+
+      const { recipient_email } = req.body;
+      const targetRecipient = (recipient_email || user.email || '').trim();
+
+      if (!targetRecipient || !isValidEmailAddress(targetRecipient)) {
+        return res.status(400).json({ error: 'A valid recipient email address is required for test email dispatch.' });
+      }
+
+      const val = getSmtpConfigValidation();
+      if (!val.configured || !val.senderEmail) {
+        return res.status(400).json({
+          error: 'Central SMTP mailer is unconfigured. Please configure SYSTEM_SENDER_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.',
+          missing: val.missing,
+          validationErrors: val.validationErrors,
+        });
+      }
+
+      const testSubject = `[Test Verification] Nail Glam Hub Central Email Sender`;
+      const testHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #EC4899 0%, #BE185D 100%); padding: 16px 20px; border-radius: 8px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-size: 20px;">Central Email Sender Verification ✅</h2>
+          </div>
+          <p style="font-size: 15px; color: #1F2937;">Hello Administrator,</p>
+          <p style="font-size: 14px; color: #4B5563; line-height: 1.6;">
+            This test email confirms that your central email sender is operational and verified by your SMTP provider.
+          </p>
+          <div style="background: #ffffff; border: 1px solid #FCE7F3; border-radius: 8px; padding: 14px; margin: 16px 0; font-size: 13px;">
+            <p style="margin: 4px 0;"><strong>Configured Sender:</strong> "${val.senderName}" &lt;${val.senderEmail}&gt;</p>
+            <p style="margin: 4px 0;"><strong>SMTP Server:</strong> ${val.host}:${val.port} (TLS: ${val.isSecure ? 'Yes' : 'STARTTLS/Standard'})</p>
+            <p style="margin: 4px 0;"><strong>SMTP User:</strong> ${val.user}</p>
+            <p style="margin: 4px 0;"><strong>Recipient:</strong> ${targetRecipient}</p>
+            <p style="margin: 4px 0;"><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+          </div>
+          <p style="font-size: 12px; color: #9CA3AF; margin-top: 20px; text-align: center;">
+            Dispatched via Nail Glam Hub Central Mailer Engine
+          </p>
+        </div>
+      `;
+
+      const dispatchResult = await dispatchViaSystemMailbox({
+        to: targetRecipient,
+        toName: user.fullname || 'Administrator',
+        subject: testSubject,
+        html: testHtml,
+      });
+
+      if (!dispatchResult.sent) {
+        return res.status(502).json({
+          success: false,
+          error: dispatchResult.error || 'SMTP delivery rejected',
+          errorCode: dispatchResult.errorCode,
+          sender: `"${val.senderName}" <${val.senderEmail}>`,
+        });
+      }
+
+      // Record test email in communications audit log
+      try {
+        await db.execute(
+          `INSERT INTO email_logs (
+            recipient_email, recipient_name, recipient_role, subject, category,
+            content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html,
+            sent_at, status, sender_email, message_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            targetRecipient,
+            user.fullname || 'Administrator',
+            'admin',
+            testSubject,
+            'alert',
+            `Central sender test dispatched to ${targetRecipient}`,
+            testHtml,
+            0,
+            '',
+            '',
+            new Date().toISOString(),
+            'accepted',
+            val.senderEmail,
+            dispatchResult.messageId || null,
+          ]
+        );
+      } catch (logErr) {
+        console.warn('Test email audit log warning:', logErr);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Test email successfully dispatched to ${targetRecipient} from "${val.senderName}" <${val.senderEmail}>`,
+        messageId: dispatchResult.messageId,
+        sender: `"${val.senderName}" <${val.senderEmail}>`,
+        recipient: targetRecipient,
+      });
+    } catch (error: any) {
+      console.error('[Server] Send test email error:', error);
+      res.status(500).json({ error: error.message || 'Failed to dispatch test email' });
     }
   });
 
