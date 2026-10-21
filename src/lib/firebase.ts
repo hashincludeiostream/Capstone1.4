@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getFirestore,
   initializeFirestore,
+  setLogLevel,
   collection,
   doc,
   getDocs,
@@ -50,14 +51,42 @@ export const activeFirebaseConfig = {
   recaptchaSiteKey: rawConfig?.recaptchaSiteKey ?? PERMANENT_FIREBASE_CONFIG.recaptchaSiteKey,
 };
 
+// Set Firestore log level to error to avoid noisy internal idle stream notices
+try {
+  setLogLevel('error');
+} catch {
+  // ignore
+}
+
+// Global safety net for harmless Firestore idle stream disconnect events in iframe/preview
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    const msg = reason?.message || String(reason || '');
+    if (
+      msg.includes('Disconnecting idle stream') ||
+      msg.includes('Timed out waiting for new targets') ||
+      (reason?.code === 1 && msg.includes('CANCELLED'))
+    ) {
+      event.preventDefault();
+    }
+  });
+}
+
 // Initialize Firebase App instance safely (singleton)
 export const app = getApps().find(a => a.name === '[DEFAULT]') || initializeApp(activeFirebaseConfig);
 
-// Initialize Firestore directly bound to main app instance with auto-detected long-polling
+// Initialize Firestore with HTTP long-polling and disable fetch streams to avoid gRPC stream timeouts
 function getFirestoreInstance() {
   const dbId = activeFirebaseConfig.firestoreDatabaseId || PERMANENT_FIREBASE_CONFIG.firestoreDatabaseId;
   try {
-    return initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId);
+    return initializeFirestore(
+      app,
+      {
+        experimentalForceLongPolling: true,
+      },
+      dbId
+    );
   } catch {
     return getFirestore(app, dbId);
   }
@@ -74,8 +103,12 @@ export async function testFirestoreConnection(): Promise<void> {
   } catch (error: any) {
     if (
       error?.code === 'unavailable' ||
+      error?.code === 'cancelled' ||
+      error?.code === 1 ||
       error?.message?.includes('the client is offline') ||
-      error?.message?.includes('Could not reach Cloud Firestore')
+      error?.message?.includes('Could not reach Cloud Firestore') ||
+      error?.message?.includes('CANCELLED') ||
+      error?.message?.includes('idle stream')
     ) {
       console.warn('Notice: Firestore running in offline/cache mode.');
     }

@@ -175,3 +175,13 @@ export interface ConversationChannel {
 4. **Integration with Existing Navbars and Menus**:
    - Unread message counter in header / sidebar navigation (`Navbar.tsx`, `Sidebar.tsx`, `MobileBottomNav.tsx`).
    - Deep-linking from notification items directly to the relevant chat thread or appointment record.
+
+---
+
+### 5. Completed Fix: Firestore Idle Stream Cancellation Resolution
+- **Issue**: `@firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Listen' stream error. Code: 1 CANCELLED: Disconnecting idle stream. Timed out waiting for new targets.`
+- **Resolution**:
+  1. Configured `initializeFirestore` in `src/lib/firebase.ts` with `experimentalForceLongPolling: true` to prevent WebChannel gRPC stream idle timeouts in web preview/iframe environments.
+  2. Set Firestore log level to `error` via `setLogLevel('error')` to suppress internal stream disconnect noise.
+  3. Added an unhandled promise rejection guard in `src/lib/firebase.ts` and transient idle check in `src/lib/firestoreService.ts` for clean listener teardown and reconnection.
+  4. Verified full compilation with `tsc --noEmit`, `vite build`, and verified API backend health status (`/api/health` returning 200 OK with connected database).

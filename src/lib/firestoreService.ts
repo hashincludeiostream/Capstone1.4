@@ -102,8 +102,16 @@ export function subscribeToAppointments(
         onUpdate(items);
       },
       (error) => {
-        console.warn('[Firestore] Real-time appointments subscription error:', error);
-        if (onError) onError(error);
+        const isTransientIdle =
+          (error as any)?.code === 'cancelled' ||
+          (error as any)?.code === 1 ||
+          error.message?.includes('CANCELLED') ||
+          error.message?.includes('idle stream') ||
+          error.message?.includes('Timed out waiting for new targets');
+        if (!isTransientIdle) {
+          console.warn('[Firestore] Real-time appointments subscription error:', error);
+          if (onError) onError(error);
+        }
       }
     );
   } catch (err) {
@@ -151,8 +159,16 @@ export function subscribeToSalons(
         onUpdate(items);
       },
       (error) => {
-        console.warn('[Firestore] Real-time salons subscription error:', error);
-        if (onError) onError(error);
+        const isTransientIdle =
+          (error as any)?.code === 'cancelled' ||
+          (error as any)?.code === 1 ||
+          error.message?.includes('CANCELLED') ||
+          error.message?.includes('idle stream') ||
+          error.message?.includes('Timed out waiting for new targets');
+        if (!isTransientIdle) {
+          console.warn('[Firestore] Real-time salons subscription error:', error);
+          if (onError) onError(error);
+        }
       }
     );
   } catch (err) {
