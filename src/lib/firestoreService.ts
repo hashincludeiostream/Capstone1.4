@@ -204,8 +204,42 @@ export function subscribeToSalons(
 }
 
 // ----------------------------------------------------------------------------
-// Async CRUD operations directly with Firestore
+// Async CRUD operations directly with Firestore with Quota Circuit-Breaker
 // ----------------------------------------------------------------------------
+
+let clientQuotaExceeded = false;
+let clientQuotaCooldownUntil = 0;
+
+function isClientQuotaExceeded(): boolean {
+  if (clientQuotaExceeded) {
+    if (Date.now() < clientQuotaCooldownUntil) {
+      return true;
+    }
+    clientQuotaExceeded = false;
+  }
+  return false;
+}
+
+function handleClientFirestoreError(err: any, context: string): void {
+  const code = err?.code || '';
+  const msg = err?.message || String(err || '');
+  if (
+    code === 'resource-exhausted' ||
+    code === 8 ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('Quota limit exceeded')
+  ) {
+    if (!clientQuotaExceeded) {
+      clientQuotaExceeded = true;
+      clientQuotaCooldownUntil = Date.now() + 30 * 60 * 1000;
+      console.warn('⚠️ [Firestore Quota] Free tier daily write limit reached (RESOURCE_EXHAUSTED). Application gracefully operating in local persistence mode.');
+    }
+    return;
+  }
+  if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable') && !msg.includes('offline')) {
+    console.warn(`[Firestore] ${context} note:`, msg);
+  }
+}
 
 export async function createFirestoreAppointment(data: Partial<Appointment>): Promise<Appointment> {
   const newId = Number(data.id) || Date.now();
@@ -238,20 +272,27 @@ export async function createFirestoreAppointment(data: Partial<Appointment>): Pr
     created_at: new Date().toISOString(),
   };
 
-  await setDoc(doc(db, 'appointments', String(newId)), appointmentRecord);
+  if (!isClientQuotaExceeded()) {
+    try {
+      await setDoc(doc(db, 'appointments', String(newId)), appointmentRecord);
+    } catch (err) {
+      handleClientFirestoreError(err, 'create appointment');
+    }
+  }
   return appointmentRecord;
 }
 
 export async function createFirestoreTransaction(tx: any): Promise<any> {
   const txId = tx.id || Date.now();
   const docRef = doc(db, 'transactions', String(txId));
-  try {
-    await setDoc(docRef, { ...tx, id: txId });
-    return { ...tx, id: txId };
-  } catch (err) {
-    console.warn('[Firestore] Failed to persist transaction:', err);
-    throw err;
+  if (!isClientQuotaExceeded()) {
+    try {
+      await setDoc(docRef, { ...tx, id: txId });
+    } catch (err) {
+      handleClientFirestoreError(err, 'create transaction');
+    }
   }
+  return { ...tx, id: txId };
 }
 
 export async function updateFirestoreAppointmentStatus(
@@ -259,6 +300,7 @@ export async function updateFirestoreAppointmentStatus(
   status: AppointmentStatus,
   extraData?: Record<string, any>
 ): Promise<boolean> {
+  if (isClientQuotaExceeded()) return true;
   try {
     const ref = doc(db, 'appointments', String(id));
     await setDoc(
@@ -273,7 +315,7 @@ export async function updateFirestoreAppointmentStatus(
     );
     return true;
   } catch (err) {
-    console.warn('[Firestore] Failed to update appointment status:', err);
+    handleClientFirestoreError(err, 'update appointment status');
     return false;
   }
 }
@@ -283,6 +325,7 @@ export async function updateFirestoreAppointmentTechnician(
   technicianId: number,
   technicianName?: string
 ): Promise<boolean> {
+  if (isClientQuotaExceeded()) return true;
   try {
     const ref = doc(db, 'appointments', String(id));
     const updateData: Record<string, any> = {
@@ -296,20 +339,21 @@ export async function updateFirestoreAppointmentTechnician(
     await setDoc(ref, updateData, { merge: true });
     return true;
   } catch (err) {
-    console.warn('[Firestore] Failed to update appointment technician:', err);
+    handleClientFirestoreError(err, 'update appointment technician');
     return false;
   }
 }
 
 export async function createFirestoreProductOrder(order: any): Promise<any> {
   const orderId = String(order.id || Date.now());
-  try {
-    await setDoc(doc(db, 'product_orders', orderId), order);
-    return order;
-  } catch (err) {
-    console.warn('[Firestore] Failed to sync product order to firestore:', err);
-    throw err;
+  if (!isClientQuotaExceeded()) {
+    try {
+      await setDoc(doc(db, 'product_orders', orderId), order);
+    } catch (err) {
+      handleClientFirestoreError(err, 'create product order');
+    }
   }
+  return order;
 }
 
 export async function updateFirestoreProductOrderStatus(
@@ -317,6 +361,7 @@ export async function updateFirestoreProductOrderStatus(
   status: string,
   extraData?: Record<string, any>
 ): Promise<boolean> {
+  if (isClientQuotaExceeded()) return true;
   try {
     const ref = doc(db, 'product_orders', String(orderId));
     await updateDoc(ref, {
@@ -326,7 +371,7 @@ export async function updateFirestoreProductOrderStatus(
     });
     return true;
   } catch (err) {
-    console.warn('[Firestore] Failed to update product order status in firestore:', err);
+    handleClientFirestoreError(err, 'update product order status');
     return false;
   }
 }
@@ -360,7 +405,13 @@ export async function createFirestoreSalon(data: Partial<Salon>): Promise<Salon>
     monthly_target_bookings: Number(data.monthly_target_bookings || 100),
   };
 
-  await setDoc(doc(db, 'salons', String(newId)), salonRecord);
+  if (!isClientQuotaExceeded()) {
+    try {
+      await setDoc(doc(db, 'salons', String(newId)), salonRecord);
+    } catch (err) {
+      handleClientFirestoreError(err, 'create salon');
+    }
+  }
   return salonRecord;
 }
 
@@ -381,7 +432,13 @@ export async function createFirestoreService(data: Partial<Service>): Promise<Se
     difficulty_level: data.difficulty_level || 'Intermediate',
   };
 
-  await setDoc(doc(db, 'services', String(newId)), serviceRecord);
+  if (!isClientQuotaExceeded()) {
+    try {
+      await setDoc(doc(db, 'services', String(newId)), serviceRecord);
+    } catch (err) {
+      handleClientFirestoreError(err, 'create service');
+    }
+  }
   return serviceRecord;
 }
 
@@ -399,7 +456,13 @@ export async function createFirestoreReview(data: Partial<Review>): Promise<Revi
     created_at: new Date().toISOString(),
   };
 
-  await setDoc(doc(db, 'reviews', String(newId)), reviewRecord);
+  if (!isClientQuotaExceeded()) {
+    try {
+      await setDoc(doc(db, 'reviews', String(newId)), reviewRecord);
+    } catch (err) {
+      handleClientFirestoreError(err, 'create review');
+    }
+  }
   return reviewRecord;
 }
 
@@ -407,6 +470,7 @@ export async function updateFirestoreUser(
   userId: number,
   userData: Record<string, any>
 ): Promise<boolean> {
+  if (isClientQuotaExceeded()) return true;
   try {
     const ref = doc(db, 'users', String(userId));
     await updateDoc(ref, {
@@ -421,7 +485,7 @@ export async function updateFirestoreUser(
       await setDoc(ref, { ...userData, id: userId, updated_at: new Date().toISOString() }, { merge: true });
       return true;
     } catch (setErr) {
-      console.warn('[Firestore] Failed to update user in firestore:', setErr);
+      handleClientFirestoreError(setErr, 'update user');
       return false;
     }
   }

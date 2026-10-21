@@ -58,15 +58,20 @@ try {
   // ignore
 }
 
-// Global safety net for harmless Firestore idle stream disconnect events in iframe/preview
+// Global safety net for harmless Firestore idle stream disconnect and quota limit events in iframe/preview
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event?.reason;
     const msg = reason?.message || String(reason || '');
+    const code = reason?.code || '';
     if (
       msg.includes('Disconnecting idle stream') ||
       msg.includes('Timed out waiting for new targets') ||
-      (reason?.code === 1 && msg.includes('CANCELLED'))
+      (reason?.code === 1 && msg.includes('CANCELLED')) ||
+      code === 'resource-exhausted' ||
+      code === 8 ||
+      msg.includes('RESOURCE_EXHAUSTED') ||
+      msg.includes('Quota limit exceeded')
     ) {
       event.preventDefault();
     }

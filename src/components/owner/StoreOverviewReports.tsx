@@ -1016,19 +1016,8 @@ export const StoreOverviewReports: React.FC<StoreOverviewReportsProps> = ({
   const handleEmailReport = async () => {
     setIsEmailingReport(true);
     try {
-      let token = getCachedAccessToken();
-      let connectedEmail = getCachedGmailUserEmail();
-      if (!token) {
-        showToast('Connecting Google Workspace to send email...');
-        const conn = await connectGoogleWorkspace();
-        if (conn.success && conn.token) {
-          token = conn.token;
-          if (conn.email) connectedEmail = conn.email;
-        }
-      }
-
       const savedUser = safeLocalStorage.getJSON<any>('nailglamhub_user');
-      const emailToUse = (connectedEmail || savedUser?.email || salon.email || 'salon@nailglamhub.com').trim();
+      const emailToUse = (savedUser?.email || salon.email || 'salon@nailglamhub.com').trim();
 
       const res = await ajax('/api/email/reports/monthly', {
         method: 'POST',

@@ -460,11 +460,9 @@ function createRawEmail(options: EmailDispatchOptions, senderEmail?: string): st
   const boundary = `----=_Part_NailGlamHub_${Date.now()}`;
   const utf8Subject = `=?UTF-8?B?${utf8ToBase64(sanitizePdfText(options.subject))}?=`;
 
-  // From header: In Gmail API, sender must match authenticated Gmail account or omit email
-  const authenticatedEmail = senderEmail || getCachedGmailUserEmail();
-  const fromHeader = authenticatedEmail
-    ? `From: "${BRAND_NAME}" <${authenticatedEmail}>`
-    : `From: "${BRAND_NAME}"`;
+  // From header: Always dispatches from the specialized system sender account
+  const systemSender = senderEmail || DEFAULT_SENDER;
+  const fromHeader = `From: "${BRAND_NAME} System" <${systemSender}>`;
 
   const toHeader = options.toName
     ? `To: "=?UTF-8?B?${utf8ToBase64(options.toName)}?=" <${options.to}>`
@@ -546,61 +544,37 @@ export interface EmailSendResult {
 }
 
 /**
- * Dispatches an email notification via server and direct Gmail API when authorized
+ * Dispatches an email notification via the specialized platform system account.
+ * Eliminates client personal inbox self-sending; all emails are sent from the official system sender.
  */
 export async function sendEmailNotification(options: EmailDispatchOptions): Promise<EmailSendResult> {
   try {
-    const accessToken = getCachedAccessToken();
-    const gmailUserEmail = getCachedGmailUserEmail();
-    let gmailSent = false;
-    let gmailMessageId: string | undefined = undefined;
-    let gmailError: string | undefined = undefined;
-
-    // 1. If user has active Google OAuth access token with Gmail scope, attempt direct dispatch
-    if (accessToken) {
+    let pdfBase64: string | undefined = undefined;
+    if (options.hasPdfAttachment) {
       try {
-        const raw = createRawEmail(options, gmailUserEmail || undefined);
-        const gmailRes = await ajax('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ raw }),
+        pdfBase64 = generateCertifiedPdfDocument({
+          title: options.subject,
+          recipientName: options.toName,
+          recipientEmail: options.to,
+          salonName: options.salonName,
+          salonAddress: options.salonAddress,
+          periodLabel: options.periodLabel,
+          metrics: options.pdfMetrics,
+          summaryText: options.masterReportSummary || (options.htmlBody ? options.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400) : undefined),
         });
-
-        if (gmailRes.ok) {
-          const gmailData = await gmailRes.json();
-          gmailSent = true;
-          gmailMessageId = gmailData.id;
-          console.log(`[EmailService] Dispatched via Google Gmail API directly to: ${options.to} (ID: ${gmailData.id})`);
-        } else {
-          const errData = await gmailRes.json().catch(() => ({}));
-          gmailError = errData.error?.message || `Gmail API HTTP error ${gmailRes.status}`;
-          console.warn('[EmailService] Gmail API send warning:', errData);
-        }
-      } catch (gmailErr: any) {
-        gmailError = gmailErr?.message || String(gmailErr);
-        console.warn('[EmailService] Direct Gmail API call warning (falling back to relay):', gmailErr);
+      } catch (pdfErr) {
+        console.warn('[EmailService] PDF document generation warning:', pdfErr);
       }
-    } else {
-      gmailError = 'Google Workspace not connected. Connect Gmail to deliver messages directly to your external inbox.';
     }
 
-    // 2. Dispatch to server to record in database and trigger automated notification
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-
+    // Dispatch centrally via backend specialized system mailer
     const response = await ajax('/api/email/send', {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...options,
-        gmailSent,
-        gmailMessageId,
-        status: gmailSent ? 'delivered' : 'pending_offline',
+        pdfBase64,
+        senderEmail: DEFAULT_SENDER,
       }),
     });
 
@@ -620,8 +594,8 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
             subject: options.subject,
             category: options.category,
             hasPdf: Boolean(options.hasPdfAttachment),
-            gmailSent,
-            gmailMessageId,
+            sender: data.sender || `Nail Glam Hub System <${DEFAULT_SENDER}>`,
+            deliveredViaSystemMailbox: Boolean(data.deliveredViaSystemMailbox),
           },
         })
       );
@@ -630,9 +604,8 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
     return {
       success: true,
       log: data.log,
-      gmailSent,
-      gmailMessageId,
-      error: gmailError,
+      gmailSent: Boolean(data.deliveredViaSystemMailbox),
+      gmailMessageId: data.messageId,
     };
   } catch (error: any) {
     console.error('[EmailService] Dispatch error:', error);

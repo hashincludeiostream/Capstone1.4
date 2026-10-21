@@ -346,6 +346,7 @@ class InMemoryDatabase {
         const msg = err?.message || String(err);
         if (msg.includes('Quota limit exceeded') || msg.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
           console.warn('[Firestore Sync] Cloud Firestore free tier quota limit reached. Falling back to local persisted store.');
+          this.markQuotaExceeded();
           break;
         }
         console.warn(`[Firestore Sync] Could not pull collection "${col}":`, msg);
@@ -360,16 +361,42 @@ class InMemoryDatabase {
     return totalLoaded;
   }
 
+  private firestoreQuotaExceeded = false;
+  private quotaExceededUntil = 0;
+
+  private isQuotaExceeded(): boolean {
+    if (this.firestoreQuotaExceeded) {
+      if (Date.now() < this.quotaExceededUntil) {
+        return true;
+      }
+      this.firestoreQuotaExceeded = false;
+    }
+    return false;
+  }
+
+  private markQuotaExceeded() {
+    this.firestoreQuotaExceeded = true;
+    this.quotaExceededUntil = Date.now() + 30 * 60 * 1000; // 30 min circuit break
+    console.warn('⚠️ [Firestore Quota Circuit-Breaker] Daily write quota reached. Circuit-breaker active: mutations will safely persist to local store.');
+  }
+
   /**
    * Asynchronously persists mutations to Cloud Firestore.
    */
   private syncToFirestore(tableName: string, action: 'set' | 'delete', id: number | string, data?: any) {
+    if (this.isQuotaExceeded()) {
+      return;
+    }
     try {
       const colName = tableName === 'business_categories' ? 'categories' : tableName;
       const docRef = doc(firestoreDb, colName, String(id));
       if (action === 'delete') {
         deleteDoc(docRef).catch((err) => {
           const msg = err?.message || String(err);
+          if (msg.includes('Quota limit exceeded') || msg.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
+            this.markQuotaExceeded();
+            return;
+          }
           if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable')) {
             console.warn(`[Firestore] Sync note for "${colName}/${id}":`, msg);
           }
@@ -378,13 +405,20 @@ class InMemoryDatabase {
         const clean = cleanForFirestore(data);
         setDoc(docRef, clean, { merge: true }).catch((err) => {
           const msg = err?.message || String(err);
+          if (msg.includes('Quota limit exceeded') || msg.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
+            this.markQuotaExceeded();
+            return;
+          }
           if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable')) {
             console.warn(`[Firestore] Sync note for "${colName}/${id}":`, msg);
           }
         });
       }
     } catch (err: any) {
-      // Safe catch for network stream drop
+      const msg = err?.message || String(err);
+      if (msg.includes('Quota limit exceeded') || msg.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
+        this.markQuotaExceeded();
+      }
     }
   }
 
