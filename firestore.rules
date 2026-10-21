@@ -6,54 +6,226 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Public read collections for visitors and clients
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email in ['hasincludeionull@gmail.com', 'medayojessemuel@gmail.com', 'admin@nailglamhub.com']
+      );
+    }
+
+    function isSalonOwner(salonId) {
+      let salonDoc = get(/databases/$(database)/documents/salons/$(string(salonId)));
+      return isAuthenticated() && (
+        isAdmin() ||
+        (salonDoc != null && salonDoc.data.owner_email == request.auth.token.email)
+      );
+    }
+
+    // Public catalog & directory collections (read-only for visitors, writes restricted to authorized salon owner or admin)
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /salons/{salonId} {
       allow read: if true;
-      allow write: if isAuthenticated() || true; // Permissive for both local mock proxy & authenticated clients
+      // Creation restricted to admin or authenticated user registering with their own email
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (request.resource.data.owner_email == request.auth.token.email &&
+         (!('verification_status' in request.resource.data) || request.resource.data.verification_status == 'pending'))
+      );
+      // Salon owners can update their salon profile, but CANNOT change verification_status, owner_email, or owner_id
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          (resource.data.owner_email != null && resource.data.owner_email == request.auth.token.email) &&
+          (!('verification_status' in request.resource.data) || request.resource.data.verification_status == resource.data.verification_status) &&
+          (!('owner_email' in request.resource.data) || request.resource.data.owner_email == resource.data.owner_email) &&
+          (!('owner_id' in request.resource.data) || request.resource.data.owner_id == resource.data.owner_id)
+        )
+      );
+      allow delete: if isAdmin();
     }
 
     match /services/{serviceId} {
       allow read: if true;
-      allow write: if isAuthenticated() || true;
+      // Only the salon owner or admin can create/modify/delete services for that salon
+      allow create: if isSalonOwner(request.resource.data.salon_id);
+      allow update, delete: if isSalonOwner(resource.data.salon_id);
     }
 
     match /technicians/{technicianId} {
       allow read: if true;
-      allow write: if isAuthenticated() || true;
-    }
-
-    match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isAuthenticated() || true;
+      // Only the salon owner or admin can create/modify/delete technicians for that salon
+      allow create: if isSalonOwner(request.resource.data.salon_id);
+      allow update, delete: if isSalonOwner(resource.data.salon_id);
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow write: if isAuthenticated() || true;
+      // Only the salon owner or admin can create/modify/delete products for that salon
+      allow create: if isSalonOwner(request.resource.data.salon_id);
+      allow update, delete: if isSalonOwner(resource.data.salon_id);
     }
 
-    match /appointments/{appointmentId} {
+    match /promotions/{promotionId} {
       allow read: if true;
-      allow write: if true;
+      // Only the salon owner or admin can create/modify/delete promotions for that salon
+      allow create: if isSalonOwner(request.resource.data.salon_id);
+      allow update, delete: if isSalonOwner(resource.data.salon_id);
     }
 
-    match /transactions/{transactionId} {
+    match /announcements/{announcementId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin();
     }
 
+    match /reels/{reelId} {
+      allow read: if true;
+      // Only the salon owner or admin can manage reels
+      allow create: if isSalonOwner(request.resource.data.salon_id);
+      allow update, delete: if isSalonOwner(resource.data.salon_id);
+    }
+
+    match /working_hours/{workingHoursId} {
+      allow read: if true;
+      // Only the salon owner or admin can alter working hours
+      allow create: if isSalonOwner(request.resource.data.salon_id);
+      allow update, delete: if isSalonOwner(resource.data.salon_id);
+    }
+
+    // Reviews - Public reviews are readable; private feedback is restricted to author, salon owner, or admin
     match /reviews/{reviewId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if (resource.data.is_private != true && resource.data.feedback_type != 'private') ||
+        (isAuthenticated() && (
+          isAdmin() ||
+          (resource.data.user_email != null && resource.data.user_email == request.auth.token.email) ||
+          (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id))
+        ));
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (request.resource.data.user_email == request.auth.token.email)
+      );
+      allow update, delete: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.user_email != null && resource.data.user_email == request.auth.token.email)
+      );
     }
 
+    // Private Collections - Strict Access Control
+
+    // Users: Private profile data
     match /users/{userId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        request.auth.uid == userId ||
+        resource.data.email == request.auth.token.email
+      );
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (request.resource.data.email == request.auth.token.email &&
+         (!('user_type' in request.resource.data) || request.resource.data.user_type != 'admin'))
+      );
+      // Users CANNOT change their own user_type, role, status, strikes, or admin privileges
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          (request.auth.uid == userId || resource.data.email == request.auth.token.email) &&
+          request.resource.data.email == resource.data.email &&
+          (!('user_type' in request.resource.data) || request.resource.data.user_type == resource.data.user_type) &&
+          (!('role' in request.resource.data) || request.resource.data.role == resource.data.role) &&
+          (!('status' in request.resource.data) || request.resource.data.status == resource.data.status) &&
+          (!('cancellation_strikes' in request.resource.data) || request.resource.data.cancellation_strikes == resource.data.cancellation_strikes) &&
+          (!('reliability_score' in request.resource.data) || request.resource.data.reliability_score == resource.data.reliability_score)
+        )
+      );
+      allow delete: if isAdmin();
     }
 
+    // Appointments: Strictly confidential
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.customer_email != null && resource.data.customer_email == request.auth.token.email) ||
+        (resource.data.salon_email != null && resource.data.salon_email == request.auth.token.email) ||
+        (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id))
+      );
+      // User can only create an appointment for themselves
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.customer_email == request.auth.token.email
+      );
+      // Customers cannot change payment_status, paid_amount, service_price, total_price, customer_email, or salon_id
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id)) ||
+        (
+          resource.data.customer_email != null &&
+          resource.data.customer_email == request.auth.token.email &&
+          (!('payment_status' in request.resource.data) || request.resource.data.payment_status == resource.data.payment_status) &&
+          (!('paid_amount' in request.resource.data) || request.resource.data.paid_amount == resource.data.paid_amount) &&
+          (!('total_price' in request.resource.data) || request.resource.data.total_price == resource.data.total_price) &&
+          (!('service_price' in request.resource.data) || request.resource.data.service_price == resource.data.service_price) &&
+          (!('customer_email' in request.resource.data) || request.resource.data.customer_email == resource.data.customer_email) &&
+          (!('salon_id' in request.resource.data) || request.resource.data.salon_id == resource.data.salon_id)
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Financial Transactions: Strictly confidential
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.customer_email != null && resource.data.customer_email == request.auth.token.email) ||
+        (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id))
+      );
+      // Transactions cannot be directly marked as succeeded/paid by browser clients
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (request.resource.data.customer_email == request.auth.token.email &&
+         (!('payment_status' in request.resource.data) || request.resource.data.payment_status in ['pending', 'unpaid']))
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Product Orders: Strictly confidential
+    match /product_orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.customer_email != null && resource.data.customer_email == request.auth.token.email) ||
+        (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id))
+      );
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (request.resource.data.customer_email == request.auth.token.email &&
+         (!('payment_status' in request.resource.data) || request.resource.data.payment_status in ['pending', 'unpaid']))
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Direct Messages between Salon and Customer
+    match /messages/{messageId} {
+      allow read, write: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.customer_email != null && resource.data.customer_email == request.auth.token.email) ||
+        (resource.data.salon_email != null && resource.data.salon_email == request.auth.token.email) ||
+        (resource.data.salon_id != null && isSalonOwner(resource.data.salon_id))
+      );
+    }
+
+    // Test collection for health connection probes (public read-only)
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Default deny for any other document or collection
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

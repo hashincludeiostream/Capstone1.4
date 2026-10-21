@@ -34,28 +34,44 @@ import {
   AppointmentStatus,
 } from '../types';
 
-let initialized = false;
+let isInitialized = false;
+let initPromise: Promise<boolean> | null = null;
 
 /**
  * Initializes Firestore collections with seed data if they don't already exist.
  * Maintains the relational IDs (salon_id, owner_id, customer_id, service_id, technician_id)
  * so that all relational queries work natively.
  */
-export async function initializeFirestoreData() {
-  if (initialized) return;
-  initialized = true;
+export async function initializeFirestoreData(): Promise<boolean> {
+  // If already successfully verified, return true
+  if (isInitialized) return true;
 
-  try {
-    // Verify connection to Cloud Firestore
-    const salonsSnap = await getDocs(collection(db, 'salons'));
-    if (!salonsSnap.empty) {
-      console.log(`🔥 [Firestore] Connected to Cloud Firestore (${salonsSnap.size} live salons loaded).`);
-    } else {
-      console.log('🔥 [Firestore] Connected to Cloud Firestore.');
+  // Deduplicate concurrent in-flight initialization attempts
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      // Verify connection to Cloud Firestore
+      const salonsSnap = await getDocs(collection(db, 'salons'));
+      if (!salonsSnap.empty) {
+        console.log(`🔥 [Firestore] Connected to Cloud Firestore (${salonsSnap.size} live salons loaded).`);
+      } else {
+        console.log('🔥 [Firestore] Connected to Cloud Firestore.');
+      }
+      isInitialized = true;
+      return true;
+    } catch (err) {
+      // Do NOT permanently set isInitialized to true if the check failed;
+      // keep it false so subsequent requests can retry.
+      isInitialized = false;
+      console.warn('[Firestore] Initialization check note (using fallback/offline mode):', err);
+      return false;
+    } finally {
+      initPromise = null;
     }
-  } catch (err) {
-    console.warn('[Firestore] Initialization check note (using fallback/offline mode):', err);
-  }
+  })();
+
+  return initPromise;
 }
 
 // ----------------------------------------------------------------------------
@@ -65,21 +81,31 @@ export async function initializeFirestoreData() {
 /**
  * Real-time listener for salon appointments.
  * Fires callback immediately with data and whenever any appointment is added/modified.
+ * Strictly requires either customer_id or salon_id to prevent unconstrained queries
+ * that could expose other users' private appointments.
  */
 export function subscribeToAppointments(
   filters: { salon_id?: number; customer_id?: number },
   onUpdate: (appointments: Appointment[]) => void,
   onError?: (err: Error) => void
 ): () => void {
+  const salonId = filters?.salon_id ? Number(filters.salon_id) : null;
+  const customerId = filters?.customer_id ? Number(filters.customer_id) : null;
+
+  // Security guard against missing filters: NEVER allow an unconstrained query that exposes all appointments!
+  if (!salonId && !customerId) {
+    const error = new Error('Security Error: subscribeToAppointments requires a specific salon_id or customer_id filter to prevent exposing other clients\' appointments.');
+    console.error('[Firestore Security]', error.message);
+    if (onError) onError(error);
+    onUpdate([]);
+    return () => {};
+  }
+
   try {
     const apptsCol = collection(db, 'appointments');
-    let q = query(apptsCol);
-
-    if (filters.salon_id) {
-      q = query(apptsCol, where('salon_id', '==', Number(filters.salon_id)));
-    } else if (filters.customer_id) {
-      q = query(apptsCol, where('customer_id', '==', Number(filters.customer_id)));
-    }
+    const q = salonId
+      ? query(apptsCol, where('salon_id', '==', salonId))
+      : query(apptsCol, where('customer_id', '==', customerId!));
 
     return onSnapshot(
       q,
@@ -217,14 +243,14 @@ export async function createFirestoreAppointment(data: Partial<Appointment>): Pr
 }
 
 export async function createFirestoreTransaction(tx: any): Promise<any> {
+  const txId = tx.id || Date.now();
+  const docRef = doc(db, 'transactions', String(txId));
   try {
-    const txId = tx.id || Date.now();
-    const docRef = doc(db, 'transactions', String(txId));
     await setDoc(docRef, { ...tx, id: txId });
     return { ...tx, id: txId };
   } catch (err) {
     console.warn('[Firestore] Failed to persist transaction:', err);
-    return tx;
+    throw err;
   }
 }
 
@@ -276,13 +302,13 @@ export async function updateFirestoreAppointmentTechnician(
 }
 
 export async function createFirestoreProductOrder(order: any): Promise<any> {
+  const orderId = String(order.id || Date.now());
   try {
-    const orderId = String(order.id || Date.now());
     await setDoc(doc(db, 'product_orders', orderId), order);
     return order;
   } catch (err) {
     console.warn('[Firestore] Failed to sync product order to firestore:', err);
-    return order;
+    throw err;
   }
 }
 

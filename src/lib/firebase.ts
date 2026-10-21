@@ -96,22 +96,104 @@ export const db = getFirestoreInstance();
 
 export const auth = getAuth(app);
 
-// Validate Firestore connection on boot
-export async function testFirestoreConnection(): Promise<void> {
+export type FirestoreConnectionStatus =
+  | 'connected'
+  | 'permission-denied'
+  | 'quota-exceeded'
+  | 'offline'
+  | 'configuration-error'
+  | 'error';
+
+export interface FirestoreConnectionResult {
+  connected: boolean;
+  status: FirestoreConnectionStatus;
+  message: string;
+  error?: any;
+}
+
+// Validate Firestore connection on boot and categorize status accurately
+export async function testFirestoreConnection(): Promise<FirestoreConnectionResult> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
+    return {
+      connected: true,
+      status: 'connected',
+      message: 'Cloud Firestore connected and responding.',
+    };
   } catch (error: any) {
+    const code = error?.code || '';
+    const message = error?.message || String(error || '');
+
+    // 1. Permission Denied (Distinguished from connectivity & configuration)
     if (
-      error?.code === 'unavailable' ||
-      error?.code === 'cancelled' ||
-      error?.code === 1 ||
-      error?.message?.includes('the client is offline') ||
-      error?.message?.includes('Could not reach Cloud Firestore') ||
-      error?.message?.includes('CANCELLED') ||
-      error?.message?.includes('idle stream')
+      code === 'permission-denied' ||
+      message.includes('permission-denied') ||
+      message.includes('Missing or insufficient permissions')
     ) {
-      console.warn('Notice: Firestore running in offline/cache mode.');
+      console.warn('⚠️ [Firestore Security] Permission denied on test probe. Firestore rules are strictly active.');
+      return {
+        connected: false,
+        status: 'permission-denied',
+        message: 'Permission denied: request rejected by Firestore security rules.',
+        error,
+      };
     }
+
+    // 2. Quota / Free Tier Exhaustion (Resource Exhausted 429)
+    if (
+      code === 'resource-exhausted' ||
+      message.includes('RESOURCE_EXHAUSTED') ||
+      message.includes('Quota limit exceeded')
+    ) {
+      console.warn('⚠️ [Firestore Quota] Cloud Firestore daily free-tier quota exceeded. Operating with local fallback store.');
+      return {
+        connected: false,
+        status: 'quota-exceeded',
+        message: 'Cloud Firestore daily free-tier quota exceeded (RESOURCE_EXHAUSTED).',
+        error,
+      };
+    }
+
+    // 3. Connectivity / Offline / Idle Stream
+    if (
+      code === 'unavailable' ||
+      code === 'cancelled' ||
+      code === 1 ||
+      code === 'deadline-exceeded' ||
+      message.includes('the client is offline') ||
+      message.includes('Could not reach Cloud Firestore') ||
+      message.includes('CANCELLED') ||
+      message.includes('idle stream') ||
+      message.includes('Timed out waiting for new targets')
+    ) {
+      console.warn('Notice: Firestore running in offline/cache mode due to network status.');
+      return {
+        connected: false,
+        status: 'offline',
+        message: 'Firestore client is offline or network is unreachable.',
+        error,
+      };
+    }
+
+    // 4. Configuration Errors (Invalid argument, missing database ID, failed precondition)
+    if (code === 'invalid-argument' || code === 'not-found' || code === 'failed-precondition') {
+      console.error('❌ [Firestore Config Error]:', message);
+      return {
+        connected: false,
+        status: 'configuration-error',
+        message: `Firestore configuration error: ${message}`,
+        error,
+      };
+    }
+
+    // 5. Unhandled / generic connection failure
+    console.error('❌ [Firestore Connection Error]:', message);
+    return {
+      connected: false,
+      status: 'error',
+      message: `Firestore connection check failed: ${message}`,
+      error,
+    };
   }
 }
 

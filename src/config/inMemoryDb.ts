@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { db as firestoreDb } from '../lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, setLogLevel } from 'firebase/firestore';
+
+try {
+  setLogLevel('error');
+} catch {
+  // no-op
+}
 import {
   seedCategories,
   seedUsers,
@@ -283,15 +289,17 @@ class InMemoryDatabase {
     }
   }
 
-  private saveToDisk() {
+  private saveToDisk(): boolean {
     try {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(this.tables, null, 2), 'utf-8');
+      return true;
     } catch (err) {
       console.warn('[Database] Failed to save database to disk:', err);
+      return false;
     }
   }
 
@@ -335,7 +343,12 @@ class InMemoryDatabase {
           }
         }
       } catch (err: any) {
-        console.warn(`[Firestore Sync] Could not pull collection "${col}":`, err?.message || err);
+        const msg = err?.message || String(err);
+        if (msg.includes('Quota limit exceeded') || msg.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
+          console.warn('[Firestore Sync] Cloud Firestore free tier quota limit reached. Falling back to local persisted store.');
+          break;
+        }
+        console.warn(`[Firestore Sync] Could not pull collection "${col}":`, msg);
       }
     }
 
@@ -864,8 +877,13 @@ class InMemoryDatabase {
     if (tableName === 'salons') {
       this.ensureSalonDefaults();
     }
-    this.saveToDisk();
+    const saved = this.saveToDisk();
     this.syncToFirestore(tableName, 'set', record.id, record);
+    if (tableName === 'appointments' && !saved) {
+      const idx = table.indexOf(record);
+      if (idx !== -1) table.splice(idx, 1);
+      throw new Error('Appointment persistence failure: unable to save record to storage.');
+    }
     return [{ insertId: record.id, affectedRows: 1 }, null];
   }
 
@@ -1016,8 +1034,11 @@ class InMemoryDatabase {
           });
         }
         record.updated_at = new Date().toISOString();
-        this.saveToDisk();
+        const saved = this.saveToDisk();
         this.syncToFirestore(tableName, 'set', record.id, record);
+        if (tableName === 'appointments' && !saved) {
+          throw new Error('Appointment update persistence failure: unable to persist changes.');
+        }
         return [{ affectedRows: 1, changedRows: 1 }, null];
       }
     }
@@ -1045,9 +1066,13 @@ class InMemoryDatabase {
       const id = Number(params[0]);
       const index = table.findIndex((item) => item.id === id);
       if (index !== -1) {
-        table.splice(index, 1);
-        this.saveToDisk();
+        const removed = table.splice(index, 1)[0];
+        const saved = this.saveToDisk();
         this.syncToFirestore(tableName, 'delete', id);
+        if (tableName === 'appointments' && !saved) {
+          table.splice(index, 0, removed);
+          throw new Error('Appointment deletion persistence failure: unable to persist changes.');
+        }
         return [{ affectedRows: 1 }, null];
       }
     }

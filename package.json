@@ -9,6 +9,7 @@
     "lint": "tsc --noEmit",
     "seed:firebase": "tsx scripts/seedToFirestore.ts",
     "verify:firebase": "tsx scripts/verifyFirestore.ts",
+    "test:rules": "tsx scripts/testFirestoreRules.ts",
     "start": "node server.ts"
   },
   "dependencies": {

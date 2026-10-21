@@ -12,6 +12,35 @@ import { sanitizeString, sanitizeEmail, sanitizeNumber, sanitizeBoolean } from '
 import { handleChatMessage } from './src/server/geminiChat';
 import { calculateAppointmentCancellationTier, parseAppointmentDateTime, getAccountReliabilityInfo } from './src/lib/cancellationPolicy.js';
 
+// Suppress harmless internal Firestore idle stream disconnection logs in Node.js server
+const isIdleStreamLog = (arg: any) => {
+  if (!arg) return false;
+  if (typeof arg === 'string') {
+    return (
+      arg.includes('Disconnecting idle stream') ||
+      arg.includes('Timed out waiting for new targets') ||
+      (arg.includes('GrpcConnection') && arg.includes('CANCELLED'))
+    );
+  }
+  if (typeof arg === 'object') {
+    const text = String(arg.message || arg.code || arg);
+    return text.includes('Disconnecting idle stream') || text.includes('Timed out waiting for new targets');
+  }
+  return false;
+};
+
+const origWarn = console.warn;
+console.warn = (...args: any[]) => {
+  if (args.some(isIdleStreamLog)) return;
+  origWarn.apply(console, args);
+};
+
+const origErr = console.error;
+console.error = (...args: any[]) => {
+  if (args.some(isIdleStreamLog)) return;
+  origErr.apply(console, args);
+};
+
 // Load environment variables
 const isDevMode = process.execArgv.some((arg) => arg.includes('tsx')) || process.env.NODE_ENV !== 'production';
 const PORT = isDevMode ? 3000 : (Number(process.env.PORT) || 3000);
