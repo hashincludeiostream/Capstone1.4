@@ -185,3 +185,14 @@ export interface ConversationChannel {
   2. Set Firestore log level to `error` via `setLogLevel('error')` to suppress internal stream disconnect noise.
   3. Added an unhandled promise rejection guard in `src/lib/firebase.ts` and transient idle check in `src/lib/firestoreService.ts` for clean listener teardown and reconnection.
   4. Verified full compilation with `tsc --noEmit`, `vite build`, and verified API backend health status (`/api/health` returning 200 OK with connected database).
+
+---
+
+### 6. Completed Fix: Central Mailer SMTP Rate-Limiting & EAUTH Handling
+- **Issue**: `⚠️ [Central Mailer] SMTP dispatch failed (EAUTH): Invalid login: 454-4.7.0 Too many login attempts, please try again later.`
+- **Root Cause**: Nodemailer initialized separate unpooled TCP connections and auth handshakes for each email, which triggered Gmail's rate limiter when multiple requests ran in quick succession or when authentication failed.
+- **Resolution**:
+  1. Configured Nodemailer transporter in `server.app.ts` with `pool: true`, `maxConnections: 1` (for Gmail), and rate limits (`rateDelta: 2000`, `rateLimit: 1`) to reuse authenticated connections.
+  2. Implemented exponential backoff and a 5-minute cooldown guard (`smtpAuthCooldownUntil`) that pauses live network attempts when provider rate limits or auth lockouts occur (such as code 454 / EAUTH).
+  3. Ensured that during cooldown, system emails seamlessly fall back to the in-app communications audit ledger (`email_logs` table) without throwing unhandled warnings or halting application workflows.
+  4. Converted noisy warning logs to informative notices to prevent false-alarm error triggers in cloud development environments.

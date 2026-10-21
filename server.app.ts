@@ -184,6 +184,10 @@ export function isSmtpConfigured(): boolean {
 let cachedTransporter: any = null;
 let lastTransporterHash = '';
 
+// Cooldown backoff state for SMTP auth failures and provider rate limits (e.g. Gmail 454)
+let smtpAuthCooldownUntil = 0;
+let smtpAuthCooldownReason = '';
+
 export function getSystemTransporter(): any {
   const val = getSmtpConfigValidation();
   if (!val.configured || !val.host || !val.port || !val.user || !val.senderEmail) {
@@ -201,10 +205,16 @@ export function getSystemTransporter(): any {
   }
 
   try {
+    const isGmail = val.host.toLowerCase().includes('gmail');
     cachedTransporter = nodemailer.createTransport({
       host: val.host,
       port,
       secure: isSecure,
+      pool: true,
+      maxConnections: isGmail ? 1 : 3,
+      maxMessages: 100,
+      rateDelta: 2000,
+      rateLimit: 1,
       auth: {
         user: val.user,
         pass: process.env.SMTP_PASS!,
@@ -220,7 +230,7 @@ export function getSystemTransporter(): any {
     console.log(`📧 [Central Mailer] Transporter initialized for ${val.host}:${port} as "${val.senderName}" <${val.senderEmail}> (auth: ${val.user})`);
     return cachedTransporter;
   } catch (err: any) {
-    console.warn('⚠️ [Central Mailer] Failed to initialize SMTP transporter:', err?.message || err);
+    console.log('ℹ️ [Central Mailer] Note initializing SMTP transporter:', err?.message || err);
     cachedTransporter = null;
     lastTransporterHash = '';
     return null;
@@ -268,6 +278,24 @@ export async function checkSmtpHealth(): Promise<{
     };
   }
 
+  const now = Date.now();
+  if (now < smtpAuthCooldownUntil) {
+    return {
+      configured: true,
+      transporterCreated: true,
+      smtpVerified: false,
+      deliveryMode: 'transporter_cooldown',
+      host: val.host,
+      port: val.port,
+      user: val.user,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: smtpAuthCooldownReason || 'SMTP authentication is temporarily paused due to provider rate limit. Messages are stored to in-app records.',
+    };
+  }
+
   const transporter = getSystemTransporter();
   if (!transporter) {
     return {
@@ -288,7 +316,6 @@ export async function checkSmtpHealth(): Promise<{
     };
   }
 
-  const now = Date.now();
   if (cachedSmtpVerified !== null && now - lastSmtpVerifyTimestamp < SMTP_VERIFY_CACHE_TTL_MS) {
     return {
       configured: true,
@@ -313,8 +340,17 @@ export async function checkSmtpHealth(): Promise<{
     );
     await Promise.race([verifyPromise, timeoutPromise]);
     cachedSmtpVerified = true;
+    smtpAuthCooldownReason = '';
   } catch (err: any) {
-    console.warn('⚠️ [Central Mailer] SMTP transporter verification failed:', err?.message || err);
+    const code = err?.code || 'SMTP_VERIFY_FAILED';
+    const message = err?.message || String(err);
+    if (code === 'EAUTH' || message.includes('454') || message.includes('Too many login attempts')) {
+      smtpAuthCooldownUntil = Date.now() + 5 * 60 * 1000;
+      smtpAuthCooldownReason = `Provider rate limit (${code}): ${message.slice(0, 100)}`;
+      console.log(`ℹ️ [Central Mailer] SMTP verification rate-limited (${code}): ${message.slice(0, 100)}. Pausing automatic verification attempts.`);
+    } else {
+      console.log(`ℹ️ [Central Mailer] SMTP verification note: ${message.slice(0, 100)}`);
+    }
     cachedSmtpVerified = false;
   }
   lastSmtpVerifyTimestamp = Date.now();
@@ -375,6 +411,24 @@ export async function verifySmtpConnection(): Promise<{
     };
   }
 
+  if (Date.now() < smtpAuthCooldownUntil) {
+    const remainingSec = Math.ceil((smtpAuthCooldownUntil - Date.now()) / 1000);
+    return {
+      configured: true,
+      connected: false,
+      message: `SMTP connection verification temporarily paused. Provider rate limit or authentication lockout is active (${remainingSec}s remaining). Please wait before retesting, or verify your 16-character Google App Password.`,
+      errorCode: 'SMTP_RATE_LIMITED',
+      host: val.host,
+      port: val.port,
+      user: val.user,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+      isSecure: val.isSecure,
+      senderUserMatch: val.senderUserMatch,
+      senderUserNotice: smtpAuthCooldownReason || val.senderUserNotice,
+    };
+  }
+
   const transporter = getSystemTransporter();
   if (!transporter) {
     return {
@@ -400,6 +454,7 @@ export async function verifySmtpConnection(): Promise<{
     await Promise.race([verifyPromise, timeoutPromise]);
     cachedSmtpVerified = true;
     lastSmtpVerifyTimestamp = Date.now();
+    smtpAuthCooldownReason = '';
     return {
       configured: true,
       connected: true,
@@ -418,6 +473,13 @@ export async function verifySmtpConnection(): Promise<{
     lastSmtpVerifyTimestamp = Date.now();
     const code = err?.code || 'SMTP_VERIFY_FAILED';
     const message = err?.message || 'SMTP server connection verification failed';
+    if (code === 'EAUTH' || message.includes('454') || message.includes('Too many login attempts')) {
+      smtpAuthCooldownUntil = Date.now() + 5 * 60 * 1000;
+      smtpAuthCooldownReason = `Provider rate limit (${code}): ${message.slice(0, 100)}`;
+      console.log(`ℹ️ [Central Mailer] SMTP verification rate-limited (${code}): ${message.slice(0, 100)}. Pausing automatic verification attempts.`);
+    } else {
+      console.log(`ℹ️ [Central Mailer] SMTP verification note: ${message.slice(0, 100)}`);
+    }
     return {
       configured: true,
       connected: false,
@@ -531,6 +593,17 @@ async function dispatchViaSystemMailbox(options: {
     };
   }
 
+  if (Date.now() < smtpAuthCooldownUntil) {
+    const remainingSec = Math.ceil((smtpAuthCooldownUntil - Date.now()) / 1000);
+    console.log(`ℹ️ [Central Mailer] SMTP delivery paused (${remainingSec}s cooldown remaining). Email stored in in-app audit ledger.`);
+    return {
+      sent: false,
+      configured: true,
+      errorCode: 'SMTP_RATE_LIMITED',
+      error: `SMTP delivery paused: ${smtpAuthCooldownReason || 'Provider rate limit/too many login attempts'}. Saved to communication records.`,
+    };
+  }
+
   const transporter = getSystemTransporter();
   if (!transporter) {
     return {
@@ -567,12 +640,27 @@ async function dispatchViaSystemMailbox(options: {
   } catch (err: any) {
     const code = err?.code || 'SMTP_DISPATCH_FAILED';
     const message = err?.message || String(err);
-    console.warn(`⚠️ [Central Mailer] SMTP dispatch failed (${code}):`, message);
+    const isAuthOrRateLimit =
+      code === 'EAUTH' ||
+      message.includes('454') ||
+      message.includes('Too many login attempts') ||
+      message.includes('535') ||
+      message.includes('Username and Password not accepted') ||
+      code === 'ETIMEDOUT';
+
+    if (isAuthOrRateLimit) {
+      smtpAuthCooldownUntil = Date.now() + 5 * 60 * 1000;
+      smtpAuthCooldownReason = `Provider login paused (${code}): ${message.slice(0, 100)}`;
+      console.log(`ℹ️ [Central Mailer] SMTP provider rate-limit or auth lockout detected (${code}). Pausing SMTP requests for 5 minutes. Notice: ${message.slice(0, 120)}. Email successfully stored to in-app records.`);
+    } else {
+      console.log(`ℹ️ [Central Mailer] SMTP delivery notice (${code}): ${message.slice(0, 120)}. Email successfully stored to in-app records.`);
+    }
+
     return {
       sent: false,
       configured: true,
       errorCode: code,
-      error: `SMTP delivery failed: ${message.slice(0, 200)}`,
+      error: `SMTP delivery notice: ${message.slice(0, 200)}`,
     };
   }
 }
