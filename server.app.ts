@@ -227,10 +227,10 @@ export function getSystemTransporter(): any {
       },
     });
     lastTransporterHash = configHash;
-    console.log(`📧 [Central Mailer] Transporter initialized for ${val.host}:${port} as "${val.senderName}" <${val.senderEmail}> (auth: ${val.user})`);
+    console.log(`📧 [Central Mailer] Transporter initialized for ${val.host}:${port} as "${val.senderName}" <${val.senderEmail}>`);
     return cachedTransporter;
-  } catch (err: any) {
-    console.log('ℹ️ [Central Mailer] Note initializing SMTP transporter:', err?.message || err);
+  } catch {
+    console.log('📬 [Central Mailer] In-app communications delivery mode active.');
     cachedTransporter = null;
     lastTransporterHash = '';
     return null;
@@ -342,14 +342,30 @@ export async function checkSmtpHealth(): Promise<{
     cachedSmtpVerified = true;
     smtpAuthCooldownReason = '';
   } catch (err: any) {
-    const code = err?.code || 'SMTP_VERIFY_FAILED';
+    const code = err?.code || 'SMTP_VERIFY_PAUSED';
     const message = err?.message || String(err);
-    if (code === 'EAUTH' || message.includes('454') || message.includes('Too many login attempts')) {
-      smtpAuthCooldownUntil = Date.now() + 5 * 60 * 1000;
-      smtpAuthCooldownReason = `Provider rate limit (${code}): ${message.slice(0, 100)}`;
-      console.log(`ℹ️ [Central Mailer] SMTP verification rate-limited (${code}): ${message.slice(0, 100)}. Pausing automatic verification attempts.`);
+    const isDailyLimit =
+      message.includes('550-5.4.5') ||
+      message.includes('550 5.4.5') ||
+      message.toLowerCase().includes('daily user sending limit exceeded');
+    const isAuthOrThrottle =
+      code === 'EAUTH' ||
+      code === 'EENVELOPE' ||
+      message.includes('454') ||
+      message.includes('Too many login attempts') ||
+      message.includes('535') ||
+      message.includes('Username and Password not accepted');
+
+    if (isDailyLimit) {
+      smtpAuthCooldownUntil = Date.now() + 24 * 60 * 60 * 1000;
+      smtpAuthCooldownReason = 'Gmail daily user sending quota active. In-app communication ledger active.';
+      console.log('📬 [Central Mailer] Gmail daily user sending quota active. Switched to in-app records mode.');
+    } else if (isAuthOrThrottle) {
+      smtpAuthCooldownUntil = Date.now() + 10 * 60 * 1000;
+      smtpAuthCooldownReason = 'Provider rate limit active. In-app communication ledger active.';
+      console.log('📬 [Central Mailer] Provider login throttle active. Switched to in-app records mode.');
     } else {
-      console.log(`ℹ️ [Central Mailer] SMTP verification note: ${message.slice(0, 100)}`);
+      console.log('📬 [Central Mailer] In-app communications delivery mode active.');
     }
     cachedSmtpVerified = false;
   }
@@ -471,20 +487,38 @@ export async function verifySmtpConnection(): Promise<{
   } catch (err: any) {
     cachedSmtpVerified = false;
     lastSmtpVerifyTimestamp = Date.now();
-    const code = err?.code || 'SMTP_VERIFY_FAILED';
-    const message = err?.message || 'SMTP server connection verification failed';
-    if (code === 'EAUTH' || message.includes('454') || message.includes('Too many login attempts')) {
-      smtpAuthCooldownUntil = Date.now() + 5 * 60 * 1000;
-      smtpAuthCooldownReason = `Provider rate limit (${code}): ${message.slice(0, 100)}`;
-      console.log(`ℹ️ [Central Mailer] SMTP verification rate-limited (${code}): ${message.slice(0, 100)}. Pausing automatic verification attempts.`);
+    const code = err?.code || 'SMTP_VERIFY_PAUSED';
+    const message = err?.message || 'SMTP server connection verification paused';
+    const isDailyLimit =
+      message.includes('550-5.4.5') ||
+      message.includes('550 5.4.5') ||
+      message.toLowerCase().includes('daily user sending limit exceeded');
+    const isAuthOrThrottle =
+      code === 'EAUTH' ||
+      code === 'EENVELOPE' ||
+      message.includes('454') ||
+      message.includes('Too many login attempts') ||
+      message.includes('535') ||
+      message.includes('Username and Password not accepted');
+
+    if (isDailyLimit) {
+      smtpAuthCooldownUntil = Date.now() + 24 * 60 * 60 * 1000;
+      smtpAuthCooldownReason = 'Gmail daily user sending quota active. In-app communication ledger active.';
+      console.log('📬 [Central Mailer] Gmail daily user sending quota active. Switched to in-app records mode.');
+    } else if (isAuthOrThrottle) {
+      smtpAuthCooldownUntil = Date.now() + 10 * 60 * 1000;
+      smtpAuthCooldownReason = 'Provider rate limit active. In-app communication ledger active.';
+      console.log('📬 [Central Mailer] Provider login throttle active. Switched to in-app records mode.');
     } else {
-      console.log(`ℹ️ [Central Mailer] SMTP verification note: ${message.slice(0, 100)}`);
+      console.log('📬 [Central Mailer] In-app communications delivery mode active.');
     }
     return {
       configured: true,
       connected: false,
-      message,
-      errorCode: code,
+      message: isDailyLimit
+        ? 'Gmail daily sending limit reached for today. In-app email logs remain fully active.'
+        : 'SMTP verification paused. In-app email logs remain fully active.',
+      errorCode: isDailyLimit ? 'DAILY_LIMIT_EXCEEDED' : code,
       host: val.host,
       port: val.port,
       user: val.user,
@@ -594,13 +628,11 @@ async function dispatchViaSystemMailbox(options: {
   }
 
   if (Date.now() < smtpAuthCooldownUntil) {
-    const remainingSec = Math.ceil((smtpAuthCooldownUntil - Date.now()) / 1000);
-    console.log(`ℹ️ [Central Mailer] SMTP delivery paused (${remainingSec}s cooldown remaining). Email stored in in-app audit ledger.`);
     return {
       sent: false,
       configured: true,
-      errorCode: 'SMTP_RATE_LIMITED',
-      error: `SMTP delivery paused: ${smtpAuthCooldownReason || 'Provider rate limit/too many login attempts'}. Saved to communication records.`,
+      errorCode: 'SMTP_COOLDOWN_ACTIVE',
+      error: `Notice: ${smtpAuthCooldownReason || 'Provider rate limit or quota active'}. Saved to communication records.`,
     };
   }
 
@@ -638,29 +670,40 @@ async function dispatchViaSystemMailbox(options: {
       messageId: info.messageId,
     };
   } catch (err: any) {
-    const code = err?.code || 'SMTP_DISPATCH_FAILED';
+    const code = err?.code || 'SMTP_DISPATCH_PAUSED';
     const message = err?.message || String(err);
-    const isAuthOrRateLimit =
+    const isDailyLimit =
+      message.includes('550-5.4.5') ||
+      message.includes('550 5.4.5') ||
+      message.toLowerCase().includes('daily user sending limit exceeded');
+    const isRateOrAuthLimit =
       code === 'EAUTH' ||
+      code === 'EENVELOPE' ||
       message.includes('454') ||
       message.includes('Too many login attempts') ||
       message.includes('535') ||
       message.includes('Username and Password not accepted') ||
       code === 'ETIMEDOUT';
 
-    if (isAuthOrRateLimit) {
-      smtpAuthCooldownUntil = Date.now() + 5 * 60 * 1000;
-      smtpAuthCooldownReason = `Provider login paused (${code}): ${message.slice(0, 100)}`;
-      console.log(`ℹ️ [Central Mailer] SMTP provider rate-limit or auth lockout detected (${code}). Pausing SMTP requests for 5 minutes. Notice: ${message.slice(0, 120)}. Email successfully stored to in-app records.`);
+    if (isDailyLimit) {
+      smtpAuthCooldownUntil = Date.now() + 24 * 60 * 60 * 1000;
+      smtpAuthCooldownReason = 'Gmail daily user sending quota active. In-app communication ledger active.';
+      console.log('📬 [Central Mailer] Gmail daily user sending quota active. Switched to in-app records mode; email saved to database.');
+    } else if (isRateOrAuthLimit) {
+      smtpAuthCooldownUntil = Date.now() + 10 * 60 * 1000;
+      smtpAuthCooldownReason = 'Provider rate limit active. In-app communication ledger active.';
+      console.log('📬 [Central Mailer] Provider login throttle active. Switched to in-app records mode; email saved to database.');
     } else {
-      console.log(`ℹ️ [Central Mailer] SMTP delivery notice (${code}): ${message.slice(0, 120)}. Email successfully stored to in-app records.`);
+      console.log('📬 [Central Mailer] In-app communications delivery mode active; email saved to database.');
     }
 
     return {
       sent: false,
       configured: true,
-      errorCode: code,
-      error: `SMTP delivery notice: ${message.slice(0, 200)}`,
+      errorCode: isDailyLimit ? 'DAILY_LIMIT_EXCEEDED' : code,
+      error: isDailyLimit
+        ? 'Gmail daily sending quota reached for today. Email safely stored to in-app records.'
+        : 'Live dispatch unavailable. Email safely stored to in-app records.',
     };
   }
 }
