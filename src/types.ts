@@ -25,6 +25,8 @@ export interface User {
   };
 }
 
+export type EmailDispatchStatus = 'accepted' | 'delivered' | 'sent' | 'failed' | 'not_configured';
+
 export interface EmailLog {
   id: number | string;
   recipient_email: string;
@@ -38,8 +40,11 @@ export interface EmailLog {
   attachment_name?: string;
   pdf_html?: string;
   sent_at: string;
-  status: 'sent' | 'delivered' | 'failed';
+  status: EmailDispatchStatus;
   sender_email?: string;
+  message_id?: string;
+  error_code?: string;
+  error_message?: string;
 }
 
 export interface Salon {

@@ -4,7 +4,6 @@
  */
 
 import { EmailLog, User, Salon, Appointment, ProductOrder, UserRole, PlatformStats } from '../types';
-import { getCachedAccessToken, getCachedGmailUserEmail } from './firebase';
 import { jsPDF } from 'jspdf';
 import { ajax } from './ajax';
 
@@ -19,6 +18,7 @@ export interface EmailDispatchOptions {
   pdfHtml?: string;
   attachmentName?: string;
   senderEmail?: string;
+  salon_id?: number;
   // All-in-One Master PDF parameters
   salonName?: string;
   salonAddress?: string;
@@ -537,10 +537,15 @@ function createRawEmail(options: EmailDispatchOptions, senderEmail?: string): st
 
 export interface EmailSendResult {
   success: boolean;
+  status: 'accepted' | 'failed' | 'not_configured';
+  smtpAccepted: boolean;
+  messageId?: string;
+  auditLogged?: boolean;
   log?: EmailLog;
+  error?: string;
+  // Backwards compatibility
   gmailSent?: boolean;
   gmailMessageId?: string;
-  error?: string;
 }
 
 /**
@@ -572,18 +577,34 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...options,
+        to: options.to,
+        toName: options.toName,
+        role: options.role,
+        subject: options.subject,
+        category: options.category,
+        htmlBody: options.htmlBody,
+        hasPdfAttachment: Boolean(options.hasPdfAttachment),
+        attachmentName: options.attachmentName,
+        pdfHtml: options.pdfHtml,
         pdfBase64,
-        senderEmail: DEFAULT_SENDER,
+        salon_id: options.salon_id,
       }),
     });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Server failed to record email');
-    }
+    const data = await response.json().catch(() => ({}));
 
-    const data = await response.json();
+    if (!response.ok || !data.success) {
+      const errorMsg = data.message || data.error || (data.status === 'not_configured' ? 'System SMTP mailer is unconfigured.' : 'Email dispatch failed.');
+      return {
+        success: false,
+        status: data.status || 'failed',
+        smtpAccepted: false,
+        gmailSent: false,
+        error: errorMsg,
+        log: data.log,
+        auditLogged: Boolean(data.auditLogged),
+      };
+    }
 
     // Notify in-app UI via event for instant live toast/feedback
     if (typeof window !== 'undefined') {
@@ -595,7 +616,8 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
             category: options.category,
             hasPdf: Boolean(options.hasPdfAttachment),
             sender: data.sender || `Nail Glam Hub System <${DEFAULT_SENDER}>`,
-            deliveredViaSystemMailbox: Boolean(data.deliveredViaSystemMailbox),
+            deliveredViaSystemMailbox: Boolean(data.smtpAccepted),
+            status: data.status,
           },
         })
       );
@@ -603,13 +625,23 @@ export async function sendEmailNotification(options: EmailDispatchOptions): Prom
 
     return {
       success: true,
-      log: data.log,
-      gmailSent: Boolean(data.deliveredViaSystemMailbox),
+      status: data.status || 'accepted',
+      smtpAccepted: Boolean(data.smtpAccepted),
+      messageId: data.messageId,
+      gmailSent: Boolean(data.smtpAccepted),
       gmailMessageId: data.messageId,
+      log: data.log,
+      auditLogged: Boolean(data.auditLogged),
     };
   } catch (error: any) {
     console.error('[EmailService] Dispatch error:', error);
-    return { success: false, error: error.message || 'Unknown email dispatch error' };
+    return {
+      success: false,
+      status: 'failed',
+      smtpAccepted: false,
+      gmailSent: false,
+      error: error.message || 'Unknown email dispatch error',
+    };
   }
 }
 

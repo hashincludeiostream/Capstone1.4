@@ -67,27 +67,135 @@ const AUTH_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'ngh
 // ---------------------------------------------------------------------------
 // SPECIALIZED SYSTEM EMAIL DISPATCHER (SINGLE PLATFORM SENDER)
 // ---------------------------------------------------------------------------
-const SYSTEM_SENDER_NAME = process.env.SYSTEM_SENDER_NAME || 'Nail Glam Hub System';
-const SYSTEM_SENDER_EMAIL = process.env.SYSTEM_SENDER_EMAIL || process.env.SMTP_USER || 'notifications@nailglamhub.com';
+const SYSTEM_SENDER_NAME = (process.env.SYSTEM_SENDER_NAME || 'Nail Glam Hub System').trim();
+const SYSTEM_SENDER_EMAIL = (process.env.SYSTEM_SENDER_EMAIL || 'notifications@nailglamhub.com').trim();
+
+export type DispatchStatus = 'accepted' | 'failed' | 'not_configured';
+
+export function getDispatchStatus(result: {
+  sent: boolean;
+  configured?: boolean;
+}): DispatchStatus {
+  if (result.sent) return 'accepted';
+  if (result.configured === false) return 'not_configured';
+  return 'failed';
+}
+
+export type DispatchResult = {
+  sent: boolean;
+  configured: boolean;
+  messageId?: string;
+  errorCode?: string;
+  error?: string;
+};
+
+export function isSmtpConfigured(): boolean {
+  return Boolean(
+    process.env.SMTP_HOST?.trim() &&
+    process.env.SMTP_PORT &&
+    process.env.SMTP_USER?.trim() &&
+    process.env.SMTP_PASS &&
+    process.env.SYSTEM_SENDER_EMAIL?.trim()
+  );
+}
 
 let systemTransporter: any = null;
-if (process.env.SMTP_HOST || process.env.SMTP_USER) {
+const smtpConfiguredInitial = isSmtpConfigured();
+if (smtpConfiguredInitial) {
   try {
+    const isSecure = process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465;
     systemTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || (process.env.SMTP_USER?.includes('@gmail.com') ? 'smtp.gmail.com' : undefined),
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: process.env.SMTP_SECURE !== 'false',
-      auth: process.env.SMTP_USER
-        ? {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          }
-        : undefined,
+      host: process.env.SMTP_HOST!.trim(),
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: isSecure,
+      auth: {
+        user: process.env.SMTP_USER!.trim(),
+        pass: process.env.SMTP_PASS!,
+      },
     });
     console.log(`📧 [System Mailer] Specialized system account configured: ${SYSTEM_SENDER_NAME} <${SYSTEM_SENDER_EMAIL}>`);
-  } catch (transporterErr) {
-    console.warn('⚠️ [System Mailer] SMTP transporter initialization note:', transporterErr);
+  } catch (transporterErr: any) {
+    console.warn('⚠️ [System Mailer] SMTP transporter initialization note:', transporterErr?.message || transporterErr);
+    systemTransporter = null;
   }
+}
+
+// Cached SMTP verification state with 60-second TTL
+let cachedSmtpVerified: boolean | null = null;
+let lastSmtpVerifyTimestamp = 0;
+const SMTP_VERIFY_CACHE_TTL_MS = 60 * 1000;
+
+export async function checkSmtpHealth(): Promise<{
+  configured: boolean;
+  transporterCreated: boolean;
+  smtpVerified: boolean | null;
+  deliveryMode: string;
+}> {
+  const configured = isSmtpConfigured();
+  const transporterCreated = Boolean(systemTransporter);
+
+  if (!configured || !systemTransporter) {
+    return {
+      configured: false,
+      transporterCreated: false,
+      smtpVerified: null,
+      deliveryMode: 'unconfigured',
+    };
+  }
+
+  const now = Date.now();
+  if (cachedSmtpVerified !== null && now - lastSmtpVerifyTimestamp < SMTP_VERIFY_CACHE_TTL_MS) {
+    return {
+      configured: true,
+      transporterCreated: true,
+      smtpVerified: cachedSmtpVerified,
+      deliveryMode: cachedSmtpVerified ? 'live_smtp' : 'transporter_unverified',
+    };
+  }
+
+  try {
+    const verifyPromise = systemTransporter.verify();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('SMTP verification timed out')), 5000)
+    );
+    await Promise.race([verifyPromise, timeoutPromise]);
+    cachedSmtpVerified = true;
+  } catch (err: any) {
+    console.warn('⚠️ [System Mailer] SMTP transporter verification failed:', err?.message || err);
+    cachedSmtpVerified = false;
+  }
+  lastSmtpVerifyTimestamp = Date.now();
+
+  return {
+    configured: true,
+    transporterCreated: true,
+    smtpVerified: cachedSmtpVerified,
+    deliveryMode: cachedSmtpVerified ? 'live_smtp' : 'transporter_unverified',
+  };
+}
+
+export function decodePdf(base64: string, maxBytes: number = 10 * 1024 * 1024): Buffer {
+  const normalized = base64.replace(/^data:application\/pdf;base64,/i, '').trim();
+
+  if (
+    !normalized ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) ||
+    normalized.length % 4 !== 0
+  ) {
+    throw new Error('INVALID_PDF_BASE64');
+  }
+
+  const buffer = Buffer.from(normalized, 'base64');
+
+  if (
+    buffer.length === 0 ||
+    buffer.length > maxBytes ||
+    buffer.subarray(0, 5).toString() !== '%PDF-'
+  ) {
+    throw new Error('INVALID_PDF_ATTACHMENT');
+  }
+
+  return buffer;
 }
 
 async function dispatchViaSystemMailbox(options: {
@@ -96,26 +204,46 @@ async function dispatchViaSystemMailbox(options: {
   subject: string;
   html: string;
   attachments?: Array<{ filename: string; content?: any; contentType?: string }>;
-}): Promise<{ sent: boolean; messageId?: string; error?: string }> {
-  if (systemTransporter) {
-    try {
-      const fromField = `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`;
-      const toField = options.toName ? `"${options.toName}" <${options.to}>` : options.to;
-      const info = await systemTransporter.sendMail({
-        from: fromField,
-        to: toField,
-        subject: options.subject,
-        html: options.html,
-        attachments: options.attachments,
-      });
-      console.log(`📧 [System Mailer] Successfully dispatched email from specialized system account to ${options.to} (Message ID: ${info.messageId})`);
-      return { sent: true, messageId: info.messageId };
-    } catch (err: any) {
-      console.warn('⚠️ [System Mailer] SMTP dispatch failed (falling back to verified system ledger):', err?.message || err);
-      return { sent: false, error: err?.message || String(err) };
-    }
+}): Promise<DispatchResult> {
+  const configured = isSmtpConfigured();
+  if (!configured || !systemTransporter) {
+    return {
+      sent: false,
+      configured: false,
+      errorCode: 'SMTP_NOT_CONFIGURED',
+      error: 'System SMTP mailbox is unconfigured.',
+    };
   }
-  return { sent: false };
+
+  try {
+    const fromField = `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`;
+    const toField = options.toName ? `"${options.toName.replace(/["\r\n]/g, '')}" <${options.to}>` : options.to;
+    const cleanSubject = options.subject.replace(/[\r\n]/g, ' ').trim();
+
+    const info = await systemTransporter.sendMail({
+      from: fromField,
+      to: toField,
+      subject: cleanSubject,
+      html: options.html,
+      attachments: options.attachments,
+    });
+    console.log(`📧 [System Mailer] Successfully dispatched email from specialized system account to ${options.to} (Message ID: ${info.messageId})`);
+    return {
+      sent: true,
+      configured: true,
+      messageId: info.messageId,
+    };
+  } catch (err: any) {
+    const code = err?.code || 'SMTP_DISPATCH_FAILED';
+    const message = err?.message || String(err);
+    console.warn(`⚠️ [System Mailer] SMTP dispatch failed (${code}):`, message);
+    return {
+      sent: false,
+      configured: true,
+      errorCode: code,
+      error: 'SMTP delivery failed to send message.',
+    };
+  }
 }
 
 function generateAuthToken(user: { id: number; email: string; user_type: string }): string {
@@ -351,6 +479,16 @@ async function startServer() {
   });
   app.use('/api/payments/create-charge', paymentLimiter);
 
+  // Rate limiting for automated email dispatch endpoint
+  const emailDispatchLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // 30 dispatches per minute per IP
+    message: { error: 'Too many email dispatch requests. Please slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/email/send', emailDispatchLimiter);
+
   // General API rate limiting (for mutating/heavy endpoints; read queries like GET are never throttled)
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -366,6 +504,7 @@ async function startServer() {
       req.path === '/auth/register' ||
       req.path === '/auth/verify-admin-code' ||
       req.path === '/payments/create-charge' ||
+      req.path === '/email/send' ||
       req.path === '/settings/registration-rate-limit' ||
       req.method === 'GET'
     ) {
@@ -516,24 +655,29 @@ async function startServer() {
     attachment_name?: string;
     pdf_html?: string;
     sender_email?: string;
-  }) {
+    attachments?: Array<{ filename: string; content?: any; contentType?: string }>;
+  }): Promise<{ dispatchResult: DispatchResult; status: DispatchStatus }> {
+    const preview = emailData.content_preview || (emailData.html_body ? emailData.html_body.replace(/<[^>]+>/g, '').slice(0, 150) : 'Email alert');
+    const sender = SYSTEM_SENDER_EMAIL;
+
+    // Dispatch via specialized system mailbox if SMTP is configured
+    const dispatchResult = await dispatchViaSystemMailbox({
+      to: emailData.recipient_email,
+      toName: emailData.recipient_name,
+      subject: emailData.subject,
+      html: emailData.html_body,
+      attachments: emailData.attachments,
+    });
+
+    const status = getDispatchStatus(dispatchResult);
+
     try {
-      const preview = emailData.content_preview || (emailData.html_body ? emailData.html_body.replace(/<[^>]+>/g, '').slice(0, 150) : 'Email alert');
-      const sender = emailData.sender_email || SYSTEM_SENDER_EMAIL;
-
-      // Dispatch via specialized system mailbox if SMTP is configured
-      await dispatchViaSystemMailbox({
-        to: emailData.recipient_email,
-        toName: emailData.recipient_name,
-        subject: emailData.subject,
-        html: emailData.html_body,
-      }).catch(() => {});
-
       await db.execute(
         `INSERT INTO email_logs (
           recipient_email, recipient_name, recipient_role, subject, category,
-          content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html, sent_at, status, sender_email
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html,
+          sent_at, status, sender_email, message_id, error_code, error_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           sanitizeEmail(emailData.recipient_email),
           emailData.recipient_name || '',
@@ -546,13 +690,18 @@ async function startServer() {
           emailData.attachment_name || '',
           emailData.pdf_html || '',
           new Date().toISOString(),
-          'delivered',
+          status,
           sender,
+          dispatchResult.messageId || null,
+          dispatchResult.errorCode || null,
+          dispatchResult.error || null,
         ]
       );
-    } catch (err) {
-      console.warn('[Server] Email log database record warning:', err);
+    } catch (auditErr) {
+      console.warn('[Server] Email log database record warning (audit failure handled separately from SMTP delivery):', auditErr);
     }
+
+    return { dispatchResult, status };
   }
 
   // Auth: Register
@@ -914,19 +1063,26 @@ async function startServer() {
     }
   });
 
-  // Query specialized system email status
-  app.get('/api/email/system-status', (_req, res) => {
-    res.json({
-      senderName: SYSTEM_SENDER_NAME,
-      senderEmail: SYSTEM_SENDER_EMAIL,
-      isConfigured: true,
-      hasSmtpTransporter: Boolean(systemTransporter),
-      deliveryMode: systemTransporter ? 'live_smtp_system_sender' : 'system_audit_ledger_sender',
-    });
+  // Query specialized system email status (Real configuration & Nodemailer verification)
+  app.get('/api/email/system-status', async (_req, res) => {
+    try {
+      const health = await checkSmtpHealth();
+      res.json({
+        senderName: SYSTEM_SENDER_NAME,
+        senderEmail: SYSTEM_SENDER_EMAIL,
+        configured: health.configured,
+        transporterCreated: health.transporterCreated,
+        smtpVerified: health.smtpVerified,
+        deliveryMode: health.deliveryMode,
+      });
+    } catch (error) {
+      console.error('[Server] System email health check error:', error);
+      res.status(500).json({ error: 'Failed to query system email status' });
+    }
   });
 
   // Automated Email Dispatch Endpoint via Specialized System Account
-  app.post('/api/email/send', async (req, res) => {
+  app.post('/api/email/send', async (req: any, res) => {
     const {
       to,
       toName,
@@ -938,87 +1094,183 @@ async function startServer() {
       attachmentName,
       pdfHtml,
       pdfBase64,
+      salon_id,
     } = req.body;
 
     if (!to || !subject) {
-      return res.status(400).json({ error: 'Recipient email and subject are required' });
+      return res.status(400).json({ error: 'Recipient email and subject are required.' });
+    }
+
+    // Header injection protection (CRLF injection prevention)
+    if (/[\r\n]/.test(String(to)) || /[\r\n]/.test(String(subject))) {
+      return res.status(400).json({ error: 'Header injection attempt detected in recipient or subject.' });
+    }
+
+    // Server-side recipient email format validation
+    const emailValidation = validateEmailFormat(String(to).trim());
+    if (!emailValidation.valid) {
+      return res.status(400).json({ error: emailValidation.message });
+    }
+
+    const user = req.user;
+    const targetCategory = category || 'notification';
+
+    // Role-based authorization & salon ownership check
+    if (targetCategory === 'report') {
+      if (!salon_id) {
+        // Platform-wide executive reports require authenticated administrator
+        if (!user || user.user_type !== 'admin') {
+          return res.status(403).json({ error: 'Access denied: Administrator privileges required for executive platform reports.' });
+        }
+      } else {
+        // Salon-specific business reports require admin or the verified owner of the salon
+        if (!user) {
+          return res.status(401).json({ error: 'Authentication required to dispatch financial performance reports.' });
+        }
+        if (user.user_type !== 'admin') {
+          const [salonRows] = await db.execute('SELECT id, owner_id FROM salons WHERE id = ?', [Number(salon_id)]);
+          const salon = (salonRows as any[])[0];
+          if (!salon || Number(salon.owner_id) !== Number(user.id)) {
+            return res.status(403).json({ error: 'Access denied: You do not have ownership authority for this salon.' });
+          }
+        }
+      }
+    } else if (targetCategory === 'promo') {
+      // Promotional broadcasts require administrator or salon owner privileges
+      if (!user || (user.user_type !== 'admin' && user.user_type !== 'salon_owner')) {
+        return res.status(403).json({ error: 'Access denied: Only salon owners or administrators can broadcast promotional announcements.' });
+      }
     }
 
     try {
       const sanitizedTo = sanitizeEmail(to);
       const preview = htmlBody ? htmlBody.replace(/<[^>]+>/g, '').slice(0, 160).trim() : 'Email alert from Nail Glam Hub';
 
-      // Prepare attachments if PDF base64 provided
-      const attachments: any[] = [];
+      // Validate & decode PDF attachment if provided (reject invalid base64 or non-PDF binary)
+      const attachments: Array<{ filename: string; content?: any; contentType?: string }> = [];
       if (hasPdfAttachment && pdfBase64) {
-        attachments.push({
-          filename: attachmentName || 'Report.pdf',
-          content: Buffer.from(pdfBase64, 'base64'),
-          contentType: 'application/pdf',
-        });
+        try {
+          const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10MB limit
+          const pdfBuffer = decodePdf(pdfBase64, MAX_PDF_BYTES);
+          const safeFilename = (attachmentName || 'Performance_Report.pdf').replace(/[\r\n]/g, '').trim();
+          attachments.push({
+            filename: safeFilename.endsWith('.pdf') ? safeFilename : `${safeFilename}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          });
+        } catch (pdfErr: any) {
+          return res.status(400).json({
+            error: pdfErr.message === 'INVALID_PDF_BASE64'
+              ? 'Invalid PDF attachment base64 encoding.'
+              : 'Invalid PDF attachment. File must be a valid PDF document (%PDF-) under 10MB.',
+            code: pdfErr.message || 'INVALID_PDF_ATTACHMENT',
+          });
+        }
       }
 
-      // Real dispatch via specialized system account if SMTP transporter is configured
+      // Real dispatch via specialized system mailbox (Single platform sender identity)
       const dispatchResult = await dispatchViaSystemMailbox({
         to: sanitizedTo,
-        toName,
-        subject,
+        toName: toName ? String(toName).replace(/[\r\n]/g, '').trim() : undefined,
+        subject: String(subject).replace(/[\r\n]/g, ' ').trim(),
         html: htmlBody || `<p>${preview}</p>`,
         attachments: attachments.length > 0 ? attachments : undefined,
       });
 
-      const [result] = await db.execute(
-        `INSERT INTO email_logs (
-          recipient_email, recipient_name, recipient_role, subject, category,
-          content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html, sent_at, status, sender_email
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          sanitizedTo,
-          toName || '',
-          role || 'customer',
-          subject,
-          category || 'notification',
-          preview,
-          htmlBody || '',
-          hasPdfAttachment ? 1 : 0,
-          attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : ''),
-          pdfHtml || '',
-          new Date().toISOString(),
-          dispatchResult.sent ? 'delivered' : 'delivered',
-          SYSTEM_SENDER_EMAIL,
-        ]
-      );
+      const dispatchStatus = getDispatchStatus(dispatchResult);
 
-      const emailId = (result as any).insertId;
+      // Persist record to communication ledger (handle audit-log failure separately from SMTP delivery)
+      let emailId: number | undefined = undefined;
+      let auditLogged = false;
+      try {
+        const [result] = await db.execute(
+          `INSERT INTO email_logs (
+            recipient_email, recipient_name, recipient_role, subject, category,
+            content_preview, html_body, has_pdf_attachment, attachment_name, pdf_html,
+            sent_at, status, sender_email, message_id, error_code, error_message
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            sanitizedTo,
+            toName || '',
+            role || 'customer',
+            subject,
+            targetCategory,
+            preview,
+            htmlBody || '',
+            hasPdfAttachment ? 1 : 0,
+            attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : ''),
+            pdfHtml || '',
+            new Date().toISOString(),
+            dispatchStatus,
+            SYSTEM_SENDER_EMAIL,
+            dispatchResult.messageId || null,
+            dispatchResult.errorCode || null,
+            dispatchResult.error || null,
+          ]
+        );
+        emailId = (result as any)?.insertId;
+        auditLogged = true;
+      } catch (auditErr) {
+        console.warn('⚠️ [Server] Communication ledger database record warning (SMTP status preserved):', auditErr);
+      }
+
       const logRecord = {
-        id: emailId,
+        id: emailId || Date.now(),
         recipient_email: sanitizedTo,
         recipient_name: toName,
         recipient_role: role || 'customer',
         subject,
-        category: category || 'notification',
+        category: targetCategory,
         content_preview: preview,
         html_body: htmlBody || '',
         has_pdf_attachment: Boolean(hasPdfAttachment),
         attachment_name: attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : undefined),
         pdf_html: pdfHtml || undefined,
         sent_at: new Date().toISOString(),
-        status: 'delivered',
+        status: dispatchStatus,
         sender_email: SYSTEM_SENDER_EMAIL,
+        message_id: dispatchResult.messageId,
       };
 
-      res.status(201).json({
-        success: true,
+      if (dispatchResult.sent) {
+        return res.status(200).json({
+          success: true,
+          status: 'accepted',
+          smtpAccepted: true,
+          messageId: dispatchResult.messageId,
+          log: logRecord,
+          sender: `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`,
+          auditLogged,
+        });
+      }
+
+      if (!dispatchResult.configured) {
+        return res.status(200).json({
+          success: false,
+          status: 'not_configured',
+          smtpAccepted: false,
+          message: 'System SMTP mailbox is unconfigured. Message recorded in platform communication ledger.',
+          log: logRecord,
+          sender: `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`,
+          auditLogged,
+        });
+      }
+
+      return res.status(502).json({
+        success: false,
+        status: 'failed',
+        smtpAccepted: false,
+        errorCode: dispatchResult.errorCode,
+        message: 'SMTP dispatch failed to accept message.',
         log: logRecord,
-        sender: `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`,
-        deliveredViaSystemMailbox: dispatchResult.sent,
-        messageId: dispatchResult.messageId,
+        auditLogged,
       });
     } catch (error) {
-      console.error('Send email error:', error);
-      res.status(500).json({ error: 'Failed to record and send email' });
+      console.error('[Server] Send email internal error:', error);
+      res.status(500).json({ error: 'Internal server error processing email dispatch' });
     }
   });
+
 
   // =========================================================================
   // APPOINTMENT SCHEDULE WARNINGS & DEADLINE ALERTS (24h, 2h, Overdue)
@@ -1644,18 +1896,20 @@ async function startServer() {
       const subject = `📊 All-in-One Master Performance Report PDF: ${salon.salon_name} (${periodLabel})`;
       const attachmentName = `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`;
 
-      await logEmailRecord({
-        recipient_email: targetEmail,
-        recipient_name: owner_name || salon.salon_name,
-        recipient_role: 'salon_owner',
-        subject,
-        category: 'report',
-        content_preview: `${periodBadge} for ${salon.salon_name}: ₱${totalRevenue.toLocaleString()} gross revenue, ${completedAppts.length} appointments.`,
-        html_body: htmlBody,
-        has_pdf_attachment: true,
-        attachment_name: attachmentName,
-        pdf_html: pdfHtml,
-      });
+      if (!req.body.compile_only) {
+        await logEmailRecord({
+          recipient_email: targetEmail,
+          recipient_name: owner_name || salon.salon_name,
+          recipient_role: 'salon_owner',
+          subject,
+          category: 'report',
+          content_preview: `${periodBadge} for ${salon.salon_name}: ₱${totalRevenue.toLocaleString()} gross revenue, ${completedAppts.length} appointments.`,
+          html_body: htmlBody,
+          has_pdf_attachment: true,
+          attachment_name: attachmentName,
+          pdf_html: pdfHtml,
+        });
+      }
 
       res.json({
         success: true,
@@ -1787,18 +2041,20 @@ async function startServer() {
       const subject = `🛡️ All-in-One Master Platform Ecosystem Performance Audit Report (PDF) - ${monthYear}`;
       const attachmentName = `Platform_Ecosystem_All_In_One_Master_Report_${monthYear.replace(/\s+/g, '_')}.pdf`;
 
-      await logEmailRecord({
-        recipient_email: targetEmail,
-        recipient_name: admin_name || 'Administrator',
-        recipient_role: 'admin',
-        subject,
-        category: 'report',
-        content_preview: `Platform health audit: ${salonsCount} active salons, ${usersCount} users, ₱${totalPlatformTurnover.toLocaleString()} platform GMV.`,
-        html_body: htmlBody,
-        has_pdf_attachment: true,
-        attachment_name: attachmentName,
-        pdf_html: pdfHtml,
-      });
+      if (!req.body.compile_only) {
+        await logEmailRecord({
+          recipient_email: targetEmail,
+          recipient_name: admin_name || 'Administrator',
+          recipient_role: 'admin',
+          subject,
+          category: 'report',
+          content_preview: `Platform health audit: ${salonsCount} active salons, ${usersCount} users, ₱${totalPlatformTurnover.toLocaleString()} platform GMV.`,
+          html_body: htmlBody,
+          has_pdf_attachment: true,
+          attachment_name: attachmentName,
+          pdf_html: pdfHtml,
+        });
+      }
 
       res.json({
         success: true,

@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { Salon, User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
-import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 import { ajax } from '../../lib/ajax';
 
@@ -37,8 +36,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   currentUser,
   showToast,
 }) => {
-  const cachedGoogleEmail = getCachedGmailUserEmail();
-  const defaultTargetEmail = cachedGoogleEmail || currentUser.email || salon.email || 'salon@nailglamhub.com';
+  const defaultTargetEmail = currentUser.email || salon.email || 'salon@nailglamhub.com';
   const ownerName = currentUser.fullname || salon.salon_name || 'Salon Partner';
 
   const [recipientEmail, setRecipientEmail] = useState(defaultTargetEmail);
@@ -47,11 +45,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   // Toggle between 'monthly' and 'yearly' reporting frequencies for PDF generation
   const [reportFrequency, setReportFrequency] = useState<'monthly' | 'yearly'>('monthly');
 
-  // Google OAuth Connection state
-  const [hasGoogleToken, setHasGoogleToken] = useState(() => Boolean(getCachedAccessToken()));
-  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
-
-  // Mandatory Workspace User Confirmation Modal
+  // Confirmation Modal
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // In-app interactive Report Preview Modal (avoids window.open popup blockers)
@@ -94,36 +88,6 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-
-  // Check cached token periodically or on window focus
-  useEffect(() => {
-    const checkToken = () => {
-      setHasGoogleToken(Boolean(getCachedAccessToken()));
-    };
-    checkToken();
-    window.addEventListener('focus', checkToken);
-    return () => window.removeEventListener('focus', checkToken);
-  }, []);
-
-  const handleConnectGoogle = async () => {
-    setIsConnectingGoogle(true);
-    try {
-      const res = await connectGoogleWorkspace();
-      if (res.success && res.token) {
-        setHasGoogleToken(true);
-        if (res.email) {
-          setRecipientEmail(res.email);
-        }
-        showToast(`Google Workspace connected (${res.email || 'Gmail'})!`);
-      } else {
-        showToast(res.error || 'Failed to connect Google account');
-      }
-    } catch (err: any) {
-      showToast(err?.message || 'Connection error');
-    } finally {
-      setIsConnectingGoogle(false);
-    }
-  };
 
   // Instant direct PDF download
   const handleDownloadDirectPdf = async () => {
@@ -203,7 +167,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
     try {
       const emailToUse = (recipientEmail.trim() || defaultTargetEmail).trim();
 
-      // 1. Generate certified report payload from backend
+      // 1. Generate certified report payload from backend (compile_only: true to prevent duplicate dispatches)
       const res = await ajax('/api/email/reports/monthly', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -212,6 +176,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
           owner_email: emailToUse,
           owner_name: ownerName,
           time_grain: reportFrequency,
+          compile_only: true,
         }),
       });
 
@@ -226,6 +191,7 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         sendResult = await sendEmailNotification({
           ...data.report,
           to: emailToUse,
+          salon_id: salon.id,
           subject: `📊 All-in-One Master Performance Report PDF: ${salon.salon_name} (${reportFrequency.toUpperCase()})`,
           attachmentName: `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
           salonName: salon.salon_name,
@@ -243,10 +209,21 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         });
       }
 
-      setFeedback(
-        `✅ Official All-in-One Master PDF report dispatched from specialized system account to ${emailToUse}!`
-      );
-      showToast(`Master PDF report dispatched to ${emailToUse}`);
+      if (sendResult?.status === 'accepted') {
+        setFeedback(
+          `✅ Official All-in-One Master PDF report dispatched from specialized system account to ${emailToUse}!`
+        );
+        showToast(`Master PDF report dispatched to ${emailToUse}`);
+      } else if (sendResult?.status === 'not_configured') {
+        setFeedback(
+          `⚠️ System SMTP is not configured. Report compiled and recorded in communication ledger for ${emailToUse}.`
+        );
+        showToast('SMTP unconfigured. Report recorded in audit ledger.');
+      } else {
+        const errorMsg = sendResult?.error || 'Email dispatch failed.';
+        setFeedback(`❌ ${errorMsg}`);
+        showToast(`❌ ${errorMsg}`);
+      }
       await fetchEmailLogs();
     } catch (err: any) {
       setFeedback(err.message || 'Error generating report');
@@ -271,16 +248,19 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
         hasPdfAttachment: Boolean(log.has_pdf_attachment),
         attachmentName: log.attachment_name || `${salon.salon_name.replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
         pdfHtml: log.pdf_html,
+        salon_id: salon.id,
         salonName: salon.salon_name,
         salonAddress: salon.address,
         periodLabel: 'All-in-One Master Performance Audit',
         masterReportSummary: log.content_preview,
       });
 
-      if (sendResult.success) {
+      if (sendResult.status === 'accepted') {
         showToast(`✅ Dispatched from specialized system account to ${log.recipient_email}!`);
+      } else if (sendResult.status === 'not_configured') {
+        showToast('⚠️ SMTP unconfigured. Record saved in communication ledger.');
       } else {
-        showToast('Logged to ledger.');
+        showToast(`❌ Dispatch failed: ${sendResult.error || 'SMTP delivery rejected'}`);
       }
       await fetchEmailLogs();
     } catch (err: any) {
@@ -633,11 +613,19 @@ export const OwnerEmailReportsManager: React.FC<OwnerEmailReportsManagerProps> =
                           PDF Attached
                         </span>
                       )}
-                      {log.status === 'delivered' && (
+                      {log.status === 'accepted' || log.status === 'delivered' ? (
                         <span className="text-[10px] text-emerald-600 font-semibold flex items-center">
-                          <Check className="w-3 h-3 mr-0.5" /> Delivered
+                          <Check className="w-3 h-3 mr-0.5" /> {log.status === 'accepted' ? 'Accepted' : 'Delivered'}
                         </span>
-                      )}
+                      ) : log.status === 'not_configured' ? (
+                        <span className="text-[10px] text-amber-600 font-semibold flex items-center">
+                          <AlertCircle className="w-3 h-3 mr-0.5" /> Ledger Only
+                        </span>
+                      ) : log.status === 'failed' ? (
+                        <span className="text-[10px] text-rose-600 font-semibold flex items-center">
+                          <X className="w-3 h-3 mr-0.5" /> Failed
+                        </span>
+                      ) : null}
                     </div>
                   </button>
                 );

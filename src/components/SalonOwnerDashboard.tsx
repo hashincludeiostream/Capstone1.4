@@ -79,10 +79,10 @@ interface SalonOwnerDashboardProps {
   onOpenRegisterSalon?: () => void;
   onOpenRegisterBranch?: () => void;
   onNavigateTab?: (tab: string) => void;
+  onRefreshAppointments?: () => void;
   refreshKey?: number;
   initialSalons?: Salon[];
   targetId?: string | null;
-  onRefreshAppointments?: () => void;
   onRefreshProducts?: () => void;
 }
 
@@ -92,10 +92,10 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
   onOpenRegisterSalon,
   onOpenRegisterBranch,
   onNavigateTab,
+  onRefreshAppointments,
   refreshKey = 0,
   initialSalons,
   targetId,
-  onRefreshAppointments,
   onRefreshProducts,
 }) => {
   const [salons, setSalons] = useState<Salon[]>(() => {
@@ -363,12 +363,30 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     setLoading(false);
   };
 
+  // Listen for real-time booking updates from customer or other tabs
+  useEffect(() => {
+    const handleSync = () => {
+      if (selectedSalonId) {
+        fetchAppointments({ salon_id: selectedSalonId })
+          .then((appts) => {
+            if (Array.isArray(appts)) {
+              setAppointments(appts);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('nailglamhub_appointments_updated', handleSync);
+    return () => window.removeEventListener('nailglamhub_appointments_updated', handleSync);
+  }, [selectedSalonId]);
+
   const handleStatusChange = async (appointmentId: number, newStatus: AppointmentStatus) => {
     const success = await updateAppointmentStatus(appointmentId, newStatus);
     if (success) {
       setAppointments((prev) =>
         prev.map((a) => (a.id === appointmentId ? { ...a, status: newStatus } : a))
       );
+      onRefreshAppointments?.();
       showToast(`Appointment status updated to ${newStatus}`);
     }
   };

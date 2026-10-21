@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { User, EmailLog } from '../../types';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
-import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 import { ajax } from '../../lib/ajax';
 
@@ -34,18 +33,13 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
   currentUser,
   showToast,
 }) => {
-  const cachedGoogleEmail = getCachedGmailUserEmail();
-  const defaultAdminEmail = cachedGoogleEmail || currentUser?.email || 'jessemuelmedayo02@gmail.com';
+  const defaultAdminEmail = currentUser?.email || 'admin@nailglamhub.com';
   const adminName = currentUser?.fullname || 'System Administrator';
 
   const [adminTargetEmail, setAdminTargetEmail] = useState(defaultAdminEmail);
   const adminEmail = adminTargetEmail;
 
-  // Google OAuth Connection state
-  const [hasGoogleToken, setHasGoogleToken] = useState(() => Boolean(getCachedAccessToken()));
-  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
-
-  // Mandatory confirmation dialog state
+  // Confirmation dialog state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // In-app interactive Report Preview Modal (avoids window.open popup blockers)
@@ -83,36 +77,6 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
   const [broadcastSubject, setBroadcastSubject] = useState('Exclusive Weekend Nail Glam Hub Treat! 💅✨');
   const [broadcastMessage, setBroadcastMessage] = useState('Enjoy complimentary nail art on your next booking at any top-rated studio this weekend!');
   const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
-
-  // Check cached token periodically
-  useEffect(() => {
-    const checkToken = () => {
-      setHasGoogleToken(Boolean(getCachedAccessToken()));
-    };
-    checkToken();
-    window.addEventListener('focus', checkToken);
-    return () => window.removeEventListener('focus', checkToken);
-  }, []);
-
-  const handleConnectGoogle = async () => {
-    setIsConnectingGoogle(true);
-    try {
-      const res = await connectGoogleWorkspace();
-      if (res.success && res.token) {
-        setHasGoogleToken(true);
-        if (res.email) {
-          setAdminTargetEmail(res.email);
-        }
-        showToast(`Google Workspace connected (${res.email || 'Gmail'})!`);
-      } else {
-        showToast(res.error || 'Failed to connect Google account');
-      }
-    } catch (err: any) {
-      showToast(err?.message || 'Connection error');
-    } finally {
-      setIsConnectingGoogle(false);
-    }
-  };
 
   // Instant direct PDF download
   const handleDownloadDirectPdf = async () => {
@@ -175,13 +139,14 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
     try {
       const emailToUse = (adminTargetEmail.trim() || defaultAdminEmail).trim();
 
-      // 1. Generate platform status report from server
+      // 1. Generate platform status report from server (compile_only: true prevents double dispatches)
       const res = await ajax('/api/email/reports/admin-platform', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           admin_email: emailToUse,
           admin_name: adminName,
+          compile_only: true,
         }),
       });
 
@@ -211,8 +176,17 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
         });
       }
 
-      setFeedback(`✅ Official All-in-One Master PDF platform report dispatched from specialized system account to ${emailToUse}!`);
-      showToast(`Master PDF report dispatched to ${emailToUse}`);
+      if (sendResult?.status === 'accepted') {
+        setFeedback(`✅ Official All-in-One Master PDF platform report dispatched from specialized system account to ${emailToUse}!`);
+        showToast(`Master PDF report dispatched to ${emailToUse}`);
+      } else if (sendResult?.status === 'not_configured') {
+        setFeedback(`⚠️ System SMTP is not configured. Report compiled and saved to communication ledger for ${emailToUse}.`);
+        showToast('SMTP unconfigured. Report saved in audit ledger.');
+      } else {
+        const errorMsg = sendResult?.error || 'Email dispatch failed.';
+        setFeedback(`❌ ${errorMsg}`);
+        showToast(`❌ ${errorMsg}`);
+      }
       await fetchEmailLogs();
     } catch (err: any) {
       setFeedback(err.message || 'Error generating platform report');
@@ -244,7 +218,7 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
       `;
 
       // Dispatch via sendEmailNotification
-      await sendEmailNotification({
+      const sendResult = await sendEmailNotification({
         to: 'customer@nailglamhub.com',
         toName: 'Valued Glam Community',
         role: 'customer',
@@ -253,7 +227,13 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
         htmlBody,
       });
 
-      showToast('Promotional news broadcast dispatched to registered customer accounts');
+      if (sendResult.status === 'accepted') {
+        showToast('Promotional news broadcast dispatched to registered customer accounts');
+      } else if (sendResult.status === 'not_configured') {
+        showToast('⚠️ SMTP unconfigured. Promo recorded in communication ledger.');
+      } else {
+        showToast(`❌ Promo broadcast failed: ${sendResult.error || 'SMTP delivery rejected'}`);
+      }
       setShowBroadcastModal(false);
       await fetchEmailLogs();
     } catch (err: any) {
@@ -282,10 +262,12 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
         masterReportSummary: log.content_preview,
       });
 
-      if (sendResult.success) {
+      if (sendResult.status === 'accepted') {
         showToast(`✅ Dispatched from specialized system account to ${log.recipient_email}!`);
+      } else if (sendResult.status === 'not_configured') {
+        showToast('⚠️ SMTP unconfigured. Record saved in communication ledger.');
       } else {
-        showToast('Recorded in ledger.');
+        showToast(`❌ Dispatch failed: ${sendResult.error || 'SMTP delivery rejected'}`);
       }
       await fetchEmailLogs();
     } catch (err: any) {
@@ -581,6 +563,19 @@ export const AdminEmailReportsManager: React.FC<AdminEmailReportsManagerProps> =
                       <span className="text-[10px] text-gray-400 truncate max-w-[150px]">
                         To: {log.recipient_email}
                       </span>
+                      {log.status === 'accepted' || log.status === 'delivered' ? (
+                        <span className="text-[10px] text-emerald-600 font-semibold flex items-center">
+                          <Check className="w-3 h-3 mr-0.5" /> {log.status === 'accepted' ? 'Accepted' : 'Delivered'}
+                        </span>
+                      ) : log.status === 'not_configured' ? (
+                        <span className="text-[10px] text-amber-600 font-semibold flex items-center">
+                          <AlertCircle className="w-3 h-3 mr-0.5" /> Ledger Only
+                        </span>
+                      ) : log.status === 'failed' ? (
+                        <span className="text-[10px] text-rose-600 font-semibold flex items-center">
+                          <X className="w-3 h-3 mr-0.5" /> Failed
+                        </span>
+                      ) : null}
                       {log.has_pdf_attachment && (
                         <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded ml-auto">
                           <FileText className="w-3 h-3 mr-1" />

@@ -37,7 +37,6 @@ import {
 import { Salon, Service, Technician, Appointment, Product, ProductOrder } from '../../types';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 import { ajax } from '../../lib/ajax';
-import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 
 export interface FiveYearRange {
@@ -130,6 +129,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
           owner_email: emailToUse,
           owner_name: salon?.salon_name,
           time_grain: selectedTimeGrain,
+          compile_only: true,
         }),
       });
       const data = await res.json();
@@ -138,6 +138,7 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
           const sendRes = await sendEmailNotification({
             ...data.report,
             to: emailToUse,
+            salon_id: targetSalonId,
             subject: `📊 All-in-One Master Performance Report PDF: ${salon?.salon_name || 'Salon'} (${selectedTimeGrain.toUpperCase()})`,
             attachmentName: `${(salon?.salon_name || 'Salon').replace(/\s+/g, '_')}_All_In_One_Master_Report.pdf`,
             salonName: salon?.salon_name,
@@ -153,21 +154,21 @@ export const DecisionReportModal: React.FC<DecisionReportModalProps> = ({
             },
             masterReportSummary: `All-in-One Master Performance Dossier for ${salon?.salon_name || 'Salon'}. Gross Revenue: PHP ${pnlData.summary.totalGrossRevenue.toLocaleString()}, Net Profit: PHP ${pnlData.summary.netProfit.toLocaleString()} (${pnlData.summary.profitMargin.toFixed(1)}% margin), ${reportData.stats.completedCount} completed sessions, CRM retention: ${reportData.crmSummary.retentionRate}%.`,
           });
-          if (sendRes.gmailSent) {
-            showToast(`✅ All-in-One Master Report PDF delivered directly to ${emailToUse} via Gmail!`);
-          } else if (sendRes.error) {
-            showToast(`Master report logged to ledger. Note: ${sendRes.error}`);
+          if (sendRes.status === 'accepted') {
+            showToast(`✅ All-in-One Master Report PDF dispatched to ${emailToUse}!`);
+          } else if (sendRes.status === 'not_configured') {
+            showToast(`⚠️ SMTP unconfigured. Master report archived in system communication ledger.`);
           } else {
-            showToast(`All-in-One Master Report PDF logged to audit ledger`);
+            showToast(`❌ Email dispatch failed: ${sendRes.error || 'SMTP delivery rejected'}`);
           }
         } else {
-          showToast(`All-in-One Master Report PDF dispatched to email!`);
+          showToast(`Report compiled.`);
         }
       } else {
         showToast(data.error || 'Failed to email report');
       }
     } catch (e: any) {
-      showToast('Error sending email report');
+      showToast(e?.message || 'Error sending email report');
     } finally {
       setIsEmailing(false);
     }

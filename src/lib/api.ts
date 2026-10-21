@@ -356,6 +356,22 @@ export async function fetchAppointments(params?: { customer_id?: number; salon_i
   }
 }
 
+function broadcastAppointmentChange(appointmentId?: number, status?: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('nailglamhub_appointments_updated', {
+        detail: { id: appointmentId, status, timestamp: Date.now() },
+      })
+    );
+    try {
+      localStorage.setItem(
+        'nailglamhub_appointment_sync_event',
+        JSON.stringify({ id: appointmentId, status, timestamp: Date.now() })
+      );
+    } catch (_) {}
+  }
+}
+
 export async function createAppointment(data: Partial<Appointment>): Promise<{ success: boolean; appointment: Appointment }> {
   try {
     const res = await ajax(`${API_BASE}/appointments`, {
@@ -371,6 +387,7 @@ export async function createAppointment(data: Partial<Appointment>): Promise<{ s
       createFirestoreAppointment(result.appointment).catch((err) =>
         console.warn('Firestore appointment sync warning:', err)
       );
+      broadcastAppointmentChange(result.appointment.id, result.appointment.status);
     }
 
     return result;
@@ -418,6 +435,10 @@ export async function updateAppointmentStatus(
       console.warn('Firestore status sync warning:', err)
     );
 
+    if (res.ok) {
+      broadcastAppointmentChange(id, status);
+    }
+
     return res.ok;
   } catch (err) {
     console.warn('API updateAppointmentStatus error:', err);
@@ -464,6 +485,8 @@ export async function cancelAppointment(
     cancellation_fee: result.cancellation_fee,
     cancellation_tier: result.cancellation_tier,
   }).catch((err) => console.warn('Firestore cancel sync warning:', err));
+
+  broadcastAppointmentChange(id, 'cancelled');
 
   return result;
 }

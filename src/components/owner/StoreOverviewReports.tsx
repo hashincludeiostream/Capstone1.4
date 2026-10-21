@@ -37,7 +37,6 @@ import { Salon, Service, Technician, Appointment, Review, Product, ProductOrder 
 import { DecisionReportModal } from './DecisionReportModal';
 import { sendEmailNotification, downloadCertifiedPdfFile } from '../../lib/emailService';
 import { ajax } from '../../lib/ajax';
-import { getCachedAccessToken, getCachedGmailUserEmail, connectGoogleWorkspace } from '../../lib/firebase';
 import { localStorage as safeLocalStorage } from '../../lib/localStorage';
 import {
   StoreReportData,
