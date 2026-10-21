@@ -800,6 +800,13 @@ class InMemoryDatabase {
       if (/WHERE LOWER\(recipient_email\)\s*=\s*LOWER\(\?\)/i.test(sql)) {
         const email = String(params[0]).toLowerCase();
         filtered = filtered.filter((l) => (l.recipient_email || '').toLowerCase() === email);
+      } else if (/WHERE recipient_email\s*=\s*\?/i.test(sql)) {
+        const email = String(params[0]).toLowerCase();
+        filtered = filtered.filter((l) => (l.recipient_email || '').toLowerCase() === email);
+        if (/category\s*=\s*'(\w+)'/i.test(sql)) {
+          const cat = sql.match(/category\s*=\s*'(\w+)'/i)![1];
+          filtered = filtered.filter((l) => l.category === cat);
+        }
       } else if (/WHERE recipient_role\s*=\s*\?/i.test(sql)) {
         const role = String(params[0]);
         filtered = filtered.filter((l) => l.recipient_role === role);

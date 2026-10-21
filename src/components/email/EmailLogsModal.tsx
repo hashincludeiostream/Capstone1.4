@@ -63,12 +63,17 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
     setIsSendingActualEmail(true);
     setActionFeedback(null);
     try {
+      const isCustomer = currentUser.user_type === 'customer';
+      const categoryToSend = isCustomer
+        ? (['booking', 'order'].includes(targetLog.category) ? targetLog.category : 'booking')
+        : ((targetLog.category as any) || 'report');
+
       const result = await sendEmailNotification({
         to: currentUser.email,
         toName: currentUser.fullname,
         role: currentUser.user_type,
-        subject: targetLog.subject || `Official Report for ${currentUser.fullname}`,
-        category: (targetLog.category as any) || 'report',
+        subject: targetLog.subject || `Official Notification for ${currentUser.fullname}`,
+        category: categoryToSend,
         htmlBody: targetLog.html_body,
         hasPdfAttachment: Boolean(targetLog.has_pdf_attachment),
         pdfHtml: targetLog.pdf_html,
@@ -76,10 +81,10 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
       });
 
       if (result.success) {
-        if (result.gmailSent) {
-          setActionFeedback(`✅ Actual email dispatched directly to your Gmail inbox (${currentUser.email})! Please check your inbox or Sent mail.`);
+        if (result.smtpAccepted) {
+          setActionFeedback(`✅ Accepted by SMTP server for delivery to ${currentUser.email}! (Message ID: ${result.messageId || 'assigned'})`);
         } else {
-          setActionFeedback(`✅ Email dispatched to ${currentUser.email}!`);
+          setActionFeedback(`ℹ️ System SMTP mailbox is unconfigured. Notification preserved in platform ledger.`);
         }
         await fetchLogs();
         setTimeout(() => setActionFeedback(null), 6000);
@@ -229,7 +234,19 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
 
                       <div className="text-[10px] text-gray-400 flex items-center justify-between pt-0.5">
                         <span className="truncate pr-1">To: {log.recipient_email}</span>
-                        <span className="text-emerald-600 font-medium shrink-0">Delivered</span>
+                        {log.status === 'accepted' ? (
+                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium shrink-0">
+                            Accepted by SMTP
+                          </span>
+                        ) : log.status === 'not_configured' ? (
+                          <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-medium shrink-0">
+                            Ledger Only
+                          </span>
+                        ) : (
+                          <span className="text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-medium shrink-0">
+                            Failed
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
@@ -252,6 +269,32 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                         <p className="truncate"><strong>From:</strong> {selectedLog.sender_email || 'notifications@nailglamhub.com'}</p>
                         <p className="truncate"><strong>To:</strong> {selectedLog.recipient_email} ({selectedLog.recipient_name || selectedLog.recipient_role})</p>
                         <p><strong>Date Sent:</strong> {new Date(selectedLog.sent_at).toLocaleString()}</p>
+                        <div className="flex items-center space-x-2 pt-1">
+                          <strong>Delivery Status:</strong>
+                          {selectedLog.status === 'accepted' ? (
+                            <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-semibold">
+                              ✓ Accepted by SMTP Mailbox
+                            </span>
+                          ) : selectedLog.status === 'not_configured' ? (
+                            <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-semibold">
+                              ⚠ Recorded in Ledger (SMTP Unconfigured)
+                            </span>
+                          ) : (
+                            <span className="text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[11px] font-semibold">
+                              ✕ SMTP Dispatch Rejected/Failed
+                            </span>
+                          )}
+                        </div>
+                        {selectedLog.message_id && (
+                          <p className="font-mono text-[11px] text-gray-600 truncate pt-0.5">
+                            <strong>SMTP Message-ID:</strong> {selectedLog.message_id}
+                          </p>
+                        )}
+                        {selectedLog.error_message && (
+                          <p className="text-[11px] text-red-600 font-medium pt-0.5">
+                            <strong>Diagnostic Note:</strong> {selectedLog.error_message}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -260,7 +303,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
                         onClick={() => handleSendActualEmail(selectedLog)}
                         disabled={isSendingActualEmail}
                         className="inline-flex items-center px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"
-                        title="Send actual email to your inbox via Gmail API"
+                        title="Send email copy to your verified account address"
                       >
                         <Send className={`w-3.5 h-3.5 mr-1.5 ${isSendingActualEmail ? 'animate-spin' : ''}`} />
                         {isSendingActualEmail ? 'Sending...' : 'Send to My Email'}
@@ -316,7 +359,7 @@ export const EmailLogsModal: React.FC<EmailLogsModalProps> = ({ currentUser, onC
         <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 shrink-0">
           <div className="flex items-center space-x-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-            <span className="truncate">Gmail API &amp; Server Relay connected. Emails automatically dispatched.</span>
+            <span className="truncate">Platform System Mailbox &amp; Communication Ledger. Dispatches centralized.</span>
           </div>
           <button
             onClick={onClose}

@@ -1,6 +1,6 @@
 /**
  * Automated Email & PDF Reports Service for Customers, Salon Owners, and Admins
- * Supports real Gmail API delivery (OAuth token) and server-backed email logging & dispatch.
+ * Connects to the specialized server SMTP system mailbox with authenticated dispatch and ledger logging.
  */
 
 import { EmailLog, User, Salon, Appointment, ProductOrder, UserRole, PlatformStats } from '../types';
@@ -53,16 +53,6 @@ function utf8ToBase64(str: string): string {
     console.warn('utf8ToBase64 fallback used:', err);
     return btoa(unescape(encodeURIComponent(str)));
   }
-}
-
-/**
- * Encodes string to URL-safe Base64 for Gmail API messages.send
- */
-function toUrlSafeBase64(str: string): string {
-  return utf8ToBase64(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }
 
 /**
@@ -450,89 +440,6 @@ export function wrapHtmlEmailTemplate(title: string, contentHtml: string, action
 </body>
 </html>
   `.trim();
-}
-
-/**
- * Builds RFC 2822 format and base64url encodes it for direct Gmail API sending.
- * Supports multipart/mixed for email body plus genuine PDF and HTML report attachments.
- */
-function createRawEmail(options: EmailDispatchOptions, senderEmail?: string): string {
-  const boundary = `----=_Part_NailGlamHub_${Date.now()}`;
-  const utf8Subject = `=?UTF-8?B?${utf8ToBase64(sanitizePdfText(options.subject))}?=`;
-
-  // From header: Always dispatches from the specialized system sender account
-  const systemSender = senderEmail || DEFAULT_SENDER;
-  const fromHeader = `From: "${BRAND_NAME} System" <${systemSender}>`;
-
-  const toHeader = options.toName
-    ? `To: "=?UTF-8?B?${utf8ToBase64(options.toName)}?=" <${options.to}>`
-    : `To: <${options.to}>`;
-
-  const replyToHeader = `Reply-To: "${BRAND_NAME} Support" <support@nailglamhub.com>`;
-
-  if (options.hasPdfAttachment) {
-    const rawAttachmentName = options.attachmentName || 'All_In_One_Master_Report.pdf';
-    const attachmentFilename = rawAttachmentName.endsWith('.pdf') ? rawAttachmentName : `${rawAttachmentName}.pdf`;
-
-    // Generate true binary PDF base64 using jsPDF (All-in-One Master Report)
-    const pdfBase64 = generateCertifiedPdfDocument({
-      title: options.subject,
-      recipientName: options.toName,
-      recipientEmail: options.to,
-      salonName: options.salonName,
-      salonAddress: options.salonAddress,
-      periodLabel: options.periodLabel,
-      metrics: options.pdfMetrics,
-      summaryText: options.masterReportSummary || (options.htmlBody ? options.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400) : undefined),
-    });
-
-    const rawAttachmentBase64 = pdfBase64;
-    const wrappedAttachment = wrapBase64(rawAttachmentBase64);
-    const wrappedHtmlBody = wrapBase64(utf8ToBase64(options.htmlBody));
-
-    const messageParts = [
-      fromHeader,
-      toHeader,
-      replyToHeader,
-      `Subject: ${utf8Subject}`,
-      'MIME-Version: 1.0',
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-      '',
-      wrappedHtmlBody,
-      '',
-      `--${boundary}`,
-      `Content-Type: application/pdf; name="${attachmentFilename}"`,
-      `Content-Disposition: attachment; filename="${attachmentFilename}"`,
-      'Content-Transfer-Encoding: base64',
-      '',
-      wrappedAttachment,
-      '',
-      `--${boundary}--`,
-    ];
-
-    const rawMessage = messageParts.join('\r\n');
-    return toUrlSafeBase64(rawMessage);
-  }
-
-  // Single-part rich HTML email
-  const wrappedHtml = wrapBase64(utf8ToBase64(options.htmlBody));
-  const messageParts = [
-    fromHeader,
-    toHeader,
-    replyToHeader,
-    `Subject: ${utf8Subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    '',
-    wrappedHtml,
-  ];
-  const rawMessage = messageParts.join('\r\n');
-  return toUrlSafeBase64(rawMessage);
 }
 
 export interface EmailSendResult {

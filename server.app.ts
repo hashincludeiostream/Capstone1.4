@@ -67,9 +67,6 @@ const AUTH_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'ngh
 // ---------------------------------------------------------------------------
 // SPECIALIZED SYSTEM EMAIL DISPATCHER (SINGLE PLATFORM SENDER)
 // ---------------------------------------------------------------------------
-const SYSTEM_SENDER_NAME = (process.env.SYSTEM_SENDER_NAME || 'Nail Glam Hub System').trim();
-const SYSTEM_SENDER_EMAIL = (process.env.SYSTEM_SENDER_EMAIL || 'notifications@nailglamhub.com').trim();
-
 export type DispatchStatus = 'accepted' | 'failed' | 'not_configured';
 
 export function getDispatchStatus(result: {
@@ -89,34 +86,96 @@ export type DispatchResult = {
   error?: string;
 };
 
-export function isSmtpConfigured(): boolean {
-  return Boolean(
-    process.env.SMTP_HOST?.trim() &&
-    process.env.SMTP_PORT &&
-    process.env.SMTP_USER?.trim() &&
-    process.env.SMTP_PASS &&
-    process.env.SYSTEM_SENDER_EMAIL?.trim()
-  );
+export interface SmtpConfigValidation {
+  configured: boolean;
+  missing: string[];
+  host?: string;
+  port?: number;
+  user?: string;
+  senderEmail: string;
+  senderName: string;
 }
 
-let systemTransporter: any = null;
-const smtpConfiguredInitial = isSmtpConfigured();
-if (smtpConfiguredInitial) {
+export function getSmtpConfigValidation(): SmtpConfigValidation {
+  const missing: string[] = [];
+  const host = process.env.SMTP_HOST?.trim();
+  const portStr = process.env.SMTP_PORT?.trim();
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS;
+  const senderEmail = process.env.SYSTEM_SENDER_EMAIL?.trim() || user || 'notifications@nailglamhub.com';
+  const senderName = process.env.SYSTEM_SENDER_NAME?.trim() || 'Nail Glam Hub System';
+
+  if (!host) missing.push('SMTP_HOST');
+  if (!portStr) {
+    missing.push('SMTP_PORT');
+  } else {
+    const portNum = Number(portStr);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      missing.push('SMTP_PORT (must be an integer between 1 and 65535)');
+    }
+  }
+  if (!user) missing.push('SMTP_USER');
+  if (!pass) missing.push('SMTP_PASS');
+
+  return {
+    configured: missing.length === 0,
+    missing,
+    host,
+    port: portStr ? Number(portStr) : undefined,
+    user,
+    senderEmail,
+    senderName,
+  };
+}
+
+export function isSmtpConfigured(): boolean {
+  return getSmtpConfigValidation().configured;
+}
+
+// Managed SMTP Transporter Singleton with configuration-change auto-reload and socket timeouts
+let cachedTransporter: any = null;
+let lastTransporterHash = '';
+
+export function getSystemTransporter(): any {
+  const val = getSmtpConfigValidation();
+  if (!val.configured || !val.host || !val.port || !val.user) {
+    cachedTransporter = null;
+    lastTransporterHash = '';
+    return null;
+  }
+
+  const port = val.port;
+  const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
+  const configHash = `${val.host}:${port}:${val.user}:${isSecure}:${process.env.SMTP_PASS ? 'set' : 'none'}`;
+
+  if (cachedTransporter && lastTransporterHash === configHash) {
+    return cachedTransporter;
+  }
+
   try {
-    const isSecure = process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465;
-    systemTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST!.trim(),
-      port: Number(process.env.SMTP_PORT) || 587,
+    cachedTransporter = nodemailer.createTransport({
+      host: val.host,
+      port,
       secure: isSecure,
       auth: {
-        user: process.env.SMTP_USER!.trim(),
+        user: val.user,
         pass: process.env.SMTP_PASS!,
       },
+      connectionTimeout: 10000, // 10s connection timeout
+      greetingTimeout: 10000,   // 10s greeting timeout
+      socketTimeout: 15000,     // 15s socket activity timeout
+      tls: {
+        rejectUnauthorized: process.env.SMTP_IGNORE_TLS_ERRORS !== 'true',
+      },
     });
-    console.log(`📧 [System Mailer] Specialized system account configured: ${SYSTEM_SENDER_NAME} <${SYSTEM_SENDER_EMAIL}>`);
-  } catch (transporterErr: any) {
-    console.warn('⚠️ [System Mailer] SMTP transporter initialization note:', transporterErr?.message || transporterErr);
-    systemTransporter = null;
+    lastTransporterHash = configHash;
+    console.log(`📧 [System Mailer] Transporter initialized for ${val.host}:${port} (${val.senderName} <${val.senderEmail}>)`);
+    return cachedTransporter;
+  } catch (err: any) {
+    console.warn('⚠️ [System Mailer] Failed to initialize SMTP transporter:', err?.message || err);
+    cachedTransporter = null;
+    lastTransporterHash = '';
+    return null;
   }
 }
 
@@ -130,16 +189,34 @@ export async function checkSmtpHealth(): Promise<{
   transporterCreated: boolean;
   smtpVerified: boolean | null;
   deliveryMode: string;
+  missing?: string[];
+  host?: string;
+  port?: number;
+  senderEmail: string;
+  senderName: string;
 }> {
-  const configured = isSmtpConfigured();
-  const transporterCreated = Boolean(systemTransporter);
-
-  if (!configured || !systemTransporter) {
+  const val = getSmtpConfigValidation();
+  if (!val.configured) {
     return {
       configured: false,
       transporterCreated: false,
       smtpVerified: null,
       deliveryMode: 'unconfigured',
+      missing: val.missing,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+    };
+  }
+
+  const transporter = getSystemTransporter();
+  if (!transporter) {
+    return {
+      configured: true,
+      transporterCreated: false,
+      smtpVerified: false,
+      deliveryMode: 'transporter_error',
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
     };
   }
 
@@ -150,13 +227,17 @@ export async function checkSmtpHealth(): Promise<{
       transporterCreated: true,
       smtpVerified: cachedSmtpVerified,
       deliveryMode: cachedSmtpVerified ? 'live_smtp' : 'transporter_unverified',
+      host: val.host,
+      port: val.port,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
     };
   }
 
   try {
-    const verifyPromise = systemTransporter.verify();
+    const verifyPromise = transporter.verify();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('SMTP verification timed out')), 5000)
+      setTimeout(() => reject(new Error('SMTP verification timed out')), 6000)
     );
     await Promise.race([verifyPromise, timeoutPromise]);
     cachedSmtpVerified = true;
@@ -171,31 +252,157 @@ export async function checkSmtpHealth(): Promise<{
     transporterCreated: true,
     smtpVerified: cachedSmtpVerified,
     deliveryMode: cachedSmtpVerified ? 'live_smtp' : 'transporter_unverified',
+    host: val.host,
+    port: val.port,
+    senderEmail: val.senderEmail,
+    senderName: val.senderName,
   };
 }
 
-export function decodePdf(base64: string, maxBytes: number = 10 * 1024 * 1024): Buffer {
-  const normalized = base64.replace(/^data:application\/pdf;base64,/i, '').trim();
+export async function verifySmtpConnection(): Promise<{
+  configured: boolean;
+  connected: boolean;
+  message: string;
+  missing?: string[];
+  host?: string;
+  port?: number;
+  user?: string;
+  senderEmail?: string;
+  senderName?: string;
+  errorCode?: string;
+}> {
+  const val = getSmtpConfigValidation();
+  if (!val.configured) {
+    return {
+      configured: false,
+      connected: false,
+      message: `SMTP not configured. Missing required settings: ${val.missing.join(', ')}`,
+      missing: val.missing,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+    };
+  }
 
-  if (
-    !normalized ||
-    !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) ||
-    normalized.length % 4 !== 0
-  ) {
+  const transporter = getSystemTransporter();
+  if (!transporter) {
+    return {
+      configured: true,
+      connected: false,
+      message: 'Failed to create SMTP transporter instance.',
+      host: val.host,
+      port: val.port,
+      user: val.user,
+    };
+  }
+
+  try {
+    const verifyPromise = transporter.verify();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('SMTP connection test timed out after 8 seconds')), 8000)
+    );
+    await Promise.race([verifyPromise, timeoutPromise]);
+    cachedSmtpVerified = true;
+    lastSmtpVerifyTimestamp = Date.now();
+    return {
+      configured: true,
+      connected: true,
+      message: `Successfully connected and authenticated with SMTP server ${val.host}:${val.port}`,
+      host: val.host,
+      port: val.port,
+      user: val.user,
+      senderEmail: val.senderEmail,
+      senderName: val.senderName,
+    };
+  } catch (err: any) {
+    cachedSmtpVerified = false;
+    lastSmtpVerifyTimestamp = Date.now();
+    const code = err?.code || 'SMTP_VERIFY_FAILED';
+    const message = err?.message || 'SMTP server connection verification failed';
+    return {
+      configured: true,
+      connected: false,
+      message,
+      errorCode: code,
+      host: val.host,
+      port: val.port,
+      user: val.user,
+    };
+  }
+}
+
+// Sanitizes and strips carriage returns and line feeds to prevent header injection
+export function sanitizeHeaderString(val?: string | null): string {
+  if (!val || typeof val !== 'string') return '';
+  return val.replace(/[\r\n\x00-\x1F\x7F]+/g, ' ').trim();
+}
+
+// Sanitizes HTML email body against script execution and unsafe embeds
+export function sanitizeEmailHtml(html: string): string {
+  if (!html || typeof html !== 'string') return '';
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '')
+    .replace(/javascript:/gi, 'blocked:');
+}
+
+// Validates, normalizes, and decodes Base64 PDF attachment data
+export function decodePdf(base64: string, maxBytes: number = 10 * 1024 * 1024): Buffer {
+  if (!base64 || typeof base64 !== 'string') {
+    throw new Error('INVALID_PDF_BASE64');
+  }
+
+  // Strip data URI scheme prefix if present
+  let normalized = base64.replace(/^data:application\/pdf(?:;[a-zA-Z0-9_-]+=[^;]+)*;base64,/i, '');
+  // Strip all whitespace (newlines, tabs, spaces)
+  normalized = normalized.replace(/\s+/g, '').trim();
+
+  // Convert URL-safe base64 (- and _) to standard (+ and /)
+  normalized = normalized.replace(/-/g, '+').replace(/_/g, '/');
+
+  // Pad to multiple of 4 if missing padding '='
+  while (normalized.length % 4 !== 0) {
+    normalized += '=';
+  }
+
+  if (!normalized || !/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) {
     throw new Error('INVALID_PDF_BASE64');
   }
 
   const buffer = Buffer.from(normalized, 'base64');
 
-  if (
-    buffer.length === 0 ||
-    buffer.length > maxBytes ||
-    buffer.subarray(0, 5).toString() !== '%PDF-'
-  ) {
+  if (buffer.length === 0 || buffer.length > maxBytes) {
+    throw new Error('INVALID_PDF_SIZE');
+  }
+
+  // Validate PDF magic header bytes '%PDF-'
+  if (buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
     throw new Error('INVALID_PDF_ATTACHMENT');
   }
 
   return buffer;
+}
+
+// In-memory dispatch rate-limiting and deduplication cache (5-second window)
+const recentEmailDispatches = new Map<string, number>();
+const EMAIL_DEDUP_WINDOW_MS = 5000;
+
+function isDuplicateDispatch(recipient: string, subject: string, userId: number): boolean {
+  const now = Date.now();
+  const key = `${userId}_${recipient.toLowerCase()}_${subject.trim().slice(0, 40)}`;
+  const lastSent = recentEmailDispatches.get(key);
+  if (lastSent && now - lastSent < EMAIL_DEDUP_WINDOW_MS) {
+    return true;
+  }
+  recentEmailDispatches.set(key, now);
+  if (recentEmailDispatches.size > 200) {
+    for (const [k, time] of recentEmailDispatches.entries()) {
+      if (now - time > 30000) recentEmailDispatches.delete(k);
+    }
+  }
+  return false;
 }
 
 async function dispatchViaSystemMailbox(options: {
@@ -205,29 +412,44 @@ async function dispatchViaSystemMailbox(options: {
   html: string;
   attachments?: Array<{ filename: string; content?: any; contentType?: string }>;
 }): Promise<DispatchResult> {
-  const configured = isSmtpConfigured();
-  if (!configured || !systemTransporter) {
+  const val = getSmtpConfigValidation();
+  if (!val.configured) {
     return {
       sent: false,
       configured: false,
       errorCode: 'SMTP_NOT_CONFIGURED',
-      error: 'System SMTP mailbox is unconfigured.',
+      error: `System SMTP mailbox is unconfigured. Missing: ${val.missing.join(', ')}`,
+    };
+  }
+
+  const transporter = getSystemTransporter();
+  if (!transporter) {
+    return {
+      sent: false,
+      configured: true,
+      errorCode: 'TRANSPORTER_UNAVAILABLE',
+      error: 'SMTP transporter instance could not be created.',
     };
   }
 
   try {
-    const fromField = `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`;
-    const toField = options.toName ? `"${options.toName.replace(/["\r\n]/g, '')}" <${options.to}>` : options.to;
-    const cleanSubject = options.subject.replace(/[\r\n]/g, ' ').trim();
+    const cleanSenderName = sanitizeHeaderString(val.senderName);
+    const cleanSenderEmail = sanitizeHeaderString(val.senderEmail);
+    const fromField = `"${cleanSenderName}" <${cleanSenderEmail}>`;
+    const toField = options.toName
+      ? `"${sanitizeHeaderString(options.toName)}" <${sanitizeHeaderString(options.to)}>`
+      : sanitizeHeaderString(options.to);
+    const cleanSubject = sanitizeHeaderString(options.subject);
 
-    const info = await systemTransporter.sendMail({
+    const info = await transporter.sendMail({
       from: fromField,
       to: toField,
+      replyTo: cleanSenderEmail,
       subject: cleanSubject,
       html: options.html,
       attachments: options.attachments,
     });
-    console.log(`📧 [System Mailer] Successfully dispatched email from specialized system account to ${options.to} (Message ID: ${info.messageId})`);
+    console.log(`📧 [System Mailer] Successfully accepted by SMTP server for ${options.to} (Message ID: ${info.messageId})`);
     return {
       sent: true,
       configured: true,
@@ -241,7 +463,7 @@ async function dispatchViaSystemMailbox(options: {
       sent: false,
       configured: true,
       errorCode: code,
-      error: 'SMTP delivery failed to send message.',
+      error: `SMTP delivery failed: ${message.slice(0, 160)}`,
     };
   }
 }
@@ -657,15 +879,18 @@ async function startServer() {
     sender_email?: string;
     attachments?: Array<{ filename: string; content?: any; contentType?: string }>;
   }): Promise<{ dispatchResult: DispatchResult; status: DispatchStatus }> {
-    const preview = emailData.content_preview || (emailData.html_body ? emailData.html_body.replace(/<[^>]+>/g, '').slice(0, 150) : 'Email alert');
-    const sender = SYSTEM_SENDER_EMAIL;
+    const val = getSmtpConfigValidation();
+    const cleanSubject = sanitizeHeaderString(emailData.subject);
+    const cleanHtml = sanitizeEmailHtml(emailData.html_body || '');
+    const preview = emailData.content_preview || (cleanHtml ? cleanHtml.replace(/<[^>]+>/g, '').slice(0, 150) : 'Email alert');
+    const sender = val.senderEmail;
 
     // Dispatch via specialized system mailbox if SMTP is configured
     const dispatchResult = await dispatchViaSystemMailbox({
       to: emailData.recipient_email,
       toName: emailData.recipient_name,
-      subject: emailData.subject,
-      html: emailData.html_body,
+      subject: cleanSubject,
+      html: cleanHtml,
       attachments: emailData.attachments,
     });
 
@@ -680,14 +905,14 @@ async function startServer() {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           sanitizeEmail(emailData.recipient_email),
-          emailData.recipient_name || '',
+          sanitizeHeaderString(emailData.recipient_name || ''),
           emailData.recipient_role || 'customer',
-          emailData.subject,
+          cleanSubject,
           emailData.category || 'notification',
           preview,
-          emailData.html_body || '',
+          cleanHtml,
           emailData.has_pdf_attachment ? 1 : 0,
-          emailData.attachment_name || '',
+          sanitizeHeaderString(emailData.attachment_name || ''),
           emailData.pdf_html || '',
           new Date().toISOString(),
           status,
@@ -1068,12 +1293,15 @@ async function startServer() {
     try {
       const health = await checkSmtpHealth();
       res.json({
-        senderName: SYSTEM_SENDER_NAME,
-        senderEmail: SYSTEM_SENDER_EMAIL,
+        senderName: health.senderName,
+        senderEmail: health.senderEmail,
         configured: health.configured,
         transporterCreated: health.transporterCreated,
         smtpVerified: health.smtpVerified,
         deliveryMode: health.deliveryMode,
+        missing: health.missing || [],
+        host: health.host || null,
+        port: health.port || null,
       });
     } catch (error) {
       console.error('[Server] System email health check error:', error);
@@ -1081,8 +1309,28 @@ async function startServer() {
     }
   });
 
+  // Manual SMTP connection test and diagnostics endpoint (admin-only)
+  app.post('/api/email/verify-connection', async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (!user || user.user_type !== 'admin') {
+        return res.status(403).json({ error: 'Administrator clearance required to verify SMTP connection.' });
+      }
+      const result = await verifySmtpConnection();
+      return res.status(result.connected ? 200 : (result.configured ? 502 : 400)).json(result);
+    } catch (error: any) {
+      console.error('[Server] Manual SMTP verification error:', error);
+      res.status(500).json({ error: 'SMTP verification check encountered an unexpected error.' });
+    }
+  });
+
   // Automated Email Dispatch Endpoint via Specialized System Account
   app.post('/api/email/send', async (req: any, res) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required to dispatch email notifications.' });
+    }
+
     const {
       to,
       toName,
@@ -1102,7 +1350,7 @@ async function startServer() {
     }
 
     // Header injection protection (CRLF injection prevention)
-    if (/[\r\n]/.test(String(to)) || /[\r\n]/.test(String(subject))) {
+    if (/[\r\n\x00-\x1F]/.test(String(to)) || /[\r\n\x00-\x1F]/.test(String(subject))) {
       return res.status(400).json({ error: 'Header injection attempt detected in recipient or subject.' });
     }
 
@@ -1111,50 +1359,107 @@ async function startServer() {
     if (!emailValidation.valid) {
       return res.status(400).json({ error: emailValidation.message });
     }
+    const sanitizedTo = sanitizeEmail(String(to).trim());
 
-    const user = req.user;
-    const targetCategory = category || 'notification';
+    // Category validation against whitelist
+    const ALLOWED_CATEGORIES = ['booking', 'order', 'promo', 'report', 'verification', 'alert'] as const;
+    const targetCategory = (category || 'notification').toLowerCase().trim();
+    if (!ALLOWED_CATEGORIES.includes(targetCategory as any) && targetCategory !== 'notification') {
+      return res.status(400).json({
+        error: `Invalid email category. Allowed categories: ${ALLOWED_CATEGORIES.join(', ')}`,
+      });
+    }
 
-    // Role-based authorization & salon ownership check
-    if (targetCategory === 'report') {
-      if (!salon_id) {
-        // Platform-wide executive reports require authenticated administrator
-        if (!user || user.user_type !== 'admin') {
-          return res.status(403).json({ error: 'Access denied: Administrator privileges required for executive platform reports.' });
-        }
-      } else {
-        // Salon-specific business reports require admin or the verified owner of the salon
-        if (!user) {
-          return res.status(401).json({ error: 'Authentication required to dispatch financial performance reports.' });
-        }
-        if (user.user_type !== 'admin') {
-          const [salonRows] = await db.execute('SELECT id, owner_id FROM salons WHERE id = ?', [Number(salon_id)]);
-          const salon = (salonRows as any[])[0];
-          if (!salon || Number(salon.owner_id) !== Number(user.id)) {
-            return res.status(403).json({ error: 'Access denied: You do not have ownership authority for this salon.' });
-          }
-        }
+    // Role-based authorization & scope enforcement
+    if (user.user_type === 'customer') {
+      if (sanitizedTo.toLowerCase() !== user.email.toLowerCase()) {
+        return res.status(403).json({
+          error: 'Access denied: Customers may only dispatch confirmation copies to their own verified email address.',
+        });
       }
-    } else if (targetCategory === 'promo') {
-      // Promotional broadcasts require administrator or salon owner privileges
-      if (!user || (user.user_type !== 'admin' && user.user_type !== 'salon_owner')) {
-        return res.status(403).json({ error: 'Access denied: Only salon owners or administrators can broadcast promotional announcements.' });
+      if (['report', 'promo', 'alert', 'verification'].includes(targetCategory)) {
+        return res.status(403).json({
+          error: `Access denied: Customers are not permitted to send ${targetCategory} category emails.`,
+        });
       }
     }
 
-    try {
-      const sanitizedTo = sanitizeEmail(to);
-      const preview = htmlBody ? htmlBody.replace(/<[^>]+>/g, '').slice(0, 160).trim() : 'Email alert from Nail Glam Hub';
+    if (user.user_type === 'salon_owner') {
+      if (['alert', 'verification'].includes(targetCategory)) {
+        return res.status(403).json({
+          error: 'Access denied: System alerts and verifications are reserved for platform administration.',
+        });
+      }
 
-      // Validate & decode PDF attachment if provided (reject invalid base64 or non-PDF binary)
+      if (targetCategory === 'report') {
+        if (!salon_id) {
+          return res.status(403).json({
+            error: 'Access denied: Administrator privileges required for executive platform reports.',
+          });
+        }
+        const [salonRows] = await db.execute('SELECT id, owner_id FROM salons WHERE id = ?', [Number(salon_id)]);
+        const salon = (salonRows as any[])[0];
+        if (!salon || Number(salon.owner_id) !== Number(user.id)) {
+          return res.status(403).json({
+            error: 'Access denied: You do not have ownership authority for this salon.',
+          });
+        }
+      }
+    }
+
+    if (targetCategory === 'promo') {
+      if (user.user_type !== 'admin' && user.user_type !== 'salon_owner') {
+        return res.status(403).json({
+          error: 'Access denied: Only salon owners or administrators can broadcast promotional announcements.',
+        });
+      }
+
+      // Check recipient marketing preferences
+      try {
+        const [recipientUsers] = await db.execute('SELECT id, notification_preferences FROM users WHERE email = ?', [sanitizedTo]);
+        const recipientUser = (recipientUsers as any[])[0];
+        if (recipientUser && recipientUser.notification_preferences) {
+          const prefs = typeof recipientUser.notification_preferences === 'string'
+            ? JSON.parse(recipientUser.notification_preferences)
+            : recipientUser.notification_preferences;
+          if (prefs.email_promos === false) {
+            return res.status(400).json({
+              error: 'Recipient has unsubscribed from promotional marketing communications.',
+              code: 'RECIPIENT_UNSUBSCRIBED',
+            });
+          }
+        }
+      } catch (_prefErr) {
+        // Proceed gracefully if preferences cannot be parsed
+      }
+    }
+
+    // In-memory deduplication check (5-second throttle window)
+    if (isDuplicateDispatch(sanitizedTo, String(subject), Number(user.id))) {
+      return res.status(429).json({
+        error: 'Duplicate email dispatch detected within 5 seconds. Please wait before retrying.',
+        code: 'DUPLICATE_DISPATCH_THROTTLED',
+      });
+    }
+
+    try {
+      // Validate & decode PDF attachment if specified
       const attachments: Array<{ filename: string; content?: any; contentType?: string }> = [];
-      if (hasPdfAttachment && pdfBase64) {
+      if (hasPdfAttachment) {
+        if (!pdfBase64) {
+          return res.status(400).json({
+            error: 'hasPdfAttachment was specified but pdfBase64 data was missing.',
+            code: 'MISSING_PDF_DATA',
+          });
+        }
         try {
           const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10MB limit
           const pdfBuffer = decodePdf(pdfBase64, MAX_PDF_BYTES);
-          const safeFilename = (attachmentName || 'Performance_Report.pdf').replace(/[\r\n]/g, '').trim();
+          const rawName = attachmentName || 'Report.pdf';
+          const baseName = path.basename(rawName).replace(/[\r\n\x00-\x1F]/g, '').trim();
+          const safeFilename = baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
           attachments.push({
-            filename: safeFilename.endsWith('.pdf') ? safeFilename : `${safeFilename}.pdf`,
+            filename: safeFilename,
             content: pdfBuffer,
             contentType: 'application/pdf',
           });
@@ -1162,18 +1467,35 @@ async function startServer() {
           return res.status(400).json({
             error: pdfErr.message === 'INVALID_PDF_BASE64'
               ? 'Invalid PDF attachment base64 encoding.'
+              : pdfErr.message === 'INVALID_PDF_SIZE'
+              ? 'PDF attachment exceeds maximum allowed size (10MB).'
               : 'Invalid PDF attachment. File must be a valid PDF document (%PDF-) under 10MB.',
             code: pdfErr.message || 'INVALID_PDF_ATTACHMENT',
           });
         }
       }
 
+      // Sanitize HTML body & add unsubscribe footer for promotional emails
+      let cleanHtml = sanitizeEmailHtml(htmlBody || '');
+      if (targetCategory === 'promo' && !cleanHtml.toLowerCase().includes('unsubscribe')) {
+        cleanHtml += `<div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center;">
+          <p>You received this promotional email because you are a registered customer of Nail Glam Hub.</p>
+          <p>To update your notification preferences or unsubscribe, please visit your account profile settings.</p>
+        </div>`;
+      }
+
+      const cleanSubject = sanitizeHeaderString(subject);
+      const cleanToName = toName ? sanitizeHeaderString(toName) : undefined;
+      const preview = cleanHtml ? cleanHtml.replace(/<[^>]+>/g, '').slice(0, 160).trim() : 'Email alert from Nail Glam Hub';
+
+      const val = getSmtpConfigValidation();
+
       // Real dispatch via specialized system mailbox (Single platform sender identity)
       const dispatchResult = await dispatchViaSystemMailbox({
         to: sanitizedTo,
-        toName: toName ? String(toName).replace(/[\r\n]/g, '').trim() : undefined,
-        subject: String(subject).replace(/[\r\n]/g, ' ').trim(),
-        html: htmlBody || `<p>${preview}</p>`,
+        toName: cleanToName,
+        subject: cleanSubject,
+        html: cleanHtml || `<p>${preview}</p>`,
         attachments: attachments.length > 0 ? attachments : undefined,
       });
 
@@ -1191,18 +1513,18 @@ async function startServer() {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             sanitizedTo,
-            toName || '',
+            cleanToName || '',
             role || 'customer',
-            subject,
+            cleanSubject,
             targetCategory,
             preview,
-            htmlBody || '',
+            cleanHtml,
             hasPdfAttachment ? 1 : 0,
-            attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : ''),
+            attachments[0]?.filename || (hasPdfAttachment ? 'Monthly_Report.pdf' : ''),
             pdfHtml || '',
             new Date().toISOString(),
             dispatchStatus,
-            SYSTEM_SENDER_EMAIL,
+            val.senderEmail,
             dispatchResult.messageId || null,
             dispatchResult.errorCode || null,
             dispatchResult.error || null,
@@ -1217,18 +1539,18 @@ async function startServer() {
       const logRecord = {
         id: emailId || Date.now(),
         recipient_email: sanitizedTo,
-        recipient_name: toName,
+        recipient_name: cleanToName,
         recipient_role: role || 'customer',
-        subject,
+        subject: cleanSubject,
         category: targetCategory,
         content_preview: preview,
-        html_body: htmlBody || '',
+        html_body: cleanHtml,
         has_pdf_attachment: Boolean(hasPdfAttachment),
-        attachment_name: attachmentName || (hasPdfAttachment ? 'Monthly_Report.pdf' : undefined),
+        attachment_name: attachments[0]?.filename || (hasPdfAttachment ? 'Monthly_Report.pdf' : undefined),
         pdf_html: pdfHtml || undefined,
         sent_at: new Date().toISOString(),
         status: dispatchStatus,
-        sender_email: SYSTEM_SENDER_EMAIL,
+        sender_email: val.senderEmail,
         message_id: dispatchResult.messageId,
       };
 
@@ -1239,7 +1561,7 @@ async function startServer() {
           smtpAccepted: true,
           messageId: dispatchResult.messageId,
           log: logRecord,
-          sender: `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`,
+          sender: `"${val.senderName}" <${val.senderEmail}>`,
           auditLogged,
         });
       }
@@ -1251,7 +1573,7 @@ async function startServer() {
           smtpAccepted: false,
           message: 'System SMTP mailbox is unconfigured. Message recorded in platform communication ledger.',
           log: logRecord,
-          sender: `"${SYSTEM_SENDER_NAME}" <${SYSTEM_SENDER_EMAIL}>`,
+          sender: `"${val.senderName}" <${val.senderEmail}>`,
           auditLogged,
         });
       }
