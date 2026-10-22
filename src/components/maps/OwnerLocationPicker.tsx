@@ -229,7 +229,7 @@ export const OwnerLocationPicker: React.FC<OwnerLocationPickerProps> = ({
           onShowToast(msg);
         }
       },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 

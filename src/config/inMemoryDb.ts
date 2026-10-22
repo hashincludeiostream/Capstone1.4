@@ -975,7 +975,7 @@ class InMemoryDatabase {
       }
 
       // Check if decrement or absolute assignment
-      if (/stock_quantity\s*=\s*stock_quantity\s*-\s*\?/i.test(sql)) {
+      if (/stock_quantity\s*-\s*\?/i.test(sql)) {
         const deductQty = Number(params[0]);
         record.stock_quantity = Math.max(0, Number(record.stock_quantity || 0) - deductQty);
       } else {
@@ -995,7 +995,7 @@ class InMemoryDatabase {
       const setMatch = sql.match(/SET\s+([\s\S]+?)\s+WHERE/i);
       let updatedCount = 0;
       if (setMatch) {
-        const assignments = setMatch[1].split(',').map((s) => s.trim());
+        const assignments = setMatch[1].split(/,(?![^(]*\))/).map((s) => s.trim());
         table.forEach((record) => {
           if (Number(record.salon_id) === sId) {
             let pIdx = 0;
@@ -1036,10 +1036,10 @@ class InMemoryDatabase {
       }
 
       if (record) {
-        // Parse SET clause: SET col1 = ?, col2 = ? ...
+        // Parse SET clause: SET col1 = ?, col2 = ? ... (prevent splitting on function commas like GREATEST(0, ...))
         const setMatch = sql.match(/SET\s+([\s\S]+?)\s+WHERE/i);
         if (setMatch) {
-          const assignments = setMatch[1].split(',').map((s) => s.trim());
+          const assignments = setMatch[1].split(/,(?![^(]*\))/).map((s) => s.trim());
           let paramIdx = 0;
           assignments.forEach((assignment) => {
             const parts = assignment.split('=');

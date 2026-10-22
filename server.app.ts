@@ -4374,7 +4374,11 @@ async function startServer() {
       // Deduct stock for all items
       for (const item of items) {
         const qty = Number(item.quantity) || 1;
-        await db.execute('UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ?', [qty, Number(item.product_id)]);
+        const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
+        const prod = (prodRows as any[])[0];
+        const currentStock = prod ? Number(prod.stock_quantity) : 0;
+        const newStock = Math.max(0, currentStock - qty);
+        await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [newStock, Number(item.product_id)]);
       }
 
       // Generate order number

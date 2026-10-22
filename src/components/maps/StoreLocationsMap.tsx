@@ -17,8 +17,7 @@ import {
 } from 'lucide-react';
 import { Salon } from '../../types';
 import { calculateDistanceKm } from '../../utils/geoUtils';
-import { ajax } from '../../lib/ajax';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 // CSS import for Leaflet
 import 'leaflet/dist/leaflet.css';
@@ -204,19 +203,41 @@ function MapViewUpdater({
   zoom,
   activeCoordinates,
   fitBoundsTarget,
+  userLocationTarget,
 }: {
   center?: { lat?: number | null; lng?: number | null } | null;
   zoom?: number;
   activeCoordinates?: [number, number] | null;
   fitBoundsTarget?: { bounds: [number, number][]; timestamp: number } | null;
+  userLocationTarget?: { lat: number; lng: number; timestamp: number } | null;
 }) {
   const map = useMap();
   const lastFitBoundsTimestampRef = useRef<number>(0);
+  const lastUserLocationTimestampRef = useRef<number>(0);
 
   useEffect(() => {
     if (!map) return;
 
-    // 1. If fitBoundsTarget is triggered, zoom out and frame all specified coordinates (e.g. user pin + all salons)
+    // 1. If user explicitly clicked "Use my location" or automatic GPS locked in, fly directly to user's exact location at street level (zoom 16)
+    if (
+      userLocationTarget &&
+      userLocationTarget.timestamp !== lastUserLocationTimestampRef.current &&
+      Number.isFinite(userLocationTarget.lat) &&
+      Number.isFinite(userLocationTarget.lng)
+    ) {
+      lastUserLocationTimestampRef.current = userLocationTarget.timestamp;
+      try {
+        map.flyTo([userLocationTarget.lat, userLocationTarget.lng], 16, {
+          animate: true,
+          duration: 1.0,
+        });
+        return;
+      } catch (err) {
+        console.warn('Map flyTo user location failed:', err);
+      }
+    }
+
+    // 2. If fitBoundsTarget is triggered, zoom out and frame all specified coordinates (e.g. user pin + all salons)
     if (
       fitBoundsTarget &&
       fitBoundsTarget.timestamp !== lastFitBoundsTimestampRef.current &&
@@ -256,7 +277,7 @@ function MapViewUpdater({
       }
     }
 
-    // 2. If activeCoordinates are valid finite numbers, smoothly fly to them
+    // 3. If activeCoordinates are valid finite numbers, smoothly fly to them
     if (
       Array.isArray(activeCoordinates) &&
       activeCoordinates.length >= 2 &&
@@ -282,7 +303,7 @@ function MapViewUpdater({
       }
     }
 
-    // 3. Fall back to center coordinates with strict finite number validation
+    // 4. Fall back to center coordinates with strict finite number validation
     const lat = Number(center?.lat);
     const lng = Number(center?.lng);
     const safeZoom = typeof zoom === 'number' && Number.isFinite(zoom) && zoom > 0 ? zoom : 13;
@@ -310,7 +331,7 @@ function MapViewUpdater({
         console.warn('Default map setView failed:', err);
       }
     }
-  }, [center?.lat, center?.lng, zoom, activeCoordinates, fitBoundsTarget, map]);
+  }, [center?.lat, center?.lng, zoom, activeCoordinates, fitBoundsTarget, userLocationTarget, map]);
 
   return null;
 }
@@ -356,7 +377,7 @@ function RouteLine({
 
       try {
         const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${salonLocation.lng},${salonLocation.lat}?overview=full&geometries=geojson`;
-        const res = await ajax(url, { signal: controller.signal });
+        const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error('OSRM routing request returned non-200');
         const data = await res.json();
 
@@ -457,6 +478,8 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeSalon, setActiveSalon] = useState<Salon | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocationAccuracy, setUserLocationAccuracy] = useState<number | null>(null);
+  const [userLocationTarget, setUserLocationTarget] = useState<{ lat: number; lng: number; timestamp: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
@@ -469,6 +492,36 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
   const [activeCoordinates, setActiveCoordinates] = useState<[number, number] | null>(null);
   const [fitBoundsTarget, setFitBoundsTarget] = useState<{ bounds: [number, number][]; timestamp: number } | null>(null);
   const availableSalons = useMemo(() => salons, [salons]);
+
+  // Automatic GPS Locator on initial mount: acquires user's actual location and centers map to their exact area
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const detectedLoc = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setUserLocation(detectedLoc);
+        setUserLocationAccuracy(position.coords.accuracy || null);
+        setIsLocating(false);
+        setLocationError(null);
+        // Center camera immediately on user's real exact area
+        setUserLocationTarget({
+          lat: detectedLoc.lat,
+          lng: detectedLoc.lng,
+          timestamp: Date.now(),
+        });
+      },
+      (error) => {
+        setIsLocating(false);
+        console.debug('Automatic geolocation initial attempt note:', error.message);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  }, []);
 
   // Compute active salon distance from user if GPS is available
   const activeDistance = useMemo(() => {
@@ -537,32 +590,27 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
     setIsLocating(true);
     setLocationError(null);
 
-    const applyFallbackAndShowRoute = (msg?: string) => {
-      const fallbackLoc = { lat: 7.0720, lng: 125.6090 };
-      setUserLocation(fallbackLoc);
-      setIsLocating(false);
-      if (msg) setLocationError(msg);
-      setShowDirections(true);
-    };
-
     if (!navigator.geolocation) {
-      applyFallbackAndShowRoute('Using Davao City center (geolocation not supported).');
+      setLocationError('Browser geolocation is not supported on this device.');
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserLocation({
+        const detectedLoc = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-        });
+        };
+        setUserLocation(detectedLoc);
+        setUserLocationAccuracy(position.coords.accuracy || null);
         setIsLocating(false);
         setShowDirections(true);
       },
       () => {
-        applyFallbackAndShowRoute('GPS not available. Directions routed from central Davao City.');
+        setIsLocating(false);
+        setLocationError('Could not acquire your location for directions. Please ensure GPS/location permissions are enabled.');
       },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   };
 
@@ -683,34 +731,16 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
     }
   };
 
-  // Handle "Salons Near Me" button click
-  const handleLocateMe = () => {
-    // Switch to map view on mobile so user sees the camera zoom out immediately
+  // Handle "Use my location" button click: captures real GPS and zooms map camera directly to user's exact street/area
+  const handleUseMyLocation = (focusUserOnly = true) => {
+    // Switch to map view on mobile so user sees the camera zoom in immediately
     setMobileView('map');
-
-    // If user position is already established, zoom out & frame all pins right away
-    if (userLocation && Number.isFinite(userLocation.lat) && Number.isFinite(userLocation.lng)) {
-      if (distanceFilter !== 'all') {
-        setDistanceFilter('all');
-      }
-      fitUserAndSalonsView(userLocation);
-      return;
-    }
-
     setIsLocating(true);
     setLocationError(null);
 
-    const applyFallbackLocation = (reasonMsg: string) => {
-      // Graceful fallback to central Davao City near downtown salons
-      const fallbackLoc = { lat: 7.0720, lng: 125.6090 };
-      setUserLocation(fallbackLoc);
-      setIsLocating(false);
-      setLocationError(reasonMsg);
-      fitUserAndSalonsView(fallbackLoc);
-    };
-
     if (!navigator.geolocation) {
-      applyFallbackLocation('Browser geolocation not supported. Placed your pin in central Davao City.');
+      setIsLocating(false);
+      setLocationError('Browser geolocation is not supported on this device.');
       return;
     }
 
@@ -721,22 +751,36 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
           lng: position.coords.longitude,
         };
         setUserLocation(detectedLoc);
+        setUserLocationAccuracy(position.coords.accuracy || null);
         setIsLocating(false);
         setLocationError(null);
-        fitUserAndSalonsView(detectedLoc);
+
+        if (focusUserOnly) {
+          // Clear active salon so camera focuses purely on the user's exact area
+          setActiveSalon(null);
+          setActiveCoordinates(null);
+          setUserLocationTarget({
+            lat: detectedLoc.lat,
+            lng: detectedLoc.lng,
+            timestamp: Date.now(),
+          });
+        } else {
+          fitUserAndSalonsView(detectedLoc);
+        }
       },
       (error) => {
-        let msg = 'Using central Davao City (GPS permission was not granted).';
+        setIsLocating(false);
+        let msg = 'Could not acquire your current location. Please check browser permissions.';
         if (error.code === 1) {
-          msg = 'GPS permission denied. Placed user pin in central Davao City.';
+          msg = 'Location permission denied. Please allow location access in your browser settings.';
         } else if (error.code === 2) {
-          msg = 'GPS signal unavailable. Placed user pin in central Davao City.';
+          msg = 'GPS signal unavailable from your device or network.';
         } else if (error.code === 3) {
-          msg = 'GPS request timed out. Placed user pin in central Davao City.';
+          msg = 'Location request timed out. Please try clicking "Use my location" again.';
         }
-        applyFallbackLocation(msg);
+        setLocationError(msg);
       },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
@@ -804,24 +848,37 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
           </div>
 
           {/* Quick GPS Locator & Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
-              onClick={handleLocateMe}
+              type="button"
+              onClick={() => handleUseMyLocation(true)}
               disabled={isLocating}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all cursor-pointer ${
                 userLocation
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 shadow-xs'
-                  : 'bg-white border-pink-200 text-pink-700 hover:bg-pink-50 shadow-xs'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100 shadow-xs'
+                  : 'bg-pink-600 border-pink-600 text-white hover:bg-pink-700 shadow-xs'
               }`}
-              title="Locate salons near your current GPS position and adjust map to frame all pins"
+              title="Detect your exact location and zoom directly to your current street or area"
             >
-              <LocateFixed className={`w-4 h-4 ${isLocating ? 'animate-spin text-pink-600' : ''}`} />
-              <span>{isLocating ? 'Locating...' : userLocation ? 'Salons Near Me (View All)' : 'Salons Near Me'}</span>
+              <LocateFixed className={`w-4 h-4 ${isLocating ? 'animate-spin text-white' : userLocation ? 'text-emerald-600' : 'text-white'}`} />
+              <span>{isLocating ? 'Finding your GPS...' : userLocation ? 'Use my location (Active)' : 'Use my location'}</span>
+            </button>
+
+            {/* Fit All Salons Button */}
+            <button
+              type="button"
+              onClick={() => fitUserAndSalonsView()}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-xs transition-all cursor-pointer"
+              title="Zoom out and fit all salons and your location on the map"
+            >
+              <Maximize2 className="w-4 h-4 text-gray-500" />
+              <span>Fit All Salons</span>
             </button>
 
             {/* Directions Route Button */}
             {userLocation && activeSalon && (
               <button
+                type="button"
                 onClick={handleToggleDirections}
                 className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all cursor-pointer ${
                   showDirections
@@ -987,7 +1044,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
           ) : (
             <button
               type="button"
-              onClick={handleLocateMe}
+              onClick={() => handleUseMyLocation(false)}
               className="px-3 py-1 rounded-full text-[11px] font-medium shrink-0 text-pink-600 bg-pink-50 border border-pink-200 hover:bg-pink-100 transition-colors cursor-pointer flex items-center gap-1"
             >
               <LocateFixed className="w-3 h-3" />
@@ -1242,8 +1299,18 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
 
         {/* RIGHT COLUMN: Interactive Visual Map Stage (8 cols) */}
         <div className={`lg:col-span-8 relative overflow-hidden bg-slate-900 flex flex-col order-1 lg:order-2 min-h-[440px] lg:min-h-[600px] xl:min-h-[700px] 2xl:min-h-[780px] ${mobileView === 'map' ? 'flex' : 'hidden lg:flex'}`}>
-          {/* Floating Quick Action: Fit All Pins */}
+          {/* Floating Quick Action Buttons: Use my location & Fit All Pins */}
           <div className="absolute top-3.5 right-3.5 z-[400] flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleUseMyLocation(true)}
+              disabled={isLocating}
+              className="bg-white/95 hover:bg-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-pink-100 text-[11px] font-bold text-gray-800 hover:text-pink-600 flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Locate and zoom directly to your exact GPS coordinates"
+            >
+              <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin text-pink-600' : 'text-emerald-600'}`} />
+              <span>{isLocating ? 'Locating...' : 'Use my location'}</span>
+            </button>
             <button
               type="button"
               onClick={() => fitUserAndSalonsView()}
@@ -1272,6 +1339,7 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
               zoom={zoomLevel}
               activeCoordinates={activeCoordinates}
               fitBoundsTarget={fitBoundsTarget}
+              userLocationTarget={userLocationTarget}
             />
 
             {/* Routing path line and directions */}
@@ -1286,6 +1354,26 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
               ) : null;
             })()}
 
+            {/* User location accuracy circle */}
+            {userLocation &&
+              Number.isFinite(userLocation.lat) &&
+              Number.isFinite(userLocation.lng) &&
+              userLocationAccuracy &&
+              userLocationAccuracy > 0 &&
+              userLocationAccuracy < 15000 && (
+                <Circle
+                  center={[userLocation.lat, userLocation.lng]}
+                  radius={userLocationAccuracy}
+                  pathOptions={{
+                    color: '#059669',
+                    fillColor: '#10b981',
+                    fillOpacity: 0.12,
+                    weight: 1.5,
+                    dashArray: '4, 4',
+                  }}
+                />
+              )}
+
             {/* User location marker */}
             {userLocation &&
               Number.isFinite(userLocation.lat) &&
@@ -1298,7 +1386,12 @@ export const StoreLocationsMap: React.FC<StoreLocationsMapProps> = ({
                 >
                   <Popup>
                     <div className="text-xs">
-                      <strong>Your Location</strong>
+                      <strong>Your Exact Location</strong>
+                      {userLocationAccuracy && (
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          Accuracy: ±{Math.round(userLocationAccuracy)}m
+                        </p>
+                      )}
                     </div>
                   </Popup>
                 </Marker>
