@@ -468,126 +468,135 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       {/* Profile Header with Functional Image Upload */}
       <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
         <div
-          className={`h-32 bg-gradient-to-r ${
+          className={`h-36 sm:h-44 bg-gradient-to-r relative overflow-hidden ${
             isAdmin
               ? 'from-blue-900 via-indigo-900 to-slate-900'
               : 'from-pink-900 via-rose-900 to-purple-950'
           }`}
-        />
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent pointer-events-none" />
+        </div>
         <div className="px-6 pb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-16">
-            {/* Functional Avatar with Upload & Drag/Drop */}
-            <div
-              className={`relative group cursor-pointer ${
-                isDragging ? 'ring-4 ring-pink-500 ring-offset-2' : ''
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              title="Click or drop an image to upload a new profile photo"
-            >
-              <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg relative">
-                {formData.avatar ? (
-                  <img
-                    src={formData.avatar}
-                    alt={formData.fullname || 'User'}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div
-                    className={`w-full h-full bg-gradient-to-br ${
-                      isAdmin
-                        ? 'from-blue-600 to-indigo-700'
-                        : 'from-pink-500 to-rose-600'
-                    } flex items-center justify-center text-white text-3xl font-serif font-bold`}
+          <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-5">
+            {/* Left: Avatar + Details on White */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-5 w-full lg:w-auto">
+              {/* Functional Avatar with Upload & Drag/Drop */}
+              <div className="-mt-16 sm:-mt-20 shrink-0">
+                <div
+                  className={`relative group cursor-pointer ${
+                    isDragging ? 'ring-4 ring-pink-500 ring-offset-2' : ''
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Click or drop an image to upload a new profile photo"
+                >
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl relative ring-1 ring-pink-100">
+                    {formData.avatar ? (
+                      <img
+                        src={formData.avatar}
+                        alt={formData.fullname || 'User'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`w-full h-full bg-gradient-to-br ${
+                          isAdmin
+                            ? 'from-blue-600 to-indigo-700'
+                            : 'from-pink-500 to-rose-600'
+                        } flex items-center justify-center text-white text-3xl font-serif font-bold`}
+                      >
+                        {formData.fullname ? formData.fullname.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                    )}
+
+                    {/* Hover overlay indicating upload */}
+                    <div className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-xs font-semibold gap-1">
+                      <Camera className="w-5 h-5" />
+                      <span>{uploadingImage ? 'Processing...' : 'Upload Photo'}</span>
+                    </div>
+
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Camera Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className={`absolute -bottom-1 -right-1 w-8 h-8 ${
+                      isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-pink-600 hover:bg-pink-700'
+                    } text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer border-2 border-white`}
+                    title="Upload image"
                   >
-                    {formData.fullname ? formData.fullname.charAt(0).toUpperCase() : 'U'}
-                  </div>
-                )}
-
-                {/* Hover overlay indicating upload */}
-                <div className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-xs font-semibold gap-1">
-                  <Camera className="w-6 h-6" />
-                  <span>{uploadingImage ? 'Processing...' : 'Upload Photo'}</span>
+                    <Camera className="w-4 h-4" />
+                  </button>
                 </div>
-
-                {uploadingImage && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <RefreshCw className="w-6 h-6 text-white animate-spin" />
-                  </div>
-                )}
               </div>
 
-              {/* Camera Trigger Button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-                className={`absolute bottom-2 right-2 w-8 h-8 ${
-                  isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-pink-600 hover:bg-pink-700'
-                } text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer`}
-                title="Upload image"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* User Info Header */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.fullname}
-                    onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
-                    placeholder="Full Name"
-                    className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-pink-300 focus:border-pink-500 outline-none max-w-sm"
-                  />
-                ) : (
-                  <h1 className="text-2xl font-serif font-bold text-gray-900 truncate">
-                    {currentUser.fullname}
-                  </h1>
-                )}
-                {getUserRoleBadge()}
-              </div>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>Joined {new Date(currentUser.created_at || Date.now()).toLocaleDateString()}</span>
+              {/* User Info Header on White Card */}
+              <div className="pt-2 sm:pt-0 pb-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2.5 mb-2">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={formData.fullname}
+                      onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
+                      placeholder="Full Name"
+                      className="text-2xl sm:text-3xl font-serif font-bold text-gray-900 bg-transparent border-b-2 border-pink-400 focus:border-pink-600 outline-none max-w-sm"
+                    />
+                  ) : (
+                    <h1 className="text-2xl sm:text-3xl font-serif font-bold text-gray-900 truncate tracking-tight">
+                      {currentUser.fullname}
+                    </h1>
+                  )}
+                  {getUserRoleBadge()}
                 </div>
-                {currentUser.status === 'active' && (
-                  <div className="flex items-center gap-1 text-emerald-600 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Active Status</span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Joined {new Date(currentUser.created_at || Date.now()).toLocaleDateString()}</span>
                   </div>
-                )}
-                <div className="flex items-center gap-1 text-gray-400">
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>{currentUser.email}</span>
+                  {currentUser.status === 'active' && (
+                    <div className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Active Status</span>
+                    </div>
+                  )}
+                  {currentUser.email && (
+                    <div className="flex items-center gap-1.5 text-gray-600">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{currentUser.email}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Profile Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-end">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-2 lg:pb-1">
               {!isEditing ? (
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     <span>Edit Profile</span>
                   </button>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3.5 py-2 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2.5 rounded-xl border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer bg-white"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>Upload Photo</span>
@@ -598,7 +607,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                   <button
                     onClick={handleSave}
                     disabled={loading || uploadingImage}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs font-semibold shadow-md shadow-pink-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{loading ? 'Saving...' : 'Save Changes'}</span>
@@ -606,7 +615,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                   <button
                     onClick={handleCancel}
                     disabled={loading}
-                    className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>Cancel</span>

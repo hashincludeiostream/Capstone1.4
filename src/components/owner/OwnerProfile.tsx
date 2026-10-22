@@ -435,108 +435,127 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
 
       {/* Profile Header Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-purple-100 overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-900 via-pink-900 to-rose-950 h-32" />
+        {/* Banner with stylish decorative accents */}
+        <div className="relative bg-gradient-to-r from-purple-900 via-pink-900 to-rose-950 h-36 sm:h-44 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/15 backdrop-blur-md text-purple-100 border border-white/20 shadow-xs">
+              Salon Partner Workspace
+            </span>
+          </div>
+        </div>
+
+        {/* Content Container below banner */}
         <div className="px-6 pb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-16">
-            {/* Functional Avatar Upload */}
-            <div
-              className="relative group cursor-pointer"
-              onClick={() => avatarInputRef.current?.click()}
-              title="Click to upload owner profile picture"
-            >
-              <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg relative">
-                {formData.avatar ? (
-                  <img
-                    src={formData.avatar}
-                    alt={formData.fullname || 'Owner'}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-3xl font-serif font-bold">
-                    {formData.fullname ? formData.fullname.charAt(0).toUpperCase() : 'O'}
-                  </div>
-                )}
+          <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-5">
+            {/* Left: Avatar overlapping banner + Clean Text Info on White Background */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-5 w-full lg:w-auto">
+              {/* Functional Avatar Upload (only this element extends into the banner) */}
+              <div className="-mt-16 sm:-mt-20 shrink-0">
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => avatarInputRef.current?.click()}
+                  title="Click to upload owner profile picture"
+                >
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl relative ring-1 ring-purple-100">
+                    {formData.avatar ? (
+                      <img
+                        src={formData.avatar}
+                        alt={formData.fullname || 'Owner'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-3xl font-serif font-bold">
+                        {formData.fullname ? formData.fullname.charAt(0).toUpperCase() : 'O'}
+                      </div>
+                    )}
 
-                <div className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-xs font-semibold gap-1">
-                  <Camera className="w-6 h-6" />
-                  <span>{uploadingAvatar ? 'Processing...' : 'Upload Photo'}</span>
+                    <div className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-xs font-semibold gap-1">
+                      <Camera className="w-5 h-5" />
+                      <span>{uploadingAvatar ? 'Processing...' : 'Upload Photo'}</span>
+                    </div>
+
+                    {uploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      avatarInputRef.current?.click();
+                    }}
+                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer border-2 border-white"
+                    title="Upload owner photo"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
                 </div>
-
-                {uploadingAvatar && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <RefreshCw className="w-6 h-6 text-white animate-spin" />
-                  </div>
-                )}
               </div>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  avatarInputRef.current?.click();
-                }}
-                className="absolute bottom-2 right-2 w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer"
-                title="Upload owner photo"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Owner Details */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.fullname}
-                    onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
-                    placeholder="Full Name"
-                    className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-purple-300 focus:border-purple-500 outline-none max-w-sm"
-                  />
-                ) : (
-                  <h1 className="text-2xl font-serif font-bold text-gray-900 truncate">
-                    {currentUser?.fullname || 'Salon Owner'}
-                  </h1>
-                )}
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                  Salon Partner &amp; Store Owner
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                  <span>
-                    Partner since{' '}
-                    {currentUser?.created_at ? new Date(currentUser.created_at).toLocaleDateString() : 'N/A'}
+              {/* Owner Details: Purely on the crisp white card background */}
+              <div className="pt-2 sm:pt-0 pb-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2.5 mb-2">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={formData.fullname}
+                      onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
+                      placeholder="Full Name"
+                      className="text-2xl sm:text-3xl font-serif font-bold text-gray-900 bg-transparent border-b-2 border-purple-400 focus:border-purple-600 outline-none max-w-sm"
+                    />
+                  ) : (
+                    <h1 className="text-2xl sm:text-3xl font-serif font-bold text-gray-900 truncate tracking-tight">
+                      {currentUser?.fullname || 'Salon Owner'}
+                    </h1>
+                  )}
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs">
+                    <Store className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Salon Partner &amp; Store Owner</span>
                   </span>
                 </div>
-                {currentUser?.status === 'active' && (
-                  <div className="flex items-center gap-1 text-emerald-600 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Verified Store Partner</span>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    <span>
+                      Partner since{' '}
+                      {currentUser?.created_at ? new Date(currentUser.created_at).toLocaleDateString() : 'N/A'}
+                    </span>
                   </div>
-                )}
-                <div className="flex items-center gap-1 text-gray-400">
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>{currentUser.email}</span>
+                  {currentUser?.status === 'active' && (
+                    <div className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Verified Store Partner</span>
+                    </div>
+                  )}
+                  {currentUser.email && (
+                    <div className="flex items-center gap-1.5 text-gray-600">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{currentUser.email}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-end">
+            {/* Action Buttons on right */}
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-2 lg:pb-1">
               {!isEditing ? (
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     <span>Edit Profile</span>
                   </button>
                   <button
                     onClick={() => avatarInputRef.current?.click()}
-                    className="px-3.5 py-2 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2.5 rounded-xl border border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer bg-white"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>Change Photo</span>
@@ -547,7 +566,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
                   <button
                     onClick={handleSave}
                     disabled={loading || uploadingAvatar}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{loading ? 'Saving...' : 'Save Changes'}</span>
@@ -555,7 +574,7 @@ export const OwnerProfile: React.FC<OwnerProfileProps> = ({
                   <button
                     onClick={handleCancel}
                     disabled={loading}
-                    className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>Cancel</span>

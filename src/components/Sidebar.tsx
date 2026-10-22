@@ -1002,24 +1002,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </button>
 
-          <button
-            id="sidebar-reels-btn"
-            onClick={() => handleNavigation('reels')}
-            aria-current={isPathActive('reels') ? 'page' : undefined}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
-              isPathActive('reels')
-                ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
-                : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
-            }`}
-          >
-            <Flame className={`w-4 h-4 shrink-0 ${isPathActive('reels') ? 'text-amber-600' : 'text-amber-500'}`} />
-            <div className="flex items-center justify-between flex-1 min-w-0">
-              <span className="truncate">Viral Nail Reels</span>
-              <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.2 rounded-full shrink-0">
-                HOT
-              </span>
-            </div>
-          </button>
 
           <button
             id="sidebar-reviews-btn"
