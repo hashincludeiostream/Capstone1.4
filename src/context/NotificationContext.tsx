@@ -307,7 +307,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         if (currentUser.user_type === 'customer') {
           warnParams.append('customer_id', String(currentUser.id));
         }
-        warnParams.append('dispatch_emails', 'true');
 
         const warnRes = await fetch(`/api/appointments/schedule-warnings?${warnParams.toString()}`);
         if (warnRes.ok && isMounted) {

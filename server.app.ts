@@ -1946,11 +1946,50 @@ async function startServer() {
 
   // =========================================================================
   // APPOINTMENT SCHEDULE WARNINGS & DEADLINE ALERTS (24h, 2h, Overdue)
+  // Deduplication & Date-Scoping:
+  // - Older bookings in the system (appointment_date < today) NEVER send emails
+  // - Overdue warnings ONLY trigger and send alerts if scheduled for TODAY
+  // - Deduplication ensures each alert is dispatched AT MOST ONCE per appointment
   // =========================================================================
+  const dispatchedScheduleAlerts = new Set<string>();
+
+  async function hasScheduleAlertBeenSent(
+    apptId: number,
+    alertType: '24h' | '2h' | 'overdue',
+    dateKey: string,
+    recipientEmail: string
+  ): Promise<boolean> {
+    const memKey = `${apptId}_${alertType}_${dateKey}`;
+    if (dispatchedScheduleAlerts.has(memKey)) {
+      return true;
+    }
+    try {
+      const todayStart = `${dateKey}T00:00:00.000Z`;
+      const searchKeyword = alertType === 'overdue' ? '%Overdue%' : alertType === '2h' ? '%Urgent Reminder%' : '%Reminder%';
+      const [rows] = await db.execute(
+        `SELECT id, subject FROM email_logs WHERE LOWER(recipient_email) = LOWER(?) AND (category = 'alert' OR category = 'booking') AND (subject LIKE ? OR subject LIKE ?) AND sent_at >= ?`,
+        [recipientEmail, `%#${apptId}%`, searchKeyword, todayStart]
+      );
+      if ((rows as any[]).length > 0) {
+        dispatchedScheduleAlerts.add(memKey);
+        return true;
+      }
+    } catch (_err) {
+      // quiet fallback
+    }
+    return false;
+  }
+
+  function markScheduleAlertSent(apptId: number, alertType: '24h' | '2h' | 'overdue', dateKey: string) {
+    dispatchedScheduleAlerts.add(`${apptId}_${alertType}_${dateKey}`);
+  }
+
   app.get('/api/appointments/schedule-warnings', async (req, res) => {
     const { customer_id, salon_id, dispatch_emails } = req.query;
     try {
       const now = new Date();
+      // Current date in YYYY-MM-DD
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const [allAppts] = await db.execute("SELECT * FROM appointments WHERE status IN ('pending', 'confirmed')");
       const warnings: any[] = [];
 
@@ -1960,6 +1999,13 @@ async function startServer() {
 
         // Parse scheduled appointment datetime
         const datePart = appt.appointment_date;
+        if (!datePart) continue;
+
+        // CRITICAL FILTER: Older bookings/reservations from past days must NEVER send emails or warnings
+        if (datePart < todayStr) {
+          continue;
+        }
+
         const timePart = appt.appointment_time || '10:00';
         const scheduledTime = new Date(`${datePart}T${timePart}:00`);
         if (isNaN(scheduledTime.getTime())) continue;
@@ -1967,8 +2013,8 @@ async function startServer() {
         const diffMs = scheduledTime.getTime() - now.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
 
-        // 1. 24-Hour Reminder Alert (between 2 and 24 hours away)
-        if (diffHours > 2 && diffHours <= 24) {
+        // 1. 24-Hour Reminder Alert (between 2 and 24 hours away, future date)
+        if (diffHours > 2 && diffHours <= 24 && datePart >= todayStr) {
           const hoursLeft = Math.round(diffHours);
           const warnObj = {
             id: `warn-24h-${appt.id}`,
@@ -1983,29 +2029,33 @@ async function startServer() {
           warnings.push(warnObj);
 
           if (dispatch_emails === 'true' && appt.customer_email) {
-            await logEmailRecord({
-              recipient_email: appt.customer_email,
-              recipient_name: appt.customer_name,
-              recipient_role: 'customer',
-              subject: `Reminder: Upcoming Appointment in ${hoursLeft} Hours (${appt.salon_name})`,
-              category: 'booking',
-              content_preview: `Your appointment for ${appt.service_name} is tomorrow (${appt.appointment_date} at ${appt.appointment_time}).`,
-              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
-                <h2 style="color: #BE185D;">Upcoming Appointment Reminder (24h) ⏰</h2>
-                <p>Hello <strong>${appt.customer_name}</strong>,</p>
-                <p>This is a friendly reminder that your booking at <strong>${appt.salon_name}</strong> is coming up in approximately ${hoursLeft} hours.</p>
-                <ul>
-                  <li><strong>Service:</strong> ${appt.service_name}</li>
-                  <li><strong>Date:</strong> ${appt.appointment_date}</li>
-                  <li><strong>Time:</strong> ${appt.appointment_time}</li>
-                  <li><strong>Specialist:</strong> ${appt.technician_name || 'Assigned Artist'}</li>
-                </ul>
-              </div>`,
-            }).catch(() => {});
+            const alreadySent = await hasScheduleAlertBeenSent(Number(appt.id), '24h', datePart, appt.customer_email);
+            if (!alreadySent) {
+              await logEmailRecord({
+                recipient_email: appt.customer_email,
+                recipient_name: appt.customer_name,
+                recipient_role: 'customer',
+                subject: `Reminder: Upcoming Appointment in ${hoursLeft} Hours #${appt.id} (${appt.salon_name})`,
+                category: 'booking',
+                content_preview: `Your appointment for ${appt.service_name} is scheduled for ${appt.appointment_date} at ${appt.appointment_time}.`,
+                html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                  <h2 style="color: #BE185D;">Upcoming Appointment Reminder (24h) ⏰</h2>
+                  <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                  <p>This is a friendly reminder that your booking at <strong>${appt.salon_name}</strong> is coming up in approximately ${hoursLeft} hours.</p>
+                  <ul>
+                    <li><strong>Service:</strong> ${appt.service_name}</li>
+                    <li><strong>Date:</strong> ${appt.appointment_date}</li>
+                    <li><strong>Time:</strong> ${appt.appointment_time}</li>
+                    <li><strong>Specialist:</strong> ${appt.technician_name || 'Assigned Specialist'}</li>
+                  </ul>
+                </div>`,
+              }).catch(() => {});
+              markScheduleAlertSent(Number(appt.id), '24h', datePart);
+            }
           }
         }
-        // 2. 2-Hour Urgent Preparation Alert (between 0 and 2 hours away)
-        else if (diffHours > 0 && diffHours <= 2) {
+        // 2. 2-Hour Urgent Preparation Alert (between 0 and 2 hours away, happening today)
+        else if (diffHours > 0 && diffHours <= 2 && datePart === todayStr) {
           const minsLeft = Math.max(1, Math.round(diffMs / (1000 * 60)));
           const warnObj = {
             id: `warn-2h-${appt.id}`,
@@ -2020,23 +2070,27 @@ async function startServer() {
           warnings.push(warnObj);
 
           if (dispatch_emails === 'true' && appt.customer_email) {
-            await logEmailRecord({
-              recipient_email: appt.customer_email,
-              recipient_name: appt.customer_name,
-              recipient_role: 'customer',
-              subject: `Urgent Reminder: Appointment in ${minsLeft} minutes! (${appt.salon_name})`,
-              category: 'booking',
-              content_preview: `Your appointment for ${appt.service_name} starts in ${minsLeft} minutes.`,
-              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FEF2F2; border-radius: 12px; border: 1px solid #FCA5A5;">
-                <h2 style="color: #DC2626;">Starting Soon: 2-Hour Appointment Advisory ⚠️</h2>
-                <p>Hello <strong>${appt.customer_name}</strong>,</p>
-                <p>Your session at <strong>${appt.salon_name}</strong> starts in <strong>${minsLeft} minutes</strong> (${appt.appointment_time}). Please arrive 5-10 minutes prior.</p>
-              </div>`,
-            }).catch(() => {});
+            const alreadySent = await hasScheduleAlertBeenSent(Number(appt.id), '2h', todayStr, appt.customer_email);
+            if (!alreadySent) {
+              await logEmailRecord({
+                recipient_email: appt.customer_email,
+                recipient_name: appt.customer_name,
+                recipient_role: 'customer',
+                subject: `Urgent Reminder: Appointment in ${minsLeft} minutes! #${appt.id} (${appt.salon_name})`,
+                category: 'booking',
+                content_preview: `Your appointment for ${appt.service_name} starts in ${minsLeft} minutes.`,
+                html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FEF2F2; border-radius: 12px; border: 1px solid #FCA5A5;">
+                  <h2 style="color: #DC2626;">Starting Soon: 2-Hour Appointment Advisory ⚠️</h2>
+                  <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                  <p>Your session at <strong>${appt.salon_name}</strong> starts in <strong>${minsLeft} minutes</strong> (${appt.appointment_time}). Please arrive 5-10 minutes prior.</p>
+                </div>`,
+              }).catch(() => {});
+              markScheduleAlertSent(Number(appt.id), '2h', todayStr);
+            }
           }
         }
-        // 3. Overdue Appointment Alert (past scheduled time, not yet marked completed or cancelled)
-        else if (diffHours <= 0) {
+        // 3. Overdue Appointment Alert: STRICTLY ONLY FOR APPOINTMENTS SCHEDULED FOR TODAY (datePart === todayStr && diffHours <= 0)
+        else if (diffHours <= 0 && datePart === todayStr) {
           const overdueMins = Math.round(Math.abs(diffMs) / (1000 * 60));
           const warnObj = {
             id: `warn-overdue-${appt.id}`,
@@ -2045,26 +2099,30 @@ async function startServer() {
             priority: 'urgent',
             overdue_minutes: overdueMins,
             title: `Overdue Appointment Alert ⚠️`,
-            message: `Your appointment for ${appt.service_name} at ${appt.salon_name} was scheduled for ${appt.appointment_date} at ${appt.appointment_time} (${overdueMins} mins ago). Please check in with the salon or reschedule.`,
+            message: `Your appointment for ${appt.service_name} at ${appt.salon_name} was scheduled for today at ${appt.appointment_time} (${overdueMins} mins ago). Please check in with the salon or reschedule.`,
             appointment: appt,
           };
           warnings.push(warnObj);
 
           if (dispatch_emails === 'true' && appt.customer_email) {
-            await logEmailRecord({
-              recipient_email: appt.customer_email,
-              recipient_name: appt.customer_name,
-              recipient_role: 'customer',
-              subject: `Overdue Appointment Alert ⚠️ (${appt.salon_name})`,
-              category: 'alert',
-              content_preview: `Your scheduled appointment for ${appt.service_name} at ${appt.salon_name} was set for ${appt.appointment_date} at ${appt.appointment_time}.`,
-              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF1F2; border-radius: 12px; border: 1px solid #FECDD3;">
-                <h2 style="color: #BE123C;">Overdue Appointment Notice ⚠️</h2>
-                <p>Hello <strong>${appt.customer_name}</strong>,</p>
-                <p>Your appointment for <strong>${appt.service_name}</strong> at <strong>${appt.salon_name}</strong> was scheduled for <strong>${appt.appointment_date} at ${appt.appointment_time}</strong> (${overdueMins} mins ago).</p>
-                <p>If you have already arrived or need to reschedule, please contact the salon or manage your booking in the dashboard.</p>
-              </div>`,
-            }).catch(() => {});
+            const alreadySent = await hasScheduleAlertBeenSent(Number(appt.id), 'overdue', todayStr, appt.customer_email);
+            if (!alreadySent) {
+              await logEmailRecord({
+                recipient_email: appt.customer_email,
+                recipient_name: appt.customer_name,
+                recipient_role: 'customer',
+                subject: `Overdue Appointment Alert ⚠️ #${appt.id} (${appt.salon_name})`,
+                category: 'alert',
+                content_preview: `Your scheduled appointment for ${appt.service_name} at ${appt.salon_name} was set for today at ${appt.appointment_time}.`,
+                html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF1F2; border-radius: 12px; border: 1px solid #FECDD3;">
+                  <h2 style="color: #BE123C;">Overdue Appointment Notice ⚠️</h2>
+                  <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                  <p>Your appointment for <strong>${appt.service_name}</strong> at <strong>${appt.salon_name}</strong> was scheduled for today (<strong>${appt.appointment_date} at ${appt.appointment_time}</strong>, ${overdueMins} mins ago).</p>
+                  <p>If you have already arrived or need to reschedule, please contact the salon or manage your booking in the dashboard.</p>
+                </div>`,
+              }).catch(() => {});
+              markScheduleAlertSent(Number(appt.id), 'overdue', todayStr);
+            }
           }
         }
       }
@@ -2892,6 +2950,112 @@ async function startServer() {
       console.error('[Background Scheduler Error]', err);
     });
   }, 6 * 60 * 60 * 1000);
+
+  // Automated Daily & Schedule Alerts Routine
+  // Only dispatches alerts for appointments scheduled for TODAY (overdue/2h) or TOMORROW (24h)
+  // Strictly skips historical / older appointments in the system
+  async function runAutomatedScheduleAlerts() {
+    try {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const [allAppts] = await db.execute("SELECT * FROM appointments WHERE status IN ('pending', 'confirmed')");
+
+      for (const appt of (allAppts as any[])) {
+        const datePart = appt.appointment_date;
+        if (!datePart || !appt.customer_email) continue;
+
+        // Skip older bookings from past days
+        if (datePart < todayStr) continue;
+
+        const timePart = appt.appointment_time || '10:00';
+        const scheduledTime = new Date(`${datePart}T${timePart}:00`);
+        if (isNaN(scheduledTime.getTime())) continue;
+
+        const diffMs = scheduledTime.getTime() - now.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        // 1. Overdue Alert: ONLY if scheduled for TODAY and past scheduled time
+        if (diffHours <= 0 && datePart === todayStr) {
+          const alreadySent = await hasScheduleAlertBeenSent(Number(appt.id), 'overdue', todayStr, appt.customer_email);
+          if (!alreadySent) {
+            const overdueMins = Math.round(Math.abs(diffMs) / (1000 * 60));
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Overdue Appointment Alert ⚠️ #${appt.id} (${appt.salon_name})`,
+              category: 'alert',
+              content_preview: `Your scheduled appointment for ${appt.service_name} at ${appt.salon_name} was set for today at ${appt.appointment_time}.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF1F2; border-radius: 12px; border: 1px solid #FECDD3;">
+                <h2 style="color: #BE123C;">Overdue Appointment Notice ⚠️</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>Your appointment for <strong>${appt.service_name}</strong> at <strong>${appt.salon_name}</strong> was scheduled for today (<strong>${appt.appointment_date} at ${appt.appointment_time}</strong>, ${overdueMins} mins ago).</p>
+                <p>If you have already arrived or need to reschedule, please contact the salon or manage your booking in the dashboard.</p>
+              </div>`,
+            }).catch(() => {});
+            markScheduleAlertSent(Number(appt.id), 'overdue', todayStr);
+          }
+        }
+        // 2. 2-Hour Urgent Alert: TODAY
+        else if (diffHours > 0 && diffHours <= 2 && datePart === todayStr) {
+          const alreadySent = await hasScheduleAlertBeenSent(Number(appt.id), '2h', todayStr, appt.customer_email);
+          if (!alreadySent) {
+            const minsLeft = Math.max(1, Math.round(diffMs / (1000 * 60)));
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Urgent Reminder: Appointment in ${minsLeft} minutes! #${appt.id} (${appt.salon_name})`,
+              category: 'booking',
+              content_preview: `Your appointment for ${appt.service_name} starts in ${minsLeft} minutes.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FEF2F2; border-radius: 12px; border: 1px solid #FCA5A5;">
+                <h2 style="color: #DC2626;">Starting Soon: 2-Hour Appointment Advisory ⚠️</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>Your session at <strong>${appt.salon_name}</strong> starts in <strong>${minsLeft} minutes</strong> (${appt.appointment_time}). Please arrive 5-10 minutes prior.</p>
+              </div>`,
+            }).catch(() => {});
+            markScheduleAlertSent(Number(appt.id), '2h', todayStr);
+          }
+        }
+        // 3. 24-Hour Reminder Alert
+        else if (diffHours > 2 && diffHours <= 24 && datePart >= todayStr) {
+          const alreadySent = await hasScheduleAlertBeenSent(Number(appt.id), '24h', datePart, appt.customer_email);
+          if (!alreadySent) {
+            const hoursLeft = Math.round(diffHours);
+            await logEmailRecord({
+              recipient_email: appt.customer_email,
+              recipient_name: appt.customer_name,
+              recipient_role: 'customer',
+              subject: `Reminder: Upcoming Appointment in ${hoursLeft} Hours #${appt.id} (${appt.salon_name})`,
+              category: 'booking',
+              content_preview: `Your appointment for ${appt.service_name} is scheduled for ${appt.appointment_date} at ${appt.appointment_time}.`,
+              html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D;">Upcoming Appointment Reminder (24h) ⏰</h2>
+                <p>Hello <strong>${appt.customer_name}</strong>,</p>
+                <p>This is a friendly reminder that your booking at <strong>${appt.salon_name}</strong> is coming up in approximately ${hoursLeft} hours.</p>
+                <ul>
+                  <li><strong>Service:</strong> ${appt.service_name}</li>
+                  <li><strong>Date:</strong> ${appt.appointment_date}</li>
+                  <li><strong>Time:</strong> ${appt.appointment_time}</li>
+                  <li><strong>Specialist:</strong> ${appt.technician_name || 'Assigned Specialist'}</li>
+                </ul>
+              </div>`,
+            }).catch(() => {});
+            markScheduleAlertSent(Number(appt.id), '24h', datePart);
+          }
+        }
+      }
+    } catch (schedErr) {
+      console.warn('[Schedule Alert Runner Error]', schedErr);
+    }
+  }
+
+  // Periodic interval: checks for today's overdue & upcoming alerts every 10 minutes
+  setInterval(() => {
+    runAutomatedScheduleAlerts().catch((err) => {
+      console.error('[Background Schedule Alert Error]', err);
+    });
+  }, 10 * 60 * 1000);
 
   // Users List (Admin)
   app.get('/api/users', async (req, res) => {
@@ -4378,6 +4542,30 @@ async function startServer() {
       const [updatedRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [id]);
       const updated = (updatedRows as any[])[0];
 
+      // Automatically dispatch email notification for order cancellation
+      try {
+        if (updated.customer_email) {
+          const [salonRows] = await db.execute('SELECT salon_name, address, phone FROM salons WHERE id = ?', [Number(updated.salon_id)]);
+          const salon = (salonRows as any[])[0];
+          await logEmailRecord({
+            recipient_email: updated.customer_email,
+            recipient_name: updated.customer_name,
+            recipient_role: 'customer',
+            subject: `Order #${updated.order_number}: Reservation Cancelled ⚠️ (${salon?.salon_name || 'Salon'})`,
+            category: 'order',
+            content_preview: `Your product pickup reservation #${updated.order_number} has been cancelled.`,
+            html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+              <h2 style="color: #BE185D; margin-top: 0;">Product Reservation Cancelled</h2>
+              <p>Dear <strong>${updated.customer_name}</strong>,</p>
+              <p>Your in-store product reservation <strong>#${updated.order_number}</strong> at <strong>${salon?.salon_name || 'the salon'}</strong> has been cancelled.</p>
+              <p><strong>Reason:</strong> ${reason}</p>
+            </div>`,
+          });
+        }
+      } catch (orderCancelEmailErr) {
+        console.warn('Order cancellation email warning:', orderCancelEmailErr);
+      }
+
       res.json({
         success: true,
         order: {
@@ -4409,6 +4597,7 @@ async function startServer() {
       if (!order) return res.status(404).json({ error: 'Order not found' });
 
       const prevStatus = order.status;
+      const isStatusChanged = prevStatus !== status;
 
       // If cancelling or marking as unclaimed, restore product stock if not already restored
       let restockedCount = 0;
@@ -4473,7 +4662,7 @@ async function startServer() {
             ? 'Marked as Unclaimed ⚠️'
             : `Status Updated to ${status}`;
 
-        if (targetCustEmail) {
+        if (isStatusChanged && targetCustEmail) {
           await logEmailRecord({
             recipient_email: targetCustEmail,
             recipient_name: updated.customer_name,
@@ -5455,6 +5644,35 @@ async function startServer() {
       const [updatedRows] = await db.execute('SELECT * FROM appointments WHERE id = ?', [id]);
       const updatedAppt = (updatedRows as any[])[0];
 
+      // Automatically send reschedule confirmation email to customer
+      try {
+        const targetEmail = updatedAppt.customer_email;
+        if (targetEmail) {
+          await logEmailRecord({
+            recipient_email: targetEmail,
+            recipient_name: updatedAppt.customer_name || 'Valued Client',
+            recipient_role: 'customer',
+            subject: `Appointment Rescheduled! 📅 ${updatedAppt.service_name} at ${updatedAppt.salon_name}`,
+            category: 'booking',
+            content_preview: `Your appointment has been rescheduled to ${new_date} at ${new_time} (${updatedAppt.salon_name}).`,
+            html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+              <h2 style="color: #BE185D; margin-top: 0;">Appointment Rescheduled! 📅</h2>
+              <p>Hello <strong>${updatedAppt.customer_name}</strong>,</p>
+              <p>Your appointment at <strong>${updatedAppt.salon_name}</strong> has been successfully rescheduled with zero penalty fees.</p>
+              <div style="background: #fff; border: 1px solid #FCE7F3; border-radius: 8px; padding: 14px; margin: 16px 0;">
+                <p style="margin: 4px 0;"><strong>Service:</strong> ${updatedAppt.service_name}</p>
+                <p style="margin: 4px 0;"><strong>New Date:</strong> ${new_date}</p>
+                <p style="margin: 4px 0;"><strong>New Time:</strong> ${new_time}</p>
+                <p style="margin: 4px 0;"><strong>Specialist:</strong> ${updatedAppt.technician_name || 'Assigned Specialist'}</p>
+                <p style="margin: 4px 0;"><strong>Previous Slot:</strong> ${oldSchedule}</p>
+              </div>
+            </div>`,
+          });
+        }
+      } catch (rescheduleEmailErr) {
+        console.warn('Reschedule email dispatch warning:', rescheduleEmailErr);
+      }
+
       res.json({
         success: true,
         appointment: {
@@ -5582,6 +5800,8 @@ async function startServer() {
       if ((apptRows as any[]).length === 0) return res.status(404).json({ error: 'Appointment not found' });
       const currentAppt = (apptRows as any[])[0];
 
+      const isStatusChanged = currentAppt.status !== status;
+
       if (status === 'cancelled') {
         const reason = cancellation_reason || currentAppt.cancellation_reason || 'Status updated to cancelled';
         const notes = cancellation_notes || currentAppt.cancellation_notes || '';
@@ -5620,54 +5840,99 @@ async function startServer() {
         cancellation_fee: Number(updatedAppt.cancellation_fee) || 0,
       };
 
-      // Automatically email status change alert to customer
-      try {
-        const [customerRows] = await db.execute('SELECT email, fullname FROM users WHERE id = ?', [Number(updatedAppt.customer_id)]);
-        const customer = (customerRows as any[])[0];
-        const targetEmail = updatedAppt.customer_email || customer?.email;
-        if (targetEmail) {
-          const statusLabel = status === 'confirmed' ? 'Confirmed & Scheduled' : status === 'completed' ? 'Completed' : status === 'cancelled' ? 'Cancelled' : status;
-          await logEmailRecord({
-            recipient_email: targetEmail,
-            recipient_name: customer?.fullname || updatedAppt.customer_name,
-            recipient_role: 'customer',
-            subject: `Appointment Status Update: ${statusLabel} (${updatedAppt.appointment_date})`,
-            category: 'booking',
-            content_preview: `Your appointment is now ${statusLabel}. Date: ${updatedAppt.appointment_date} at ${updatedAppt.appointment_time}.`,
-            html_body: `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
-              <h2 style="color: #BE185D; margin-top: 0;">Appointment Status: ${statusLabel}</h2>
-              <p>Hello <strong>${customer?.fullname || updatedAppt.customer_name}</strong>,</p>
-              <p>Your appointment status has been updated to: <strong>${statusLabel}</strong>.</p>
-              <ul>
-                <li><strong>Date:</strong> ${updatedAppt.appointment_date}</li>
-                <li><strong>Time:</strong> ${updatedAppt.appointment_time}</li>
-              </ul>
-            </div>`,
-          });
+      // Only dispatch state change alert emails if the status actually changed
+      // (Older bookings already completed/cancelled or unchanged records do NOT trigger emails)
+      if (isStatusChanged) {
+        try {
+          const [customerRows] = await db.execute('SELECT email, fullname FROM users WHERE id = ?', [Number(updatedAppt.customer_id)]);
+          const customer = (customerRows as any[])[0];
+          const targetEmail = updatedAppt.customer_email || customer?.email;
+          if (targetEmail) {
+            const customerName = customer?.fullname || updatedAppt.customer_name || 'Valued Client';
+            let subject = `Appointment Status Update: ${status} (${updatedAppt.appointment_date})`;
+            let preview = `Your appointment for ${updatedAppt.service_name} is now ${status}.`;
+            let bodyHtml = '';
 
-          // Insert in-app system notification for customer
-          await db.execute(
-            `INSERT INTO system_notifications (
-              category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
-              priority, type, linkTab, linkTargetId, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              'bookings',
-              `Appointment ${statusLabel} 💅`,
-              `Your appointment for ${updatedAppt.service_name} on ${updatedAppt.appointment_date} is now ${statusLabel}.`,
-              'customer',
-              Number(updatedAppt.customer_id),
-              Number(updatedAppt.salon_id),
-              status === 'cancelled' ? 'urgent' : 'normal',
-              status === 'confirmed' ? 'booking_confirmed' : status === 'cancelled' ? 'booking_cancelled_by_owner' : 'system_alert',
-              'customer-dashboard',
-              `appt-${updatedAppt.id}`,
-              new Date().toISOString(),
-            ]
-          );
+            if (status === 'completed') {
+              subject = `Appointment Completed! 🎉 Thank You for Visiting ${updatedAppt.salon_name}`;
+              preview = `Thank you for visiting ${updatedAppt.salon_name} for ${updatedAppt.service_name}! Your appointment has been marked as completed.`;
+              bodyHtml = `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D; margin-top: 0;">Appointment Completed! 🎉</h2>
+                <p>Hello <strong>${customerName}</strong>,</p>
+                <p>Thank you for visiting <strong>${updatedAppt.salon_name}</strong>! Your appointment has been marked as completed.</p>
+                <div style="background: #fff; border: 1px solid #FCE7F3; border-radius: 8px; padding: 14px; margin: 16px 0;">
+                  <p style="margin: 4px 0;"><strong>Service:</strong> ${updatedAppt.service_name}</p>
+                  <p style="margin: 4px 0;"><strong>Date & Time:</strong> ${updatedAppt.appointment_date} at ${updatedAppt.appointment_time}</p>
+                  <p style="margin: 4px 0;"><strong>Specialist:</strong> ${updatedAppt.technician_name || 'Assigned Specialist'}</p>
+                  <p style="margin: 4px 0;"><strong>Total Fee:</strong> ₱${Number(updatedAppt.total_price || 0).toLocaleString()}</p>
+                </div>
+                <p style="font-size: 13px; color: #6B7280;">We hope you loved your look! Feel free to log in to your account anytime to leave a review and share your feedback.</p>
+              </div>`;
+            } else if (status === 'confirmed') {
+              subject = `Appointment Confirmed! 💅 ${updatedAppt.service_name} at ${updatedAppt.salon_name}`;
+              preview = `Your appointment has been confirmed for ${updatedAppt.appointment_date} at ${updatedAppt.appointment_time}.`;
+              bodyHtml = `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D; margin-top: 0;">Appointment Confirmed! 💅</h2>
+                <p>Hello <strong>${customerName}</strong>,</p>
+                <p>Your appointment at <strong>${updatedAppt.salon_name}</strong> has been confirmed and scheduled.</p>
+                <div style="background: #fff; border: 1px solid #FCE7F3; border-radius: 8px; padding: 14px; margin: 16px 0;">
+                  <p style="margin: 4px 0;"><strong>Service:</strong> ${updatedAppt.service_name}</p>
+                  <p style="margin: 4px 0;"><strong>Schedule:</strong> ${updatedAppt.appointment_date} at ${updatedAppt.appointment_time}</p>
+                  <p style="margin: 4px 0;"><strong>Specialist:</strong> ${updatedAppt.technician_name || 'Assigned Specialist'}</p>
+                </div>
+              </div>`;
+            } else if (status === 'cancelled') {
+              subject = `Appointment Cancelled: ${updatedAppt.service_name} (${updatedAppt.appointment_date})`;
+              preview = `Your appointment for ${updatedAppt.service_name} on ${updatedAppt.appointment_date} has been cancelled.`;
+              bodyHtml = `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D; margin-top: 0;">Appointment Cancelled</h2>
+                <p>Hello <strong>${customerName}</strong>,</p>
+                <p>Your appointment at <strong>${updatedAppt.salon_name}</strong> has been cancelled.</p>
+                <p><strong>Reason:</strong> ${updatedAppt.cancellation_reason || 'Cancelled by salon'}</p>
+              </div>`;
+            } else {
+              bodyHtml = `<div style="font-family: sans-serif; padding: 20px; background: #FFF9FB; border-radius: 12px; border: 1px solid #FCE7F3;">
+                <h2 style="color: #BE185D; margin-top: 0;">Appointment Status: ${status}</h2>
+                <p>Hello <strong>${customerName}</strong>,</p>
+                <p>Your appointment status has been updated to: <strong>${status}</strong>.</p>
+              </div>`;
+            }
+
+            await logEmailRecord({
+              recipient_email: targetEmail,
+              recipient_name: customerName,
+              recipient_role: 'customer',
+              subject,
+              category: 'booking',
+              content_preview: preview,
+              html_body: bodyHtml,
+            });
+
+            // Insert in-app system notification for customer
+            const statusLabel = status === 'confirmed' ? 'Confirmed & Scheduled' : status === 'completed' ? 'Completed' : status === 'cancelled' ? 'Cancelled' : status;
+            await db.execute(
+              `INSERT INTO system_notifications (
+                category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+                priority, type, linkTab, linkTargetId, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                'bookings',
+                `Appointment ${statusLabel} 💅`,
+                `Your appointment for ${updatedAppt.service_name} on ${updatedAppt.appointment_date} is now ${statusLabel}.`,
+                'customer',
+                Number(updatedAppt.customer_id),
+                Number(updatedAppt.salon_id),
+                status === 'cancelled' ? 'urgent' : 'normal',
+                status === 'confirmed' ? 'booking_confirmed' : status === 'cancelled' ? 'booking_cancelled_by_owner' : 'system_alert',
+                'customer-dashboard',
+                `appt-${updatedAppt.id}`,
+                new Date().toISOString(),
+              ]
+            );
+          }
+        } catch (statusEmailErr) {
+          console.warn('Status change email warning:', statusEmailErr);
         }
-      } catch (statusEmailErr) {
-        console.warn('Status change email warning:', statusEmailErr);
       }
       
       res.json({ success: true, appointment: formattedAppointment });
