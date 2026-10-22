@@ -245,28 +245,35 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
 
             {/* Direct Private Messages */}
-            {currentUser && (
-              <button
-                id="navbar-direct-messages-btn"
-                onClick={() => {
-                  if (currentUser.user_type === 'customer') {
-                    handleNavigation('customer-dashboard');
-                  } else if (currentUser.user_type === 'salon_owner') {
-                    handleNavigation('owner-messages');
-                  }
-                }}
-                className="relative p-2 rounded-full text-gray-600 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
-                title="Direct Messages & Inquiries"
-                aria-label="Direct Messages"
-              >
-                <MessageSquare className="w-5 h-5 text-gray-600 hover:text-pink-600 transition-colors" />
-                {unreadMessagesCount > 0 && (
-                  <span className="absolute top-1 right-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
-                    {unreadMessagesCount}
-                  </span>
-                )}
-              </button>
-            )}
+            <button
+              id="navbar-direct-messages-btn"
+              onClick={() => {
+                if (!currentUser) {
+                  onOpenAuth();
+                  return;
+                }
+                if (currentUser.user_type === 'customer') {
+                  handleNavigation('customer-messages');
+                  window.dispatchEvent(new CustomEvent('open-direct-messages'));
+                } else if (currentUser.user_type === 'salon_owner' || currentUser.user_type === 'admin') {
+                  handleNavigation('owner-messages');
+                  window.dispatchEvent(new CustomEvent('open-direct-messages'));
+                } else {
+                  handleNavigation('customer-messages');
+                  window.dispatchEvent(new CustomEvent('open-direct-messages'));
+                }
+              }}
+              className="relative p-2 rounded-full text-gray-600 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
+              title="Direct Messages & Inquiries"
+              aria-label="Direct Messages"
+            >
+              <MessageSquare className="w-5 h-5 text-gray-600 hover:text-pink-600 transition-colors" />
+              {unreadMessagesCount > 0 && (
+                <span className="absolute top-1 right-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
+                  {unreadMessagesCount}
+                </span>
+              )}
+            </button>
 
             {/* Notification Button (Arranged In-Store Cart & System Notifications) */}
             <NotificationMenu
@@ -455,6 +462,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                         )}
                       </button>
 
+                      <button
+                        onClick={() => {
+                          handleNavigation('customer-messages');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700 flex items-center justify-between cursor-pointer transition-colors"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <MessageSquare className="w-4 h-4 text-pink-600" />
+                          <span>Direct Messages & Inquiries</span>
+                        </span>
+                        {unreadMessagesCount > 0 && (
+                          <span className="text-[11px] font-semibold bg-rose-600 text-white px-2 py-0.5 rounded-full">
+                            {unreadMessagesCount}
+                          </span>
+                        )}
+                      </button>
+
                       {onOpenEmailHistory && (
                         <button
                           onClick={() => {
@@ -481,6 +506,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                       >
                         <BarChart3 className="w-4 h-4 text-purple-600" />
                         <span>Salon Partner Dashboard</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleNavigation('owner-messages');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center justify-between cursor-pointer transition-colors"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <MessageSquare className="w-4 h-4 text-purple-600" />
+                          <span>Client Messages</span>
+                        </span>
+                        {unreadMessagesCount > 0 && (
+                          <span className="text-[11px] font-semibold bg-rose-600 text-white px-2 py-0.5 rounded-full">
+                            {unreadMessagesCount}
+                          </span>
+                        )}
                       </button>
 
                       {onOpenEmailHistory && (

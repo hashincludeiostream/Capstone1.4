@@ -38,6 +38,7 @@ interface CustomerDashboardProps {
   onRefreshAppointments?: () => void;
   targetAppointmentId?: number | null;
   onViewReceipt?: (appointment: Appointment) => void;
+  initialTab?: 'appointments' | 'messages';
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
@@ -49,6 +50,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   onRefreshAppointments,
   targetAppointmentId,
   onViewReceipt,
+  initialTab = 'appointments',
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,9 +58,25 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
-  const [activePortalTab, setActivePortalTab] = useState<'appointments' | 'messages'>('appointments');
+  const [activePortalTab, setActivePortalTab] = useState<'appointments' | 'messages'>(initialTab || 'appointments');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const { addNotification, unreadMessagesCount } = useNotifications();
+
+  // Keep activePortalTab synchronized with initialTab prop from navigation
+  useEffect(() => {
+    if (initialTab) {
+      setActivePortalTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Listen for direct message trigger events
+  useEffect(() => {
+    const handleOpenMessages = () => {
+      setActivePortalTab('messages');
+    };
+    window.addEventListener('open-direct-messages', handleOpenMessages);
+    return () => window.removeEventListener('open-direct-messages', handleOpenMessages);
+  }, []);
 
   useEffect(() => {
     if (targetAppointmentId) {

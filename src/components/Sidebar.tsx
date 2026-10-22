@@ -183,6 +183,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       );
     }
 
+    // Customer Messages & Inquiries
+    if (normTarget === 'customer-messages') {
+      return (
+        normActive === 'customer-messages' ||
+        normActive === 'messages' ||
+        normHash === 'customer-messages' ||
+        normHash === 'messages'
+      );
+    }
+
+    // Owner Messages & Inquiries
+    if (normTarget === 'owner-messages') {
+      return (
+        normActive === 'owner-messages' ||
+        (normActive === 'messages' && (currentUser?.user_type === 'salon_owner' || currentUser?.user_type === 'admin')) ||
+        normHash === 'owner-messages' ||
+        normHash === 'messages'
+      );
+    }
+
     // 5. Customer Orders synonyms & sub-views
     if (normTarget === 'customer-orders') {
       return (
@@ -1101,6 +1121,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         variant={isActive ? 'white' : 'emerald'}
                         priority="normal"
                         isUnread={unreadOrdersCount > 0}
+                        showPing={true}
+                        size="sm"
+                      />
+                    )}
+                  </button>
+                );
+              })()}
+
+              {/* Direct Messages & Inquiries with live unread badge */}
+              {(() => {
+                const isActive = isPathActive('customer-messages');
+                return (
+                  <button
+                    id="sidebar-customer-messages-btn"
+                    onClick={() => handleNavigation('customer-messages')}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                      isActive
+                        ? 'bg-pink-100 text-pink-900 font-bold shadow-xs ring-1 ring-pink-300'
+                        : 'text-gray-700 hover:bg-pink-50/70 hover:text-pink-700'
+                    }`}
+                    title="Direct Messages & Inquiries with Salons"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <MessageSquare className={`w-4 h-4 shrink-0 ${isActive ? 'text-pink-700' : 'text-pink-600'}`} />
+                      </div>
+                      <span className="truncate">Salon Messages</span>
+                    </div>
+
+                    {unreadMessagesCount > 0 && (
+                      <NotificationBadge
+                        id="sidebar-customer-messages-badge"
+                        count={unreadMessagesCount}
+                        variant={isActive ? 'white' : 'rose'}
+                        priority="urgent"
+                        isUnread={true}
                         showPing={true}
                         size="sm"
                       />

@@ -826,11 +826,11 @@ const AppContent: React.FC = () => {
       if (!rawHash) return;
       const validTabs = [
         'landing', 'explore', 'salons', 'map', 'services', 'products',
-        'reels', 'reviews', 'favorites', 'customer-dashboard', 'customer-orders',
+        'reels', 'reviews', 'favorites', 'customer-dashboard', 'customer-messages', 'messages', 'customer-orders',
         'profile', 'login-customer', 'register-customer', 'login-owner', 'register-owner',
         'owner-dashboard', 'owner-branches', 'owner-appointments', 'owner-services',
         'owner-staff', 'owner-inventory', 'owner-location', 'owner-settings',
-        'owner-cancellation-fees', 'owner-emails', 'admin-dashboard', 'admin-salons',
+        'owner-cancellation-fees', 'owner-emails', 'owner-messages', 'admin-dashboard', 'admin-salons',
         'admin-users', 'admin-content', 'admin-announcements', 'admin-appointments',
         'admin-cancellation-fees', 'admin-emails', 'admin-reports',
       ];
@@ -1043,6 +1043,30 @@ const AppContent: React.FC = () => {
         showToast('Security verification error. Redirected to landing.');
         return;
       }
+    }
+
+    // Direct routing for messages
+    if (tab === 'messages') {
+      if (!currentUser) {
+        handleRequireCustomerLogin();
+        return;
+      }
+      if (currentUser.user_type === 'salon_owner' || currentUser.user_type === 'admin') {
+        setActiveTab('owner-messages');
+        return;
+      } else {
+        setActiveTab('customer-messages');
+        return;
+      }
+    }
+
+    if (tab === 'customer-messages') {
+      if (!currentUser || currentUser.user_type !== 'customer') {
+        handleRequireCustomerLogin();
+        return;
+      }
+      setActiveTab('customer-messages');
+      return;
     }
 
     // Restrict salon owner portal
@@ -1482,12 +1506,13 @@ const AppContent: React.FC = () => {
             />
           )}
 
-          {/* 5. CUSTOMER DASHBOARD */}
-          {activeTab === 'customer-dashboard' && (
+          {/* 5. CUSTOMER DASHBOARD & MESSAGES */}
+          {(activeTab === 'customer-dashboard' || activeTab === 'customer-messages' || (activeTab === 'messages' && currentUser?.user_type === 'customer')) && (
             currentUser?.user_type === 'customer' ? (
               <CustomerDashboard
                 currentUser={currentUser}
                 salons={salons}
+                initialTab={activeTab === 'customer-messages' || activeTab === 'messages' ? 'messages' : 'appointments'}
                 onOpenBooking={() => {
                   setBookingSalon(salons[0] || null);
                   setBookingService(null);
@@ -1592,7 +1617,7 @@ const AppContent: React.FC = () => {
           )}
 
           {/* 6. SALON OWNER DASHBOARD & SUB-TABS */}
-          {activeTab.startsWith('owner') && (
+          {(activeTab.startsWith('owner') || (activeTab === 'messages' && (currentUser?.user_type === 'salon_owner' || currentUser?.user_type === 'admin'))) && (
             currentUser?.user_type === 'salon_owner' || currentUser?.user_type === 'admin' ? (
               <SalonOwnerDashboard
                 currentUser={currentUser}
@@ -1622,7 +1647,7 @@ const AppContent: React.FC = () => {
                     ? 'cancellation-fees'
                     : activeTab === 'owner-emails'
                     ? 'emails'
-                    : activeTab === 'owner-messages'
+                    : activeTab === 'owner-messages' || activeTab === 'messages'
                     ? 'messages'
                     : 'overview'
                 }
