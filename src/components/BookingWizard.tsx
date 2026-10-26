@@ -16,10 +16,14 @@ import {
   Store,
   ShieldCheck,
   ExternalLink,
+  Lock,
+  Loader2,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import { Salon, Service, Technician, User, Appointment, WorkingHour, PaymentMethod, PaymentType, PaymentTransaction } from '../types';
 import { fetchServices, fetchTechnicians, fetchAppointments, fetchSalonDetails, createAppointment } from '../lib/api';
-import { calculatePaymentBreakdown, initiatePayment, checkPaymentGatewayStatus } from '../lib/paymentService';
+import { calculatePaymentBreakdown, initiatePayment, checkPaymentGatewayStatus, fetchReceiptByReference } from '../lib/paymentService';
 import { createFirestoreTransaction } from '../lib/firestoreService';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
 import { useNotifications } from '../context/NotificationContext';
@@ -87,6 +91,61 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     liveAvailable: false,
     gatewayName: 'PayMongo Philippines',
   });
+
+  // PayMongo Automatic Checkout States
+  const [checkoutStage, setCheckoutStage] = useState<'idle' | 'redirecting' | 'interactive_checkout'>('idle');
+  const [redirectCountdown, setRedirectCountdown] = useState<number>(2);
+  const [activePaymentSession, setActivePaymentSession] = useState<{
+    appointment: Appointment;
+    transaction: PaymentTransaction;
+    amountDue: number;
+    checkoutUrl?: string;
+    salonName: string;
+    appointmentId: number;
+  } | null>(null);
+
+  // PayMongo Interactive Simulation Form States
+  const [paymongoMethodTab, setPaymongoMethodTab] = useState<'gcash' | 'maya' | 'card'>('gcash');
+  const [gcashPhone, setGcashPhone] = useState<string>('');
+  const [gcashOtp, setGcashOtp] = useState<string>('');
+  const [otpSent, setOtpSent] = useState<boolean>(true);
+  const [mayaAccount, setMayaAccount] = useState<string>('');
+  const [cardNumber, setCardNumber] = useState<string>('');
+  const [cardExpiry, setCardExpiry] = useState<string>('');
+  const [cardCvv, setCardCvv] = useState<string>('');
+  const [cardHolder, setCardHolder] = useState<string>('');
+  const [isAuthorizingPayment, setIsAuthorizingPayment] = useState<boolean>(false);
+  const [authorizationStepMsg, setAuthorizationStepMsg] = useState<string>('');
+  const [paymongoCountdown, setPaymongoCountdown] = useState<number>(899); // 14:59
+
+  // PayMongo Countdown Timer
+  useEffect(() => {
+    if (checkoutStage !== 'interactive_checkout' || paymongoCountdown <= 0) return;
+    const interval = setInterval(() => {
+      setPaymongoCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [checkoutStage, paymongoCountdown]);
+
+  // Live Mode Automatic Redirect Effect
+  useEffect(() => {
+    if (checkoutStage !== 'redirecting' || !livePaymongoCheckoutUrl) return;
+    const interval = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          try {
+            window.location.href = livePaymongoCheckoutUrl;
+          } catch (e) {
+            console.warn('Direct location navigation fallback:', e);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [checkoutStage, livePaymongoCheckoutUrl]);
 
   // Check backend payment gateway status on mount
   useEffect(() => {
@@ -217,6 +276,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     setDesignImageName(null);
   };
 
+  const paymentBreakdown = React.useMemo(() => {
+    return calculatePaymentBreakdown(Number(currentService?.price) || 0, paymentType);
+  }, [currentService?.price, paymentType]);
+
   const handleSubmitBooking = async () => {
     if (!currentService) return;
     setValidationError(null);
@@ -252,8 +315,68 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
     try {
       const breakdown = calculatePaymentBreakdown(Number(currentService.price) || 0, paymentType);
+      const isOnlinePaymongo = paymentType !== 'pay_at_salon' && paymentMethod !== 'pay_in_salon';
 
-      // Process payment through Dual-Mode service
+      // 1. If physical in-salon counter payment, create appointment directly and confirm
+      if (!isOnlinePaymongo) {
+        const res = await createAppointment({
+          customer_id: currentUser?.id || 0,
+          customer_name: fullName || 'Guest Client',
+          customer_phone: cleanPhone,
+          customer_email: email || '',
+          salon_id: selectedSalonId,
+          salon_name: currentSalon?.salon_name,
+          service_id: currentService.id,
+          service_name: currentService.service_name,
+          service_duration: currentService.duration,
+          technician_id: selectedStaffId,
+          staff_name: currentTech?.fullname || 'Any Available Specialist',
+          appointment_date: appointmentDate,
+          appointment_time: appointmentTime,
+          status: 'pending',
+          notes,
+          design_image: designImage || undefined,
+          payment_method: 'pay_in_salon',
+          payment_type: 'pay_at_salon',
+          payment_status: 'unpaid',
+          paid_amount: 0,
+          remaining_balance: Number(currentService.price) || 0,
+        });
+
+        if (res.success && res.appointment) {
+          setConfirmedAppt(res.appointment);
+          setStep(6);
+          onSuccess(res.appointment);
+
+          addNotification({
+            recipient_role: 'customer',
+            recipient_user_id: currentUser?.id,
+            category: 'bookings',
+            title: 'Booking Confirmed! 🎉',
+            message: `Your appointment for ${currentService.service_name} at ${currentSalon?.salon_name || 'the salon'} on ${appointmentDate} at ${appointmentTime} is confirmed. Settle at salon counter.`,
+            type: 'booking_confirmed',
+            priority: 'normal',
+            linkTab: 'customer-dashboard',
+            metadata: { appointmentId: res.appointment.id },
+          });
+
+          addNotification({
+            recipient_role: 'salon_owner',
+            recipient_salon_id: selectedSalonId,
+            category: 'bookings',
+            title: 'New Customer Booking 📅',
+            message: `${fullName || 'Client'} booked ${currentService.service_name} for ${appointmentDate} at ${appointmentTime} (Pay In-Store).`,
+            type: 'booking_new',
+            priority: 'urgent',
+            linkTab: 'owner-appointments',
+            metadata: { appointmentId: res.appointment.id },
+          });
+        }
+        return;
+      }
+
+      // 2. PayMongo Online Checkout Flow
+      // Step A: Initiate charge session on backend
       const paymentResult = await initiatePayment(
         {
           entityType: 'appointment',
@@ -271,14 +394,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       );
 
       const chargedAmount = paymentResult.transaction?.amount || breakdown.dueNow;
-      const computedPaymentStatus =
-        paymentType === 'pay_at_salon'
-          ? 'unpaid'
-          : paymentType === 'deposit'
-          ? 'deposit_paid'
-          : 'fully_paid';
 
-      // Create appointment record with payment telemetry
+      // Step B: Create appointment with 'pending' payment status until checkout completes
       const res = await createAppointment({
         customer_id: currentUser?.id || 0,
         customer_name: fullName || 'Guest Client',
@@ -298,107 +415,73 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         design_image: designImage || undefined,
         payment_method: paymentMethod,
         payment_type: paymentType,
-        payment_status: computedPaymentStatus,
-        paid_amount: chargedAmount,
-        remaining_balance: breakdown.remainingBalance,
+        payment_status: 'unpaid',
+        paid_amount: 0,
+        remaining_balance: Number(currentService.price) || 0,
         transaction_reference: paymentResult.transaction?.transaction_reference,
       });
 
-      if (res.success && res.appointment) {
-        // Sync transaction to Firestore & prepare full transaction record
-        const fullTx: PaymentTransaction = paymentResult.transaction
-          ? {
-              ...paymentResult.transaction,
-              entity_id: res.appointment.id,
-            }
-          : {
-              id: Date.now(),
-              transaction_reference:
-                res.appointment.transaction_reference || `TX-PM-${Date.now().toString(36).toUpperCase()}`,
-              entity_type: 'appointment',
-              entity_id: res.appointment.id,
-              customer_id: res.appointment.customer_id,
-              customer_name: res.appointment.customer_name || fullName || 'Valued Client',
-              customer_email: res.appointment.customer_email || email || '',
-              customer_phone: res.appointment.customer_phone || phone || '',
-              salon_id: res.appointment.salon_id,
-              salon_name: res.appointment.salon_name || currentSalon?.salon_name || 'Nail Salon',
-              amount: chargedAmount,
-              total_service_price: Number(currentService.price) || 0,
-              remaining_balance: breakdown.remainingBalance,
-              currency: 'PHP',
-              payment_method: paymentMethod,
-              payment_type: paymentType,
-              payment_status: 'succeeded',
-              provider: paymentResult.mode === 'live' ? 'paymongo_live' : 'paymongo_sandbox',
-              receipt_number: `REC-PM-${Math.floor(100000 + Math.random() * 900000)}`,
-              created_at: new Date().toISOString(),
-            };
+      if (!res.success || !res.appointment) {
+        throw new Error('Failed to register appointment. Please try again.');
+      }
 
-        setConfirmedTx(fullTx);
-        createFirestoreTransaction(fullTx).catch((err) =>
-          console.warn('Firestore transaction sync warning:', err)
-        );
+      const activeSession = {
+        appointment: res.appointment,
+        transaction: {
+          ...paymentResult.transaction,
+          entity_id: res.appointment.id,
+        },
+        amountDue: chargedAmount,
+        checkoutUrl: paymentResult.checkoutUrl,
+        salonName: currentSalon?.salon_name || 'Nail Glam Hub',
+        appointmentId: res.appointment.id,
+      };
 
-        // Persist receipt state in localStorage so return from PayMongo redirect preserves receipt
+      setActivePaymentSession(activeSession);
+
+      // Pre-fill PayMongo simulator fields
+      setGcashPhone(cleanPhone.startsWith('09') ? cleanPhone : '09171234567');
+      setMayaAccount(cleanPhone.startsWith('09') ? cleanPhone : '09181234567');
+      setCardHolder(fullName || 'Valued Client');
+      if (paymentMethod === 'paymongo_maya') {
+        setPaymongoMethodTab('maya');
+      } else if (paymentMethod === 'paymongo_card') {
+        setPaymongoMethodTab('card');
+      } else {
+        setPaymongoMethodTab('gcash');
+      }
+
+      // Step C: Trigger automatic checkout!
+      if (paymentResult.checkoutUrl && !isSandboxMode) {
+        // Real Live PayMongo Checkout: Automatic Redirect Screen
+        setCheckoutStage('redirecting');
+        setLivePaymongoCheckoutUrl(paymentResult.checkoutUrl);
         const receiptPayload = {
           appointment: res.appointment,
-          transaction: fullTx,
+          transaction: activeSession.transaction,
           salon: currentSalon,
           checkoutUrl: paymentResult.checkoutUrl,
           timestamp: new Date().toISOString(),
         };
-
         safeLocalStorage.setJSON('nailglamhub_active_receipt', receiptPayload);
-        if (fullTx.transaction_reference) {
+        if (activeSession.transaction.transaction_reference) {
           safeLocalStorage.setJSON(
-            `nailglamhub_receipt_${fullTx.transaction_reference}`,
+            `nailglamhub_receipt_${activeSession.transaction.transaction_reference}`,
             receiptPayload
           );
         }
-
-        if (paymentResult.checkoutUrl) {
-          setLivePaymongoCheckoutUrl(paymentResult.checkoutUrl);
-        }
-
-        setConfirmedAppt(res.appointment);
-        setStep(6); // Step 6: Confirmation
-        onSuccess(res.appointment);
-
-        // Instant Notification for the Client
-        addNotification({
-          recipient_role: 'customer',
-          recipient_user_id: currentUser?.id,
-          category: 'bookings',
-          title: 'Booking Confirmed! 🎉',
-          message: `Your appointment for ${currentService.service_name} at ${currentSalon?.salon_name || 'the salon'} on ${appointmentDate} at ${appointmentTime} is confirmed.`,
-          type: 'booking_confirmed',
-          priority: 'normal',
-          linkTab: 'customer-dashboard',
-          metadata: { appointmentId: res.appointment.id },
-        });
-
-        // Instant Notification for the Salon Owner
-        addNotification({
-          recipient_role: 'salon_owner',
-          recipient_salon_id: selectedSalonId,
-          category: 'bookings',
-          title: 'New Customer Booking 📅',
-          message: `${fullName || 'Client'} booked ${currentService.service_name} for ${appointmentDate} at ${appointmentTime}.`,
-          type: 'booking_new',
-          priority: 'urgent',
-          linkTab: 'owner-appointments',
-          metadata: { appointmentId: res.appointment.id },
-        });
-
-        // If a real PayMongo checkout session URL was returned, open PayMongo
-        if (paymentResult.checkoutUrl && !isSandboxMode) {
+        // Seamless automatic navigation to PayMongo (without popup blocking)
+        setTimeout(() => {
           try {
-            window.open(paymentResult.checkoutUrl, '_blank', 'noopener,noreferrer');
+            window.location.href = paymentResult.checkoutUrl!;
           } catch (e) {
-            console.warn('Popup blocked, customer can click the PayMongo payment link:', e);
+            console.warn('Direct location navigation fallback:', e);
           }
-        }
+        }, 1200);
+      } else {
+        // Interactive PayMongo Automatic Checkout Interface
+        setCheckoutStage('interactive_checkout');
+        setPaymongoCountdown(899);
       }
     } catch (err) {
       console.error('Booking submission error:', err);
@@ -410,38 +493,144 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     }
   };
 
-  const paymentBreakdown = React.useMemo(() => {
-    return calculatePaymentBreakdown(Number(currentService?.price) || 0, paymentType);
-  }, [currentService?.price, paymentType]);
+  const handleCompleteInteractivePayment = async (_chosenMethod?: 'gcash' | 'maya' | 'card') => {
+    if (!activePaymentSession) return;
+    setIsAuthorizingPayment(true);
+    setAuthorizationStepMsg('Connecting to PayMongo Philippines gateway...');
+
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      setAuthorizationStepMsg('Authorizing payment with issuer...');
+
+      const txRef = activePaymentSession.transaction.transaction_reference;
+      // Finalize transaction and appointment on backend
+      const verifyRes = await fetchReceiptByReference(txRef, 'success');
+
+      await new Promise((r) => setTimeout(r, 400));
+      setAuthorizationStepMsg('Payment verified & approved!');
+
+      const updatedAppt: Appointment = verifyRes.data?.appointment || {
+        ...activePaymentSession.appointment,
+        payment_status: paymentType === 'full_payment' ? 'fully_paid' : 'deposit_paid',
+        paid_amount: activePaymentSession.amountDue,
+        remaining_balance: Math.max(0, Number(currentService?.price || 0) - activePaymentSession.amountDue),
+      };
+
+      const updatedTx: PaymentTransaction = verifyRes.data?.transaction || {
+        ...activePaymentSession.transaction,
+        payment_status: 'succeeded',
+        amount: activePaymentSession.amountDue,
+      };
+
+      setConfirmedAppt(updatedAppt);
+      setConfirmedTx(updatedTx);
+
+      // Persist verified receipt
+      const receiptPayload = {
+        appointment: updatedAppt,
+        transaction: updatedTx,
+        salon: currentSalon,
+        timestamp: new Date().toISOString(),
+      };
+      safeLocalStorage.setJSON('nailglamhub_active_receipt', receiptPayload);
+      if (txRef) {
+        safeLocalStorage.setJSON(`nailglamhub_receipt_${txRef}`, receiptPayload);
+      }
+
+      createFirestoreTransaction(updatedTx).catch((err) =>
+        console.warn('Firestore transaction sync warning:', err)
+      );
+
+      // Add instant notification for client & salon owner
+      addNotification({
+        recipient_role: 'customer',
+        recipient_user_id: currentUser?.id,
+        category: 'bookings',
+        title: 'Payment Verified & Booking Confirmed! 🎉',
+        message: `Your payment of ₱${activePaymentSession.amountDue.toLocaleString()} via PayMongo is verified. Appointment with ${currentSalon?.salon_name} is confirmed!`,
+        type: 'booking_confirmed',
+        priority: 'normal',
+        linkTab: 'customer-dashboard',
+        metadata: { appointmentId: updatedAppt.id },
+      });
+
+      addNotification({
+        recipient_role: 'salon_owner',
+        recipient_salon_id: selectedSalonId,
+        category: 'bookings',
+        title: 'New Paid Booking 💳',
+        message: `${fullName || 'Client'} paid ₱${activePaymentSession.amountDue.toLocaleString()} via PayMongo for ${currentService?.service_name}.`,
+        type: 'booking_new',
+        priority: 'urgent',
+        linkTab: 'owner-appointments',
+        metadata: { appointmentId: updatedAppt.id },
+      });
+
+      setCheckoutStage('idle');
+      setStep(6);
+      onSuccess(updatedAppt);
+    } catch (err: any) {
+      console.error('Interactive payment authorization error:', err);
+      setValidationError('Payment authorization failed. Please try again or choose another payment method.');
+    } finally {
+      setIsAuthorizingPayment(false);
+      setAuthorizationStepMsg('');
+    }
+  };
+
+  const handleCancelInteractivePayment = async () => {
+    if (activePaymentSession?.transaction?.transaction_reference) {
+      await fetchReceiptByReference(activePaymentSession.transaction.transaction_reference, 'cancelled').catch(() => {});
+    }
+    setCheckoutStage('idle');
+    setValidationError('PayMongo checkout was cancelled. You can retry paying with PayMongo or choose Pay in Salon.');
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-[calc(100vw-1rem)] sm:max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-pink-100 max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-3.5 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex items-center justify-between shrink-0">
+        <div className={`px-3.5 sm:px-6 py-3 sm:py-4 text-white flex items-center justify-between shrink-0 transition-colors ${
+          checkoutStage === 'interactive_checkout' || checkoutStage === 'redirecting'
+            ? 'bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900'
+            : 'bg-gradient-to-r from-pink-600 to-rose-600'
+        }`}>
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+              {checkoutStage === 'interactive_checkout' || checkoutStage === 'redirecting' ? (
+                <ShieldCheck className="w-4 h-4 text-emerald-200" />
+              ) : (
+                <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+              )}
             </div>
             <div className="min-w-0">
               <h3 className="font-serif font-bold text-xs sm:text-lg truncate">
-                Book Your Nail Appointment
+                {checkoutStage === 'interactive_checkout'
+                  ? 'PayMongo Philippines — Secure Checkout'
+                  : checkoutStage === 'redirecting'
+                  ? 'Transferring to PayMongo...'
+                  : 'Book Your Nail Appointment'}
               </h3>
               <p className="text-[10px] sm:text-[11px] text-pink-100 truncate">
-                Step {step} of 5 — {currentSalon?.salon_name}
+                {checkoutStage === 'interactive_checkout'
+                  ? `PCI-DSS Level 1 • Ref: ${activePaymentSession?.transaction.transaction_reference || 'Online'}`
+                  : checkoutStage === 'redirecting'
+                  ? 'Connecting to secure payment portal...'
+                  : `Step ${step} of 5 — ${currentSalon?.salon_name}`}
               </p>
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={checkoutStage === 'interactive_checkout' ? handleCancelInteractivePayment : onClose}
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-1.5"
+            title={checkoutStage === 'interactive_checkout' ? 'Cancel checkout' : 'Close'}
           >
             <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* Stepper Progress Bar */}
-        {step < 6 && (
+        {step < 6 && checkoutStage === 'idle' && (
           <div className="px-3 sm:px-6 py-2.5 sm:py-3 bg-pink-50/70 border-b border-pink-100 shrink-0">
             {/* Mobile Stepper Header (< sm) */}
             <div className="sm:hidden flex items-center justify-between text-xs mb-1.5">
@@ -967,7 +1156,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           )}
 
           {/* STEP 5: PAYMENT SELECTION (DUAL-MODE PAYMONGO) */}
-          {step === 5 && (
+          {step === 5 && checkoutStage === 'idle' && (
             <div className="space-y-5 sm:space-y-6 max-w-full">
               <div>
                 <h4 className="font-serif font-bold text-base sm:text-lg text-gray-900">
@@ -1196,6 +1385,445 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             </div>
           )}
 
+          {/* PAYMONGO AUTOMATIC REDIRECT SCREEN (LIVE GATEWAY MODE) */}
+          {checkoutStage === 'redirecting' && (
+            <div className="py-8 sm:py-12 text-center space-y-5 max-w-lg mx-auto">
+              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
+                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center shadow-inner">
+                  <ExternalLink className="w-6 h-6 animate-pulse" />
+                </div>
+              </div>
+
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold uppercase tracking-wider mb-2">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Live PayMongo Gateway
+                </span>
+                <h4 className="text-xl sm:text-2xl font-serif font-bold text-gray-900">
+                  Redirecting to PayMongo Checkout...
+                </h4>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 max-w-sm mx-auto">
+                  Automatically transferring you to the secure PayMongo Philippine payment portal in{' '}
+                  <strong className="text-emerald-700">{redirectCountdown}s</strong>.
+                </p>
+              </div>
+
+              {activePaymentSession && (
+                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-left text-xs space-y-2">
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Payee Merchant:</span>
+                    <strong className="text-gray-900">{activePaymentSession.salonName}</strong>
+                  </div>
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Transaction Reference:</span>
+                    <strong className="font-mono text-emerald-800 break-all">{activePaymentSession.transaction.transaction_reference}</strong>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-emerald-200/80 font-bold text-sm">
+                    <span className="text-gray-900">Amount Due:</span>
+                    <span className="text-emerald-800 text-base">₱{activePaymentSession.amountDue.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+                {livePaymongoCheckoutUrl && (
+                  <a
+                    href={livePaymongoCheckoutUrl}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span>Click Here if Not Redirected</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCancelInteractivePayment}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel & Return
+                </button>
+              </div>
+
+              <p className="text-[11px] text-gray-400">
+                🔒 256-bit SSL encrypted connection directly to PayMongo Philippines
+              </p>
+            </div>
+          )}
+
+          {/* PAYMONGO AUTOMATIC INTERACTIVE CHECKOUT (SANDBOX / SIMULATION MODE) */}
+          {checkoutStage === 'interactive_checkout' && activePaymentSession && (
+            <div className="space-y-4 sm:space-y-5 max-w-full">
+              {/* PayMongo Header Card */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white shadow-md relative overflow-hidden">
+                <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-emerald-500/10 to-transparent pointer-events-none" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold tracking-wider uppercase">
+                        PayMongo Philippines
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-semibold">
+                        Sandbox / Test Gateway
+                      </span>
+                    </div>
+                    <h4 className="font-serif font-bold text-base sm:text-lg text-white truncate">
+                      {activePaymentSession.salonName}
+                    </h4>
+                    <p className="text-xs text-emerald-200/80 truncate">
+                      Booking #{activePaymentSession.appointmentId} • Ref: {activePaymentSession.transaction.transaction_reference}
+                    </p>
+                  </div>
+                  <div className="sm:text-right shrink-0 bg-white/10 sm:bg-transparent p-2 sm:p-0 rounded-xl">
+                    <span className="text-[11px] text-emerald-200 block">Total Due Now</span>
+                    <div className="text-xl sm:text-2xl font-bold text-emerald-300 font-mono">
+                      ₱{activePaymentSession.amountDue.toLocaleString()}
+                    </div>
+                    <span className="text-[10px] text-gray-300">
+                      {paymentType === 'deposit' ? '20% Slot Deposit' : 'Full 100% Service Fee'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-emerald-800/60 flex items-center justify-between text-[11px] text-emerald-200/80">
+                  <div className="flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>256-Bit Bank-Grade PCI-DSS Encrypted</span>
+                  </div>
+                  <div className="font-mono text-amber-200 font-semibold">
+                    Expires: {Math.floor(paymongoCountdown / 60)}:{(paymongoCountdown % 60).toString().padStart(2, '0')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Method Selection Tabs */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymongoMethodTab('gcash')}
+                  disabled={isAuthorizingPayment}
+                  className={`py-2 px-2 sm:px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                    paymongoMethodTab === 'gcash'
+                      ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-sm ring-2 ring-blue-500/20 font-bold'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <div className="text-xs sm:text-sm font-bold flex items-center justify-center gap-1">
+                    <Smartphone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>GCash</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 hidden sm:block">Instant E-Wallet</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymongoMethodTab('maya')}
+                  disabled={isAuthorizingPayment}
+                  className={`py-2 px-2 sm:px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                    paymongoMethodTab === 'maya'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm ring-2 ring-emerald-600/20 font-bold'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <div className="text-xs sm:text-sm font-bold flex items-center justify-center gap-1">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Maya</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 hidden sm:block">Maya Wallet / QR</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymongoMethodTab('card')}
+                  disabled={isAuthorizingPayment}
+                  className={`py-2 px-2 sm:px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                    paymongoMethodTab === 'card'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm ring-2 ring-indigo-600/20 font-bold'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <div className="text-xs sm:text-sm font-bold flex items-center justify-center gap-1">
+                    <CreditCard className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span>Credit / Debit</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 hidden sm:block">Visa • Mastercard</span>
+                </button>
+              </div>
+
+              {/* Method Form Contents */}
+              <div className="p-4 rounded-2xl bg-white border border-gray-200 space-y-4">
+                {paymongoMethodTab === 'gcash' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                          G
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-gray-900">GCash Mobile Number</div>
+                          <div className="text-[10px] text-gray-500">Philippine mobile wallet verification</div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                        Simulated OTP
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                        GCash Mobile (11-digit)
+                      </label>
+                      <input
+                        type="text"
+                        value={gcashPhone}
+                        onChange={(e) => setGcashPhone(e.target.value)}
+                        placeholder="09171234567"
+                        maxLength={11}
+                        disabled={isAuthorizingPayment}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-gray-700">
+                          One-Time PIN (OTP)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGcashOtp('123456');
+                            setOtpSent(true);
+                          }}
+                          disabled={isAuthorizingPayment}
+                          className="text-[11px] text-blue-600 hover:text-blue-700 font-semibold cursor-pointer underline"
+                        >
+                          Auto-fill Test OTP (123456)
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={gcashOtp}
+                        onChange={(e) => setGcashOtp(e.target.value)}
+                        placeholder="Enter 6-digit OTP (e.g. 123456)"
+                        maxLength={6}
+                        disabled={isAuthorizingPayment}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono tracking-widest text-center text-sm font-bold"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        In sandbox mode, any 6-digit OTP is accepted. Click the button above to autofill.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {paymongoMethodTab === 'maya' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                          M
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-gray-900">Maya Mobile / Account</div>
+                          <div className="text-[10px] text-gray-500">Maya 1-Click checkout simulator</div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
+                        Instant Approval
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                        Maya Registered Mobile
+                      </label>
+                      <input
+                        type="text"
+                        value={mayaAccount}
+                        onChange={(e) => setMayaAccount(e.target.value)}
+                        placeholder="09181234567"
+                        maxLength={11}
+                        disabled={isAuthorizingPayment}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Maya Wallet balance pre-authenticated for this sandbox session.</span>
+                    </div>
+                  </div>
+                )}
+
+                {paymongoMethodTab === 'card' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <div className="text-xs font-bold text-gray-900">Credit or Debit Card</div>
+                          <div className="text-[10px] text-gray-500">PayMongo 3D-Secure 2.0 Card Simulator</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCardNumber('4111 2222 3333 4444');
+                            setCardExpiry('12/28');
+                            setCardCvv('123');
+                          }}
+                          disabled={isAuthorizingPayment}
+                          className="text-[10px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-semibold cursor-pointer"
+                        >
+                          Use Test Visa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCardNumber('5555 5555 5555 4444');
+                            setCardExpiry('10/27');
+                            setCardCvv('888');
+                          }}
+                          disabled={isAuthorizingPayment}
+                          className="text-[10px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-semibold cursor-pointer"
+                        >
+                          Use Test MC
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                        Card Number
+                      </label>
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        placeholder="4111 2222 3333 4444"
+                        maxLength={19}
+                        disabled={isAuthorizingPayment}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                          Expiry (MM/YY)
+                        </label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          placeholder="12/28"
+                          maxLength={5}
+                          disabled={isAuthorizingPayment}
+                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                          CVV / CVC
+                        </label>
+                        <input
+                          type="password"
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value)}
+                          placeholder="123"
+                          maxLength={4}
+                          disabled={isAuthorizingPayment}
+                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                        Cardholder Name
+                      </label>
+                      <input
+                        type="text"
+                        value={cardHolder}
+                        onChange={(e) => setCardHolder(e.target.value)}
+                        placeholder="Valued Client"
+                        disabled={isAuthorizingPayment}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* In-Flight Processing Banner */}
+              {isAuthorizingPayment && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3 animate-pulse">
+                  <Loader2 className="w-5 h-5 text-emerald-600 animate-spin shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-emerald-900">
+                      Processing PayMongo Payment...
+                    </div>
+                    <div className="text-[11px] text-emerald-700 truncate">
+                      {authorizationStepMsg || 'Contacting acquiring bank...'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isAuthorizingPayment}
+                  onClick={() => handleCompleteInteractivePayment(paymongoMethodTab)}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 disabled:opacity-60 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  {isAuthorizingPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Authorizing Payment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      <span>
+                        Authorize & Pay ₱{activePaymentSession.amountDue.toLocaleString()} via{' '}
+                        {paymongoMethodTab === 'gcash'
+                          ? 'GCash'
+                          : paymongoMethodTab === 'maya'
+                          ? 'Maya'
+                          : 'Card'}
+                      </span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <button
+                    type="button"
+                    disabled={isAuthorizingPayment}
+                    onClick={handleCancelInteractivePayment}
+                    className="text-gray-500 hover:text-gray-700 font-medium cursor-pointer underline flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Cancel Checkout & Change Method</span>
+                  </button>
+                  <span className="text-[11px] text-gray-400">
+                    Appointment will remain pending until payment
+                  </span>
+                </div>
+              </div>
+
+              {/* PayMongo Footer Badge */}
+              <div className="pt-2 text-center text-[10px] text-gray-400 space-y-0.5">
+                <p>Secured by PayMongo Payments, Inc. • BSP Registered Operator of Payment System</p>
+                <p>PCI-DSS Level 1 Compliant • 256-bit SSL Bank Security</p>
+              </div>
+            </div>
+          )}
+
           {/* STEP 6: BOOKING CONFIRMED & PAYMENT RECEIPT */}
           {step === 6 && confirmedAppt && (
             <div className="py-4 sm:py-6 text-center space-y-4 max-w-full overflow-hidden">
@@ -1322,7 +1950,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         </div>
 
         {/* Footer Navigation Buttons */}
-        {step < 6 && (
+        {step < 6 && checkoutStage === 'idle' && (
           <div className="p-3 sm:p-4 bg-gray-50 border-t border-pink-100 flex items-center justify-between gap-2 shrink-0">
             {step > 1 ? (
               <button
@@ -1383,7 +2011,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 className="px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition-all shadow-md shadow-pink-500/20 flex items-center gap-1.5 sm:gap-2 cursor-pointer min-w-0"
               >
                 {submitting ? (
-                  <span>Processing...</span>
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin shrink-0" />
+                    <span>Preparing Checkout...</span>
+                  </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -1395,7 +2026,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                     <span className="hidden sm:inline">
                       {paymentType === 'pay_at_salon'
                         ? 'Confirm Booking (Pay In-Salon)'
-                        : `Pay ₱${paymentBreakdown.dueNow.toLocaleString()} & Confirm`}
+                        : `Proceed to PayMongo Checkout (₱${paymentBreakdown.dueNow.toLocaleString()})`}
                     </span>
                   </>
                 )}

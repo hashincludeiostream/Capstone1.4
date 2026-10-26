@@ -6832,15 +6832,24 @@ async function startServer() {
           );
           transaction.payment_status = 'succeeded';
         }
+        if (transaction && (!transaction.entity_id || Number(transaction.entity_id) === 0) && appointment?.id) {
+          await db.execute(
+            "UPDATE transactions SET entity_id = ? WHERE transaction_reference = ?",
+            [Number(appointment.id), ref]
+          );
+          transaction.entity_id = Number(appointment.id);
+        }
         if (appointment) {
           const targetStatus = appointment.payment_type === 'full_payment' ? 'fully_paid' : 'deposit_paid';
-          if (appointment.payment_status !== targetStatus) {
-            await db.execute(
-              "UPDATE appointments SET payment_status = ? WHERE id = ?",
-              [targetStatus, appointment.id]
-            );
-            appointment.payment_status = targetStatus;
-          }
+          const targetPaid = transaction ? Number(transaction.amount || 0) : Number(appointment.paid_amount || 0);
+          const targetRemaining = transaction ? Number(transaction.remaining_balance || 0) : Math.max(0, Number(appointment.total_price || 0) - targetPaid);
+          await db.execute(
+            "UPDATE appointments SET payment_status = ?, paid_amount = ?, remaining_balance = ? WHERE id = ?",
+            [targetStatus, targetPaid, targetRemaining, appointment.id]
+          );
+          appointment.payment_status = targetStatus;
+          appointment.paid_amount = targetPaid;
+          appointment.remaining_balance = targetRemaining;
         }
       } else if (isCancelled) {
         if (transaction && transaction.payment_status === 'pending') {
@@ -6850,6 +6859,13 @@ async function startServer() {
             [failStatus, ref]
           );
           transaction.payment_status = failStatus;
+        }
+        if (appointment && appointment.payment_status === 'pending') {
+          await db.execute(
+            "UPDATE appointments SET payment_status = 'unpaid' WHERE id = ?",
+            [appointment.id]
+          );
+          appointment.payment_status = 'unpaid';
         }
       }
 
