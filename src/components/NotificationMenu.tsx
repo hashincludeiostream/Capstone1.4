@@ -35,6 +35,7 @@ import {
 } from '../types';
 import { NotificationBadge } from './common/NotificationBadge';
 import { useNotifications, SystemNotification } from '../context/NotificationContext';
+import { formatTimeTo12Hour, getAppointmentSortTimestamp } from '../lib/timeUtils';
 
 export interface NotificationMenuProps {
   currentUser: UserType | null;
@@ -192,19 +193,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
 
   // Helper to extract recency timestamp for appointments (LIFO)
   const getApptRecency = (a: Appointment): number => {
-    const dates = [a.updated_at, a.cancelled_at, a.created_at];
-    for (const d of dates) {
-      if (d) {
-        const parsed = new Date(d).getTime();
-        if (!isNaN(parsed) && parsed > 0) return parsed;
-      }
-    }
-    if (a.appointment_date) {
-      const timeStr = a.appointment_time ? `T${a.appointment_time.length === 5 ? a.appointment_time : '00:00'}` : 'T00:00';
-      const parsed = new Date(`${a.appointment_date}${timeStr}`).getTime();
-      if (!isNaN(parsed) && parsed > 0) return parsed;
-    }
-    return Number(a.id) || 0;
+    return getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at) || Number(a.id) || 0;
   };
 
   // Helper to extract recency timestamp for product orders (LIFO)
@@ -413,7 +402,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
       trashedItems.push({
         id: key,
         title: a.service_name || 'Appointment',
-        subtitle: `${a.appointment_date} at ${a.appointment_time} (${a.salon_name})`,
+        subtitle: `${a.appointment_date} at ${formatTimeTo12Hour(a.appointment_time)} (${a.salon_name})`,
         category: 'Booking',
         timestamp: getApptRecency(a),
       });
@@ -427,7 +416,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
       trashedItems.push({
         id: key,
         title: `${a.customer_name || 'Client'} - ${a.service_name}`,
-        subtitle: `${a.appointment_date} at ${a.appointment_time}`,
+        subtitle: `${a.appointment_date} at ${formatTimeTo12Hour(a.appointment_time)}`,
         category: 'Booking',
         timestamp: getApptRecency(a),
       });
@@ -830,7 +819,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                       <span>Salon Owner Cancelled Booking</span>
                                     </div>
                                     <p className="text-[11px] text-rose-900 truncate mt-0.5">
-                                      {appt.salon_name || 'Salon'} cancelled {appt.service_name} ({appt.appointment_date} at {appt.appointment_time})
+                                      {appt.salon_name || 'Salon'} cancelled {appt.service_name} ({appt.appointment_date} at {formatTimeTo12Hour(appt.appointment_time)})
                                     </p>
                                     {appt.cancellation_reason && (
                                       <p className="text-[10px] text-rose-700 italic truncate mt-0.5">
@@ -853,7 +842,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                       </p>
                                     </div>
                                     <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                                      {appt.appointment_date} • {appt.appointment_time}
+                                      {appt.appointment_date} • {formatTimeTo12Hour(appt.appointment_time)}
                                       {appt.salon_name ? ` • ${appt.salon_name}` : ''}
                                     </p>
                                   </div>
@@ -957,7 +946,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   {appt.customer_name || 'Client'} • {appt.service_name}
                                 </p>
                                 <p className="text-[11px] text-amber-800 truncate mt-0.5">
-                                  {appt.appointment_date} at {appt.appointment_time}
+                                  {appt.appointment_date} at {formatTimeTo12Hour(appt.appointment_time)}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
@@ -1003,7 +992,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   {appt.customer_name || 'Client'} • {appt.service_name}
                                 </p>
                                 <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                                  {appt.appointment_date} at {appt.appointment_time}
+                                  {appt.appointment_date} at {formatTimeTo12Hour(appt.appointment_time)}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">

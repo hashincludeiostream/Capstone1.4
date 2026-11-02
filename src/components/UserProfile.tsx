@@ -37,6 +37,7 @@ import { User as UserType, Salon, Appointment, ProductOrder } from '../types';
 import { fetchAppointments, updateUser, changePassword } from '../lib/api';
 import { processImageFile, PRESET_AVATARS } from '../utils/imageUploadHelper';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
+import { formatTimeTo12Hour } from '../lib/timeUtils';
 
 interface UserProfileProps {
   currentUser: UserType;
@@ -980,7 +981,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-gray-400" />
-                        <span>{apt.appointment_time}</span>
+                        <span>{formatTimeTo12Hour(apt.appointment_time)}</span>
                       </div>
                     </div>
                   </div>

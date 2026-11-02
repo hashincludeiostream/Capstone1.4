@@ -17,6 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { Appointment, PaymentTransaction, Salon } from '../../types';
+import { formatTimeTo12Hour } from '../../lib/timeUtils';
 
 interface PaymentReceiptModalProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const specialist =
     appointment?.staff_name || appointment?.technician_name || 'Any Specialist';
   const apptDate = appointment?.appointment_date || new Date().toISOString().split('T')[0];
-  const apptTime = appointment?.appointment_time || '10:00 AM';
+  const apptTime = formatTimeTo12Hour(appointment?.appointment_time) || '10:00 AM';
 
   const amountPaid = Number(
     transaction?.amount ?? appointment?.paid_amount ?? 0

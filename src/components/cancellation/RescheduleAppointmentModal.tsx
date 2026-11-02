@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { Appointment } from '../../types';
+import { formatTimeTo12Hour } from '../../lib/timeUtils';
 
 interface RescheduleAppointmentModalProps {
   isOpen: boolean;
@@ -126,7 +127,7 @@ export const RescheduleAppointmentModal: React.FC<RescheduleAppointmentModalProp
             </div>
             <div className="flex justify-between items-center gap-2">
               <span className="shrink-0 text-gray-600">Originally Scheduled:</span>
-              <span className="line-through text-purple-700 truncate">{appointment.appointment_date} @ {appointment.appointment_time}</span>
+              <span className="line-through text-purple-700 truncate">{appointment.appointment_date} @ {formatTimeTo12Hour(appointment.appointment_time)}</span>
             </div>
           </div>
 

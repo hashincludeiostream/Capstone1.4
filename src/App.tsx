@@ -70,6 +70,7 @@ import { scrollToElement } from './utils/scrollHelper';
 import { NotificationProvider } from './context/NotificationContext';
 import { NotificationBadge } from './components/common/NotificationBadge';
 import { SiteAnnouncementBar } from './components/common/SiteAnnouncementBar';
+import { getAppointmentSortTimestamp } from './lib/timeUtils';
 
 export const App: React.FC = () => {
   return (
@@ -423,9 +424,9 @@ const AppContent: React.FC = () => {
     try {
       const appts = await fetchAppointments({ customer_id: currentUser.id });
       const sortedAppts = (Array.isArray(appts) ? appts : []).sort((a, b) => {
-        const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
-        const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
-        if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+        const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+        const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+        if (timeB !== timeA) return timeB - timeA;
         return Number(b.id || 0) - Number(a.id || 0);
       });
       setCustomerAppointments(sortedAppts);
@@ -502,9 +503,9 @@ const AppContent: React.FC = () => {
         );
 
         apptsAcc.sort((a, b) => {
-          const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
-          const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
-          if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+          const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+          const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+          if (timeB !== timeA) return timeB - timeA;
           return Number(b.id || 0) - Number(a.id || 0);
         });
 
@@ -558,9 +559,9 @@ const AppContent: React.FC = () => {
               const otherSalonAppts = prev.filter((a) => a.salon_id !== s.id);
               const merged = [...otherSalonAppts, ...liveAppts];
               return merged.sort((a, b) => {
-                const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
-                const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
-                if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+                const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+                const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+                if (timeB !== timeA) return timeB - timeA;
                 return Number(b.id || 0) - Number(a.id || 0);
               });
             });
@@ -2145,18 +2146,20 @@ const AppContent: React.FC = () => {
       />
 
       {/* 10. In-Store Product Reservation Checkout Modal */}
-      <ProductCheckoutModal
-        isOpen={checkoutModalOpen}
-        onClose={() => setCheckoutModalOpen(false)}
-        cartItems={cartItems}
-        currentUser={currentUser}
-        salons={salons}
-        onOrderSuccess={handleOrderSuccess}
-        onViewMyOrders={() => {
-          setCheckoutModalOpen(false);
-          setActiveTab('customer-orders');
-        }}
-      />
+      {checkoutModalOpen && (
+        <ProductCheckoutModal
+          isOpen={checkoutModalOpen}
+          onClose={() => setCheckoutModalOpen(false)}
+          cartItems={cartItems}
+          currentUser={currentUser}
+          salons={salons}
+          onOrderSuccess={handleOrderSuccess}
+          onViewMyOrders={() => {
+            setCheckoutModalOpen(false);
+            setActiveTab('customer-orders');
+          }}
+        />
+      )}
 
       {/* 11. Mobile Bottom Navigation Bar */}
       <MobileBottomNav

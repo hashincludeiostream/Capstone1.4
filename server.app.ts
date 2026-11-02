@@ -750,7 +750,7 @@ function isFutureDate(dateString: string): boolean {
 
 function parseTimeToMinutes(timeStr: string): number {
   if (!timeStr) return 0;
-  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*(AM|PM))?$/i);
   if (!match) return 0;
   let hours = parseInt(match[1], 10);
   const minutes = parseInt(match[2], 10);
@@ -765,7 +765,7 @@ function formatMinutesToTime(totalMinutes: number): string {
   const m = totalMinutes % 60;
   const period = h >= 12 ? 'PM' : 'AM';
   const displayH = h % 12 === 0 ? 12 : h % 12;
-  return `${displayH}:${String(m).padStart(2, '0')} ${period}`;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
 }
 
 async function checkAppointmentConflict(
@@ -2006,8 +2006,7 @@ async function startServer() {
           continue;
         }
 
-        const timePart = appt.appointment_time || '10:00';
-        const scheduledTime = new Date(`${datePart}T${timePart}:00`);
+        const scheduledTime = parseAppointmentDateTime(datePart, appt.appointment_time);
         if (isNaN(scheduledTime.getTime())) continue;
 
         const diffMs = scheduledTime.getTime() - now.getTime();
@@ -2967,8 +2966,7 @@ async function startServer() {
         // Skip older bookings from past days
         if (datePart < todayStr) continue;
 
-        const timePart = appt.appointment_time || '10:00';
-        const scheduledTime = new Date(`${datePart}T${timePart}:00`);
+        const scheduledTime = parseAppointmentDateTime(datePart, appt.appointment_time);
         if (isNaN(scheduledTime.getTime())) continue;
 
         const diffMs = scheduledTime.getTime() - now.getTime();
@@ -5167,14 +5165,15 @@ async function startServer() {
         });
       }
 
-      // Validate time format (basic check)
-      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-      if (!timeRegex.test(appointment_time)) {
+      // Validate time format (supports 12-hour AM/PM and 24-hour formats)
+      const timeRegex = /^((0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)|([01]?[0-9]|2[0-3]):[0-5][0-9])$/i;
+      if (!timeRegex.test(appointment_time?.trim() || '')) {
         return res.status(400).json({ 
           error: 'Invalid time format',
-          details: 'Please provide a valid time in HH:MM format'
+          details: 'Please provide a valid time in 12-hour AM/PM format (e.g. 02:00 PM) or 24-hour format'
         });
       }
+      const normalizedAppointmentTime = formatMinutesToTime(parseTimeToMinutes(appointment_time));
       
       let technician = null;
       if (technician_id) {
@@ -5276,7 +5275,7 @@ async function startServer() {
           technician_id ? Number(technician_id) : null,
           technician ? technician.fullname : 'Any Available Specialist',
           appointment_date,
-          appointment_time,
+          normalizedAppointmentTime,
           'pending',
           notes || '',
           design_image || '',

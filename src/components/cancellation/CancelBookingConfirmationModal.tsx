@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Appointment } from '../../types';
+import { formatTimeTo12Hour } from '../../lib/timeUtils';
 
 export interface CancelBookingConfirmationModalProps {
   isOpen: boolean;
@@ -133,7 +134,7 @@ export const CancelBookingConfirmationModal: React.FC<CancelBookingConfirmationM
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                <span>{appointment.appointment_time}</span>
+                <span>{formatTimeTo12Hour(appointment.appointment_time)}</span>
               </div>
             </div>
           </div>

@@ -28,6 +28,7 @@ import { RescheduleAppointmentModal } from './cancellation/RescheduleAppointment
 import { AccountReliabilityBadge } from './cancellation/AccountReliabilityBadge';
 import { useNotifications } from '../context/NotificationContext';
 import { MessagesInboxView } from './chat/MessagesInboxView';
+import { formatTimeTo12Hour, getAppointmentSortTimestamp } from '../lib/timeUtils';
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -148,7 +149,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         recipient_salon_id: targetAppt.salon_id,
         category: 'bookings',
         title: 'Customer Cancelled Booking ⚠️',
-        message: `${currentUser.fullname || 'Client'} cancelled appointment #${appointmentId} for ${targetAppt.service_name || 'Nail Treatment'} on ${targetAppt.appointment_date} at ${targetAppt.appointment_time}. Reason: ${data.cancellation_reason}. Station is now vacant.`,
+        message: `${currentUser.fullname || 'Client'} cancelled appointment #${appointmentId} for ${targetAppt.service_name || 'Nail Treatment'} on ${targetAppt.appointment_date} at ${formatTimeTo12Hour(targetAppt.appointment_time)}. Reason: ${data.cancellation_reason}. Station is now vacant.`,
         type: 'booking_cancelled_by_customer',
         priority: 'urgent',
         linkTab: 'owner-appointments',
@@ -188,9 +189,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       return true;
     })
     .sort((a, b) => {
-      const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
-      const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
-      if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+      const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+      const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+      if (timeB !== timeA) return timeB - timeA;
       return Number(b.id || 0) - Number(a.id || 0);
     });
 
@@ -449,7 +450,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-gray-600">
                         <span className="inline-flex items-center gap-1 text-gray-700 shrink-0">
                           <Clock className="w-3.5 h-3.5 text-pink-500 shrink-0" />
-                          <span>{appt.appointment_time} ({appt.service_duration || 60}m)</span>
+                          <span>{formatTimeTo12Hour(appt.appointment_time)} ({appt.service_duration || 60}m)</span>
                         </span>
                         <span className="text-pink-200 hidden sm:inline">•</span>
                         <span className="text-gray-700 shrink-0">

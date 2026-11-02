@@ -27,6 +27,7 @@ import { calculatePaymentBreakdown, initiatePayment, checkPaymentGatewayStatus, 
 import { createFirestoreTransaction } from '../lib/firestoreService';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
 import { useNotifications } from '../context/NotificationContext';
+import { generate12HourSlots, normalizeTimeSlot, formatTimeTo12Hour } from '../lib/timeUtils';
 
 interface BookingWizardProps {
   salons: Salon[];
@@ -65,7 +66,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const defaultDate = tomorrow.toISOString().split('T')[0];
 
   const [appointmentDate, setAppointmentDate] = useState<string>(defaultDate);
-  const [appointmentTime, setAppointmentTime] = useState<string>('14:00');
+  const [appointmentTime, setAppointmentTime] = useState<string>('02:00 PM');
 
   // Customer Contact Info
   const [fullName, setFullName] = useState<string>(currentUser?.fullname || '');
@@ -200,21 +201,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     const hours = workingHours.find((item) => item.day_of_week.toLowerCase() === dayName.toLowerCase());
     if (!hours || hours.is_closed) return [];
 
-    const toMinutes = (value: string) => {
-      const [hour, minute] = value.split(':').map(Number);
-      return hour * 60 + minute;
-    };
-    const toTime = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-    const opening = toMinutes(hours.opening_time);
-    const closing = toMinutes(hours.closing_time);
     const bookedTimes = new Set(
       bookedAppointments
         .filter((appointment) => appointment.appointment_date === appointmentDate && ['pending', 'confirmed'].includes(appointment.status))
-        .map((appointment) => appointment.appointment_time)
+        .map((appointment) => normalizeTimeSlot(appointment.appointment_time))
     );
 
-    return Array.from({ length: Math.max(0, Math.floor((closing - opening) / 60)) }, (_, index) => toTime(opening + index * 60))
-      .filter((time) => !bookedTimes.has(time));
+    const slots = generate12HourSlots(hours.opening_time, hours.closing_time, 60);
+    return slots.filter((time) => !bookedTimes.has(normalizeTimeSlot(time)));
   }, [appointmentDate, bookedAppointments, workingHours]);
 
   useEffect(() => {
@@ -353,7 +347,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             recipient_user_id: currentUser?.id,
             category: 'bookings',
             title: 'Booking Confirmed! 🎉',
-            message: `Your appointment for ${currentService.service_name} at ${currentSalon?.salon_name || 'the salon'} on ${appointmentDate} at ${appointmentTime} is confirmed. Settle at salon counter.`,
+            message: `Your appointment for ${currentService.service_name} at ${currentSalon?.salon_name || 'the salon'} on ${appointmentDate} at ${formatTimeTo12Hour(appointmentTime)} is confirmed. Settle at salon counter.`,
             type: 'booking_confirmed',
             priority: 'normal',
             linkTab: 'customer-dashboard',
@@ -365,7 +359,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             recipient_salon_id: selectedSalonId,
             category: 'bookings',
             title: 'New Customer Booking 📅',
-            message: `${fullName || 'Client'} booked ${currentService.service_name} for ${appointmentDate} at ${appointmentTime} (Pay In-Store).`,
+            message: `${fullName || 'Client'} booked ${currentService.service_name} for ${appointmentDate} at ${formatTimeTo12Hour(appointmentTime)} (Pay In-Store).`,
             type: 'booking_new',
             priority: 'urgent',
             linkTab: 'owner-appointments',
@@ -1138,7 +1132,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-gray-600 shrink-0">Date &amp; Time:</span>
                   <span className="font-semibold text-gray-900 text-right min-w-0">
-                    {appointmentDate} at {appointmentTime}
+                    {appointmentDate} at {formatTimeTo12Hour(appointmentTime)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
@@ -1857,7 +1851,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-gray-500 shrink-0">Schedule:</span>
                   <span className="font-bold text-pink-700 text-right min-w-0">
-                    {confirmedAppt.appointment_date} at {confirmedAppt.appointment_time}
+                    {confirmedAppt.appointment_date} at {formatTimeTo12Hour(confirmedAppt.appointment_time)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">

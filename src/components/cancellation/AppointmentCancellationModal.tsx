@@ -20,6 +20,7 @@ import {
   APPOINTMENT_CANCELLATION_REASONS,
   CancellationTierCalculation,
 } from '../../lib/cancellationPolicy';
+import { formatTimeTo12Hour } from '../../lib/timeUtils';
 
 interface AppointmentCancellationModalProps {
   isOpen: boolean;
@@ -195,7 +196,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
                   </div>
                   <div className="flex items-center space-x-1.5">
                     <Clock className="w-4 h-4 text-gray-400" />
-                    <span>{appointment.appointment_time}</span>
+                    <span>{formatTimeTo12Hour(appointment.appointment_time)}</span>
                   </div>
                   <div className="flex items-center space-x-1.5 col-span-2">
                     <UserCheck className="w-4 h-4 text-gray-400" />
@@ -369,7 +370,7 @@ export const AppointmentCancellationModal: React.FC<AppointmentCancellationModal
                   <div className="flex justify-between py-1 border-b border-gray-200">
                     <span className="text-gray-600">Reserved Slot:</span>
                     <span className="font-semibold text-gray-900">
-                      {appointment.appointment_date} @ {appointment.appointment_time}
+                      {appointment.appointment_date} @ {formatTimeTo12Hour(appointment.appointment_time)}
                     </span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200">

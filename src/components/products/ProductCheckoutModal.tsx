@@ -39,27 +39,65 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
   onOrderSuccess,
   onViewMyOrders,
 }) => {
-  if (!isOpen) return null;
-
-  // Determine primary salon from cart items
-  const primarySalonId = cartItems[0]?.product.salon_id || (salons[0]?.id ?? 1);
-  const primarySalon = salons.find((s) => s.id === primarySalonId) || salons[0];
-
   const [customerName, setCustomerName] = useState(currentUser?.fullname || '');
   const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '');
   const [customerEmail, setCustomerEmail] = useState(currentUser?.email || '');
-  
+
   // Date default to tomorrow
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const [pickupDate, setPickupDate] = useState(tomorrow.toISOString().split('T')[0]);
-  const [pickupTime, setPickupTime] = useState('14:00');
+  const [pickupDate, setPickupDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  });
+  const [pickupTime, setPickupTime] = useState('02:00 PM');
   const [notes, setNotes] = useState('');
   const [acknowledgedTerms, setAcknowledgedTerms] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<ProductOrder | null>(null);
+
+  // Sync recipient contact info whenever modal opens or user profile changes
+  useEffect(() => {
+    if (isOpen) {
+      if (currentUser) {
+        setCustomerName(currentUser.fullname || '');
+        setCustomerPhone(currentUser.phone || '');
+        setCustomerEmail(currentUser.email || '');
+      }
+      setErrorMsg(null);
+      setSubmitting(false);
+      setConfirmedOrder(null);
+    }
+  }, [isOpen, currentUser]);
+
+  // Keyboard Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Lock body scrolling while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  // Determine primary salon from cart items
+  const primarySalonId = cartItems[0]?.product.salon_id || (salons[0]?.id ?? 1);
+  const primarySalon = salons.find((s) => s.id === primarySalonId) || salons[0];
 
   const totalAmount = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const totalCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -118,26 +156,6 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
       setSubmitting(false);
     }
   };
-
-  // Keyboard Escape key handler
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  // Lock body scrolling while modal is open
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -419,11 +437,11 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
                     onChange={(e) => setPickupTime(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 bg-stone-50/50"
                   >
-                    <option value="10:00">Morning (10:00 AM)</option>
-                    <option value="12:00">Noon (12:00 PM)</option>
-                    <option value="14:00">Afternoon (02:00 PM)</option>
-                    <option value="16:00">Late Afternoon (04:00 PM)</option>
-                    <option value="18:00">Evening (06:00 PM)</option>
+                    <option value="10:00 AM">Morning (10:00 AM)</option>
+                    <option value="12:00 PM">Noon (12:00 PM)</option>
+                    <option value="02:00 PM">Afternoon (02:00 PM)</option>
+                    <option value="04:00 PM">Late Afternoon (04:00 PM)</option>
+                    <option value="06:00 PM">Evening (06:00 PM)</option>
                   </select>
                 </div>
               </div>

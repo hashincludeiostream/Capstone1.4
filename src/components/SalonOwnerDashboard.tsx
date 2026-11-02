@@ -35,6 +35,7 @@ import {
 import { Salon, Service, Technician, Appointment, User, Review, AppointmentStatus, WorkingHour, Product, ProductOrder } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
 import { subscribeToAppointments } from '../lib/firestoreService';
+import { formatTimeTo12Hour, getAppointmentSortTimestamp } from '../lib/timeUtils';
 import {
   fetchSalons,
   fetchServices,
@@ -420,7 +421,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
           recipient_user_id: appt.customer_id,
           category: 'bookings',
           title: 'Salon Cancelled Booking ⚠️',
-          message: `${activeSalon?.salon_name || appt.salon_name || 'Salon'} cancelled your appointment for ${appt.service_name} on ${appt.appointment_date} at ${appt.appointment_time}. Reason: ${reason}.`,
+          message: `${activeSalon?.salon_name || appt.salon_name || 'Salon'} cancelled your appointment for ${appt.service_name} on ${appt.appointment_date} at ${formatTimeTo12Hour(appt.appointment_time)}. Reason: ${reason}.`,
           type: 'booking_cancelled_by_owner',
           priority: 'urgent',
           linkTab: 'customer-dashboard',
@@ -685,9 +686,9 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
         return true;
       })
       .sort((a, b) => {
-        const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
-        const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
-        if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+        const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+        const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+        if (timeB !== timeA) return timeB - timeA;
         return Number(b.id || 0) - Number(a.id || 0);
       });
   }, [appointments, bookingStatusFilter, bookingDateFilter, bookingSearch]);
@@ -1131,7 +1132,7 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
 
                         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-gray-600">
                           <span className="font-semibold text-purple-900 bg-purple-50 px-2.5 py-0.5 rounded-md shrink-0">
-                            📅 {appt.appointment_date} at {appt.appointment_time}
+                            📅 {appt.appointment_date} at {formatTimeTo12Hour(appt.appointment_time)}
                           </span>
                           <span className="text-purple-200 hidden sm:inline">•</span>
                           <div className="flex items-center gap-1.5 min-w-0">

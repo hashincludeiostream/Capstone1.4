@@ -28,6 +28,7 @@ import {
 import { Salon, Appointment, SalonCancellationPolicyConfig } from '../../types';
 import { updateAppointmentLateFee, updateSalonCancellationPolicy } from '../../lib/api';
 import { evaluateGracePeriod } from '../../lib/cancellationPolicy';
+import { formatTimeTo12Hour } from '../../lib/timeUtils';
 
 interface LateCancellationFeesManagerProps {
   salon: Salon | null;
@@ -800,7 +801,7 @@ export const LateCancellationFeesManager: React.FC<LateCancellationFeesManagerPr
                       <div className="text-stone-500 flex items-center gap-1.5">
                         <Calendar className="w-3 h-3 text-stone-400" />
                         <span>
-                          {item.appointment_date} at {item.appointment_time}
+                          {item.appointment_date} at {formatTimeTo12Hour(item.appointment_time)}
                         </span>
                       </div>
                       <div className="text-stone-500">

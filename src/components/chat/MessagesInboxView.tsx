@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { User, Salon, ConversationChannel, PrivateMessage } from '../../types';
 import { fetchConversations, fetchMessages, sendPrivateMessage, markMessagesRead } from '../../lib/api';
+import { formatTimeTo12Hour } from '../../lib/timeUtils';
 
 interface MessagesInboxViewProps {
   currentUser: User;
@@ -471,7 +472,7 @@ export const MessagesInboxView: React.FC<MessagesInboxViewProps> = ({
                     <span className="truncate">
                       <strong>Scheduled Service:</strong> {activeConversation.active_appointment.service_name} on{' '}
                       {activeConversation.active_appointment.appointment_date} at{' '}
-                      {activeConversation.active_appointment.appointment_time}
+                      {formatTimeTo12Hour(activeConversation.active_appointment.appointment_time)}
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-pink-700 border border-pink-200 uppercase tracking-wider shrink-0">

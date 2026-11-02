@@ -41,6 +41,25 @@ function cleanForFirestore(obj: any): any {
   return obj;
 }
 
+function parseTimeToMinutes(timeStr: any): number {
+  if (!timeStr || typeof timeStr !== 'string') return -1;
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*(AM|PM))?$/i);
+  if (!match) return -1;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const meridiem = match[3] ? match[3].toUpperCase() : null;
+  if (meridiem === 'PM' && hours < 12) hours += 12;
+  if (meridiem === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+function matchAppointmentTime(t1: any, t2: any): boolean {
+  if (String(t1).trim().toLowerCase() === String(t2).trim().toLowerCase()) return true;
+  const m1 = parseTimeToMinutes(t1);
+  const m2 = parseTimeToMinutes(t2);
+  return m1 !== -1 && m2 !== -1 && m1 === m2;
+}
+
 class InMemoryDatabase {
   private tables: Record<string, any[]> = {
     business_categories: JSON.parse(JSON.stringify(seedCategories)),
@@ -646,7 +665,7 @@ class InMemoryDatabase {
             (a) =>
               a.technician_id === tId &&
               a.appointment_date === date &&
-              a.appointment_time === time &&
+              matchAppointmentTime(a.appointment_time, time) &&
               ['pending', 'confirmed'].includes(a.status)
           ),
           null,
@@ -670,7 +689,7 @@ class InMemoryDatabase {
       }
       if (/appointment_time\s*=\s*\?/i.test(sql)) {
         const aTime = String(params[pIdx++]);
-        filtered = filtered.filter((a) => a.appointment_time === aTime);
+        filtered = filtered.filter((a) => matchAppointmentTime(a.appointment_time, aTime));
       }
       if (/technician_id\s*=\s*\?/i.test(sql)) {
         const tId = params[pIdx++];
@@ -906,7 +925,7 @@ class InMemoryDatabase {
           Number(a.customer_id) === Number(record.customer_id) &&
           Number(a.salon_id) === Number(record.salon_id) &&
           String(a.appointment_date) === String(record.appointment_date) &&
-          String(a.appointment_time) === String(record.appointment_time) &&
+          matchAppointmentTime(a.appointment_time, record.appointment_time) &&
           ['pending', 'confirmed'].includes(a.status)
       );
       if (existingSlot) {

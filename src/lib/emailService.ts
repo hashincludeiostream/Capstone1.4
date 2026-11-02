@@ -6,6 +6,7 @@
 import { EmailLog, User, Salon, Appointment, ProductOrder, UserRole, PlatformStats } from '../types';
 import { jsPDF } from 'jspdf';
 import { ajax } from './ajax';
+import { formatTimeTo12Hour } from './timeUtils';
 
 export interface EmailDispatchOptions {
   to: string;
@@ -571,7 +572,7 @@ export async function sendCustomerBookingConfirmation(
     <div class="card">
       <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${appointment.service_name || 'Nail Care & Styling'}</span></div>
       <div class="detail-row"><span class="detail-label">Date:</span><span class="detail-value">${appointment.appointment_date}</span></div>
-      <div class="detail-row"><span class="detail-label">Time:</span><span class="detail-value">${appointment.appointment_time}</span></div>
+      <div class="detail-row"><span class="detail-label">Time:</span><span class="detail-value">${formatTimeTo12Hour(appointment.appointment_time)}</span></div>
       <div class="detail-row"><span class="detail-label">Specialist:</span><span class="detail-value">${appointment.staff_name || appointment.technician_name || 'Assigned Salon Specialist'}</span></div>
       <div class="detail-row"><span class="detail-label">Total Fee:</span><span class="detail-value">₱${Number(appointment.total_price || 0).toLocaleString()}</span></div>
       <div class="detail-row"><span class="detail-label">Salon Address:</span><span class="detail-value">${salon.address}</span></div>
@@ -620,7 +621,7 @@ export async function sendCustomerBookingStatusUpdate(
     <div class="card">
       <div class="detail-row"><span class="detail-label">Status:</span><span class="detail-value badge ${newStatus === 'completed' ? 'badge-green' : newStatus === 'cancelled' ? 'badge-amber' : 'badge-pink'}">${label}</span></div>
       <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${appointment.service_name || 'Nail Treatment'}</span></div>
-      <div class="detail-row"><span class="detail-label">Date & Time:</span><span class="detail-value">${appointment.appointment_date} at ${appointment.appointment_time}</span></div>
+      <div class="detail-row"><span class="detail-label">Date & Time:</span><span class="detail-value">${appointment.appointment_date} at ${formatTimeTo12Hour(appointment.appointment_time)}</span></div>
       ${extraNote ? `<div class="detail-row"><span class="detail-label">Details / Note:</span><span class="detail-value">${extraNote}</span></div>` : ''}
     </div>
 
@@ -737,7 +738,7 @@ export async function sendOwnerNewBookingAlert(
   appointment: Appointment,
   customer: { fullname: string; phone?: string; email?: string }
 ) {
-  const subject = `New Appointment Alert! 📅 ${appointment.customer_name} on ${appointment.appointment_date} at ${appointment.appointment_time}`;
+  const subject = `New Appointment Alert! 📅 ${appointment.customer_name} on ${appointment.appointment_date} at ${formatTimeTo12Hour(appointment.appointment_time)}`;
   const content = `
     <p>Hello <strong>${salon.salon_name}</strong> Team,</p>
     <p>A new customer booking has been scheduled at your salon.</p>
@@ -747,7 +748,7 @@ export async function sendOwnerNewBookingAlert(
       <div class="detail-row"><span class="detail-label">Customer Phone:</span><span class="detail-value">${customer.phone || 'N/A'}</span></div>
       <div class="detail-row"><span class="detail-label">Customer Email:</span><span class="detail-value">${customer.email || 'N/A'}</span></div>
       <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${appointment.service_name || 'Nail Treatment'}</span></div>
-      <div class="detail-row"><span class="detail-label">Date & Time:</span><span class="detail-value">${appointment.appointment_date} @ ${appointment.appointment_time}</span></div>
+      <div class="detail-row"><span class="detail-label">Date & Time:</span><span class="detail-value">${appointment.appointment_date} @ ${formatTimeTo12Hour(appointment.appointment_time)}</span></div>
       <div class="detail-row"><span class="detail-label">Specialist:</span><span class="detail-value">${appointment.staff_name || appointment.technician_name || 'Any Specialist'}</span></div>
       <div class="detail-row"><span class="detail-label">Total Expected:</span><span class="detail-value">₱${Number(appointment.total_price || 0).toLocaleString()}</span></div>
     </div>

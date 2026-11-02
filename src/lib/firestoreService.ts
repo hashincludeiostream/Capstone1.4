@@ -33,6 +33,7 @@ import {
   User,
   AppointmentStatus,
 } from '../types';
+import { getAppointmentSortTimestamp } from './timeUtils';
 
 let isInitialized = false;
 let initPromise: Promise<boolean> | null = null;
@@ -120,9 +121,9 @@ export function subscribeToAppointments(
         });
         // Sort descending by recency (LIFO)
         items.sort((a, b) => {
-          const timeB = new Date(b.updated_at || b.cancelled_at || b.created_at || (b.appointment_date ? `${b.appointment_date}T${b.appointment_time || '00:00'}` : 0)).getTime();
-          const timeA = new Date(a.updated_at || a.cancelled_at || a.created_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '00:00'}` : 0)).getTime();
-          if (!isNaN(timeB) && !isNaN(timeA) && timeB !== timeA) return timeB - timeA;
+          const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+          const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+          if (timeB !== timeA) return timeB - timeA;
           return Number(b.id || 0) - Number(a.id || 0);
         });
         onUpdate(items);
