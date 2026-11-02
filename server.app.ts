@@ -4343,40 +4343,69 @@ async function startServer() {
       const salon = (salonRows as any[])[0];
 
       // Validate items and verify available stock
-      let calculatedTotal = 0;
-      let calculatedItemsCount = 0;
+      const consolidatedItemsMap = new Map<number, {
+        product_id: number;
+        product_name: string;
+        price: number;
+        quantity: number;
+        subtotal: number;
+        image_url?: string;
+        volume_or_size?: string;
+      }>();
 
-      for (const item of items) {
-        const [prodRows] = await db.execute('SELECT * FROM products WHERE id = ?', [Number(item.product_id)]);
+      for (const rawItem of items) {
+        const prodId = Number(rawItem.product_id);
+        const reqQty = Math.max(1, Math.floor(Number(rawItem.quantity) || 1));
+        const [prodRows] = await db.execute('SELECT * FROM products WHERE id = ?', [prodId]);
         const product = (prodRows as any[])[0];
         if (!product) {
-          return res.status(404).json({ error: `Product with ID ${item.product_id} no longer exists` });
+          return res.status(404).json({ error: `Product with ID ${rawItem.product_id} no longer exists` });
         }
         if (Number(product.salon_id) !== Number(salon_id)) {
           return res.status(400).json({ error: `Product "${product.name}" does not belong to the selected salon store.` });
         }
 
-        const requestedQty = Number(item.quantity) || 1;
+        const price = Number(product.price) || 0;
         const availableStock = Number(product.stock_quantity) || 0;
 
-        if (requestedQty > availableStock) {
-          return res.status(400).json({
-            error: `Insufficient stock for "${product.name}". Only ${availableStock} unit(s) currently available.`,
+        if (consolidatedItemsMap.has(prodId)) {
+          const existing = consolidatedItemsMap.get(prodId)!;
+          existing.quantity += reqQty;
+          existing.subtotal = existing.quantity * price;
+          if (existing.quantity > availableStock) {
+            return res.status(400).json({
+              error: `Insufficient stock for "${product.name}". Only ${availableStock} unit(s) currently available.`,
+            });
+          }
+        } else {
+          if (reqQty > availableStock) {
+            return res.status(400).json({
+              error: `Insufficient stock for "${product.name}". Only ${availableStock} unit(s) currently available.`,
+            });
+          }
+          consolidatedItemsMap.set(prodId, {
+            product_id: prodId,
+            product_name: product.name,
+            price,
+            quantity: reqQty,
+            subtotal: reqQty * price,
+            image_url: rawItem.image_url || product.image_url,
+            volume_or_size: rawItem.volume_or_size || product.volume_or_size,
           });
         }
-
-        calculatedTotal += Number(product.price) * requestedQty;
-        calculatedItemsCount += requestedQty;
       }
 
+      const verifiedItems = Array.from(consolidatedItemsMap.values());
+      const calculatedTotal = verifiedItems.reduce((sum, item) => sum + item.subtotal, 0);
+      const calculatedItemsCount = verifiedItems.reduce((sum, item) => sum + item.quantity, 0);
+
       // Deduct stock for all items
-      for (const item of items) {
-        const qty = Number(item.quantity) || 1;
-        const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [Number(item.product_id)]);
+      for (const item of verifiedItems) {
+        const [prodRows] = await db.execute('SELECT stock_quantity FROM products WHERE id = ?', [item.product_id]);
         const prod = (prodRows as any[])[0];
         const currentStock = prod ? Number(prod.stock_quantity) : 0;
-        const newStock = Math.max(0, currentStock - qty);
-        await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [newStock, Number(item.product_id)]);
+        const newStock = Math.max(0, currentStock - item.quantity);
+        await db.execute('UPDATE products SET stock_quantity = ? WHERE id = ?', [newStock, item.product_id]);
       }
 
       // Generate order number
@@ -4399,7 +4428,7 @@ async function startServer() {
           customer_name.trim(),
           customer_phone.trim(),
           customer_email?.trim() || '',
-          JSON.stringify(items),
+          JSON.stringify(verifiedItems),
           calculatedTotal,
           calculatedItemsCount,
           'pending_pickup',
@@ -4412,7 +4441,15 @@ async function startServer() {
 
       const orderId = (result as any).insertId;
       const [orderRows] = await db.execute('SELECT * FROM product_orders WHERE id = ?', [orderId]);
-      const createdOrder = (orderRows as any[])[0] || {
+      const createdOrder = (orderRows as any[])[0] ? {
+        ...(orderRows as any[])[0],
+        id: Number((orderRows as any[])[0].id),
+        salon_id: Number((orderRows as any[])[0].salon_id),
+        customer_id: Number((orderRows as any[])[0].customer_id),
+        total_amount: Number((orderRows as any[])[0].total_amount) || calculatedTotal,
+        total_items: Number((orderRows as any[])[0].total_items) || calculatedItemsCount,
+        items: verifiedItems,
+      } : {
         id: orderId,
         order_number: orderNumber,
         salon_id: Number(salon_id),
@@ -4423,7 +4460,7 @@ async function startServer() {
         customer_name,
         customer_phone,
         customer_email,
-        items,
+        items: verifiedItems,
         total_amount: calculatedTotal,
         total_items: calculatedItemsCount,
         status: 'pending_pickup',

@@ -16,6 +16,8 @@ import {
   ArrowRight,
   Store,
   Sparkles,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { CartItem, ProductOrder, Salon, User } from '../../types';
 import { createProductOrder } from '../../lib/api';
@@ -95,15 +97,50 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Determine primary salon from cart items
-  const primarySalonId = cartItems[0]?.product.salon_id || (salons[0]?.id ?? 1);
+  const [itemsToReserve, setItemsToReserve] = useState<CartItem[]>(cartItems);
+
+  useEffect(() => {
+    setItemsToReserve(cartItems);
+  }, [cartItems, isOpen]);
+
+  const handleUpdateItemQuantity = (productId: number, delta: number) => {
+    setItemsToReserve((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.id === productId) {
+            const currentQty = Number(item.quantity) || 1;
+            const newQty = currentQty + delta;
+            if (newQty <= 0) return null;
+            const maxStock = Number(item.product.stock_quantity) || 1;
+            if (newQty > maxStock) return item;
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[]
+    );
+  };
+
+  // Determine primary salon from reservation items
+  const primarySalonId = itemsToReserve[0]?.product.salon_id || (salons[0]?.id ?? 1);
   const primarySalon = salons.find((s) => s.id === primarySalonId) || salons[0];
 
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const totalCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = itemsToReserve.reduce(
+    (sum, item) => sum + (Number(item.product.price) || 0) * (Number(item.quantity) || 1),
+    0
+  );
+  const totalCount = itemsToReserve.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 1),
+    0
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (itemsToReserve.length === 0) {
+      setErrorMsg('No items selected for reservation.');
+      return;
+    }
+
     const cleanPhone = customerPhone.replace(/\D/g, '');
     if (!customerName.trim() || !cleanPhone) {
       setErrorMsg('Please provide your full name and valid phone number for pickup verification.');
@@ -133,11 +170,11 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
         pickup_date: pickupDate,
         pickup_time: pickupTime,
         notes: notes.trim(),
-        items: cartItems.map((item) => ({
-          product_id: item.product.id,
+        items: itemsToReserve.map((item) => ({
+          product_id: Number(item.product.id),
           product_name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
+          price: Number(item.product.price) || 0,
+          quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
           image_url: item.product.image_url,
           volume_or_size: item.product.volume_or_size,
         })),
@@ -465,43 +502,78 @@ export const ProductCheckoutModal: React.FC<ProductCheckoutModalProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
-                  Items to Reserve ({cartItems.length})
+                  Items to Reserve ({itemsToReserve.length})
                 </h3>
                 <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
                   Salon Stock Confirmed
                 </span>
               </div>
 
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {cartItems.map((item) => (
-                  <div
-                    key={item.product.id}
-                    className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/70 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <img
-                        src={item.product.image_url || 'https://images.unsplash.com/photo-1608248597359-0a62377c08fe?w=600&auto=format&fit=crop&q=80'}
-                        alt={item.product.name}
-                        referrerPolicy="no-referrer"
-                        className="w-9 h-9 rounded-lg object-cover bg-stone-200 shrink-0 border border-stone-200"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="font-semibold text-stone-900 truncate text-xs">{item.product.name}</h4>
-                        <div className="flex items-center gap-2 text-[10px] text-stone-500">
-                          <span>Reserve: <strong className="text-stone-800">{item.quantity}</strong></span>
-                          <span>•</span>
-                          <span className="text-emerald-700 font-semibold">Available stock: {item.product.stock_quantity} units</span>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {itemsToReserve.map((item) => {
+                  const unitPrice = Number(item.product.price) || 0;
+                  const itemQty = Number(item.quantity) || 1;
+                  const itemSubtotal = unitPrice * itemQty;
+                  const maxStock = Number(item.product.stock_quantity) || 1;
+
+                  return (
+                    <div
+                      key={item.product.id}
+                      className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/70 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={item.product.image_url || 'https://images.unsplash.com/photo-1608248597359-0a62377c08fe?w=600&auto=format&fit=crop&q=80'}
+                          alt={item.product.name}
+                          referrerPolicy="no-referrer"
+                          className="w-10 h-10 rounded-lg object-cover bg-stone-200 shrink-0 border border-stone-200"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-stone-900 truncate text-xs">{item.product.name}</h4>
+                          <div className="flex items-center gap-2 text-[10px] text-stone-500 mt-0.5">
+                            <span className="font-medium text-stone-700">₱{unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} each</span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-semibold">{maxStock} in stock</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {/* Quantity Adjuster */}
+                        <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQuantity(item.product.id, -1)}
+                            disabled={itemQty <= 1}
+                            className="p-1 hover:bg-stone-100 text-stone-600 disabled:opacity-30 cursor-pointer transition"
+                            title="Decrease quantity"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="px-2 py-0.5 text-xs font-bold text-stone-900 min-w-[1.5rem] text-center">
+                            {itemQty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQuantity(item.product.id, 1)}
+                            disabled={itemQty >= maxStock}
+                            className="p-1 hover:bg-stone-100 text-stone-600 disabled:opacity-30 cursor-pointer transition"
+                            title={itemQty >= maxStock ? 'Max available stock reached' : 'Increase quantity'}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* Subtotal */}
+                        <div className="text-right min-w-[4.5rem]">
+                          <div className="font-bold text-stone-900 text-xs">
+                            ₱{itemSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="font-bold text-stone-900">
-                        ₱{(item.product.price * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

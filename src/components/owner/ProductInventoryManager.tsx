@@ -139,14 +139,27 @@ export const ProductInventoryManager: React.FC<ProductInventoryManagerProps> = (
   // Filter products for this salon
   const salonProducts = useMemo(() => {
     if (!salon) return products;
-    return products.filter((p) => p.salon_id === salon.id);
+    return products.filter((p) => Number(p.salon_id) === Number(salon.id));
   }, [products, salon]);
 
   // Salon specific pickup orders
   const salonOrders = useMemo(() => {
     if (!salon) return orders;
-    return orders.filter((o) => o.salon_id === salon.id);
+    return orders.filter((o) => Number(o.salon_id) === Number(salon.id));
   }, [orders, salon]);
+
+  // Auto-refresh when inventory or reservations update
+  useEffect(() => {
+    const handleUpdate = () => {
+      onRefresh();
+    };
+    window.addEventListener('nailglamhub_inventory_updated', handleUpdate);
+    window.addEventListener('nailglamhub_product_orders_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('nailglamhub_inventory_updated', handleUpdate);
+      window.removeEventListener('nailglamhub_product_orders_updated', handleUpdate);
+    };
+  }, [onRefresh]);
 
   // Order Sub-tab Filters & State
   const [orderFilter, setOrderFilter] = useState<'all' | 'pending' | 'ready' | 'unclaimed' | 'completed' | 'cancelled'>('all');

@@ -381,6 +381,54 @@ export const SalonOwnerDashboard: React.FC<SalonOwnerDashboardProps> = ({
     return () => window.removeEventListener('nailglamhub_appointments_updated', handleSync);
   }, [selectedSalonId]);
 
+  // Listen for real-time inventory and product order updates from customer reservations or stock adjustments
+  useEffect(() => {
+    const handleSyncInventory = () => {
+      if (selectedSalonId) {
+        Promise.all([
+          fetchProducts({ salon_id: selectedSalonId }),
+          fetchProductOrders({ salon_id: selectedSalonId }),
+        ])
+          .then(([prods, orders]) => {
+            if (Array.isArray(prods)) setProducts(prods);
+            if (Array.isArray(orders)) setProductOrders(orders);
+          })
+          .catch((err) => console.warn('Sync inventory error:', err));
+      }
+    };
+
+    window.addEventListener('nailglamhub_inventory_updated', handleSyncInventory);
+    window.addEventListener('nailglamhub_product_orders_updated', handleSyncInventory);
+
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === 'nailglamhub_inventory_sync_event' || e.key === 'nailglamhub_appointment_sync_event') {
+        handleSyncInventory();
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+
+    return () => {
+      window.removeEventListener('nailglamhub_inventory_updated', handleSyncInventory);
+      window.removeEventListener('nailglamhub_product_orders_updated', handleSyncInventory);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
+  }, [selectedSalonId]);
+
+  // Auto-refresh fresh stock levels and pickup orders whenever owner navigates to inventory or overview tab
+  useEffect(() => {
+    if ((activeTab === 'inventory' || activeTab === 'overview') && selectedSalonId) {
+      Promise.all([
+        fetchProducts({ salon_id: selectedSalonId }),
+        fetchProductOrders({ salon_id: selectedSalonId }),
+      ])
+        .then(([prods, orders]) => {
+          if (Array.isArray(prods)) setProducts(prods);
+          if (Array.isArray(orders)) setProductOrders(orders);
+        })
+        .catch(() => {});
+    }
+  }, [activeTab, selectedSalonId]);
+
   const handleStatusChange = async (appointmentId: number, newStatus: AppointmentStatus) => {
     const success = await updateAppointmentStatus(appointmentId, newStatus);
     if (success) {

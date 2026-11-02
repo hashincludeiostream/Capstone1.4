@@ -372,6 +372,27 @@ function broadcastAppointmentChange(appointmentId?: number, status?: string) {
   }
 }
 
+export function broadcastProductInventoryChange(productId?: number, salonId?: number, orderId?: number) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('nailglamhub_inventory_updated', {
+        detail: { productId, salonId, orderId, timestamp: Date.now() },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('nailglamhub_product_orders_updated', {
+        detail: { productId, salonId, orderId, timestamp: Date.now() },
+      })
+    );
+    try {
+      localStorage.setItem(
+        'nailglamhub_inventory_sync_event',
+        JSON.stringify({ productId, salonId, orderId, timestamp: Date.now() })
+      );
+    } catch (_) {}
+  }
+}
+
 export async function createAppointment(data: Partial<Appointment>): Promise<{ success: boolean; appointment: Appointment }> {
   try {
     const res = await ajax(`${API_BASE}/appointments`, {
@@ -1046,7 +1067,9 @@ export async function updateProduct(id: number, productData: Partial<Product>): 
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to update product');
   }
-  return await res.json();
+  const updated = await res.json();
+  broadcastProductInventoryChange(id, updated?.salon_id);
+  return updated;
 }
 
 export async function updateProductStock(
@@ -1062,12 +1085,17 @@ export async function updateProductStock(
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to adjust stock');
   }
-  return await res.json();
+  const result = await res.json();
+  broadcastProductInventoryChange(id, result.product?.salon_id);
+  return result;
 }
 
 export async function deleteProduct(id: number): Promise<boolean> {
   try {
     const res = await ajax(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      broadcastProductInventoryChange(id);
+    }
     return res.ok;
   } catch (err) {
     return false;
@@ -1128,6 +1156,8 @@ export async function createProductOrder(orderData: {
       console.warn('Firestore product order sync warning:', err)
     );
   }
+  // Broadcast real-time inventory and order update event across tabs and owner view
+  broadcastProductInventoryChange(undefined, orderData.salon_id, result.order?.id);
   return result;
 }
 
@@ -1162,6 +1192,7 @@ export async function updateProductOrderStatus(
   updateFirestoreProductOrderStatus(orderId, status, cancellationData).catch((err) =>
     console.warn('Firestore product order status sync warning:', err)
   );
+  broadcastProductInventoryChange(undefined, result.order?.salon_id, orderId);
   return result;
 }
 
@@ -1195,6 +1226,7 @@ export async function cancelProductOrder(
     cancellation_notes: data.cancellation_notes,
     cancelled_by: data.cancelled_by || 'customer',
   }).catch((err) => console.warn('Firestore product order cancel sync warning:', err));
+  broadcastProductInventoryChange(undefined, result.order?.salon_id, orderId);
 
   return result;
 }

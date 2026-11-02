@@ -201,6 +201,7 @@ const AppContent: React.FC = () => {
   const [targetCartProductId, setTargetCartProductId] = useState<number | null>(null);
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Product | null>(null);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [checkoutItems, setCheckoutItems] = useState<CartItem[]>([]);
 
   // Salon Owner notification state
   const [ownerSalons, setOwnerSalons] = useState<Salon[]>([]);
@@ -669,6 +670,7 @@ const AppContent: React.FC = () => {
       return;
     }
     setCartOpen(false);
+    setCheckoutItems([...cartItems]);
     setCheckoutModalOpen(true);
   };
 
@@ -677,13 +679,22 @@ const AppContent: React.FC = () => {
       handleRequireCustomerLogin('Please sign in to your customer account to reserve products.');
       return;
     }
-    handleAddToCart(product, quantity);
+    const cleanQty = Math.max(1, Math.min(product.stock_quantity, quantity));
+    const directCartItem: CartItem = {
+      product,
+      quantity: cleanQty,
+    };
+    // Direct reservation isolates the specific product and chosen quantity
+    setCheckoutItems([directCartItem]);
     setSelectedProductForDetail(null);
     setCheckoutModalOpen(true);
   };
 
   const handleOrderSuccess = (order: ProductOrder) => {
-    setCartItems([]);
+    const itemsReserved = checkoutItems.length > 0 ? checkoutItems : cartItems;
+    const reservedIds = new Set(itemsReserved.map((i) => i.product.id));
+    setCartItems((prev) => prev.filter((i) => !reservedIds.has(i.product.id)));
+    setCheckoutItems([]);
     setCheckoutModalOpen(false);
     showToast(`Reservation #${order.order_number} confirmed! Settle balance upon in-store pickup.`);
     // Refresh product stock and customer orders
@@ -2149,13 +2160,17 @@ const AppContent: React.FC = () => {
       {checkoutModalOpen && (
         <ProductCheckoutModal
           isOpen={checkoutModalOpen}
-          onClose={() => setCheckoutModalOpen(false)}
-          cartItems={cartItems}
+          onClose={() => {
+            setCheckoutModalOpen(false);
+            setCheckoutItems([]);
+          }}
+          cartItems={checkoutItems.length > 0 ? checkoutItems : cartItems}
           currentUser={currentUser}
           salons={salons}
           onOrderSuccess={handleOrderSuccess}
           onViewMyOrders={() => {
             setCheckoutModalOpen(false);
+            setCheckoutItems([]);
             setActiveTab('customer-orders');
           }}
         />

@@ -40,6 +40,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [addedSuccess, setAddedSuccess] = useState(false);
 
+  // Reset quantity to 1 whenever a new product is selected
+  useEffect(() => {
+    if (product) {
+      setQuantity(1);
+      setAddedSuccess(false);
+    }
+  }, [product?.id]);
+
   // Keyboard Escape key handler to ensure modal can always be closed
   useEffect(() => {
     if (!product) return;
@@ -325,7 +333,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden bg-stone-50 shrink-0">
                       <button
                         onClick={handleDecrement}
@@ -348,10 +356,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </button>
                     </div>
 
+                    <div className="text-right">
+                      <span className="text-[10px] text-stone-400 block font-sans">
+                        {quantity} × ₱{(Number(product.price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-xs sm:text-sm font-extrabold text-pink-700">
+                        ₱{((Number(product.price) || 0) * quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
                     {quantity >= product.stock_quantity && (
-                      <span className="text-[10px] sm:text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 sm:py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 truncate">
+                      <span className="w-full text-[10px] sm:text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 sm:py-1 rounded-lg border border-amber-200/80 flex items-center gap-1 truncate">
                         <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                        <span className="truncate">All {product.stock_quantity} selected</span>
+                        <span className="truncate">All {product.stock_quantity} available units selected</span>
                       </span>
                     )}
                   </div>
@@ -407,7 +424,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     className="flex-1 min-w-0 py-2.5 sm:py-3 px-2.5 sm:px-4 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 truncate"
                   >
                     {!isCustomer && <Lock className="w-3.5 h-3.5 shrink-0" />}
-                    <span className="truncate">{isCustomer ? 'Reserve' : 'Sign In'}</span>
+                    <span className="truncate">
+                      {isCustomer
+                        ? `Reserve (₱${((Number(product.price) || 0) * quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })})`
+                        : 'Sign In'}
+                    </span>
                   </button>
                 )}
               </div>
