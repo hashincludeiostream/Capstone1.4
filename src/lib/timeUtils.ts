@@ -133,3 +133,193 @@ export function generate12HourSlots(
 
   return slots;
 }
+
+/**
+ * Formats a date/timestamp into a friendly human-readable relative timeline string.
+ * Example: 'Just now', '4m ago', '2h ago', 'Today at 3:30 PM', 'Yesterday', 'Nov 2'
+ */
+export function formatRelativeTime(dateInput?: string | number | Date | null): string {
+  if (!dateInput) return 'Recently';
+
+  try {
+    const date = typeof dateInput === 'object' && dateInput instanceof Date ? dateInput : new Date(dateInput);
+    const timeMs = date.getTime();
+    if (isNaN(timeMs) || timeMs <= 0) return 'Recently';
+
+    const now = Date.now();
+    const diffSec = Math.floor((now - timeMs) / 1000);
+
+    if (diffSec < 0) {
+      // Future date
+      return 'Upcoming';
+    }
+
+    if (diffSec < 45) {
+      return 'Just now';
+    }
+
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) {
+      return `${diffMin}m ago`;
+    }
+
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) {
+      const hours = date.getHours();
+      const mins = String(date.getMinutes()).padStart(2, '0');
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+      return `Yesterday, ${displayHours}:${mins} ${period}`;
+    }
+
+    if (diffDays < 7) {
+      return `${diffDays}d ago`;
+    }
+
+    // Older than 7 days, format e.g. "Oct 28"
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    const day = date.getDate();
+    return `${month} ${day}`;
+  } catch {
+    return 'Recently';
+  }
+}
+
+/**
+ * Formats a date/timestamp into a concise timeline timestamp with exact time.
+ * Example: 'Nov 2, 2:30 PM'
+ */
+export function formatTimelineDate(dateInput?: string | number | Date | null): string {
+  if (!dateInput) return '';
+  try {
+    const date = typeof dateInput === 'object' && dateInput instanceof Date ? dateInput : new Date(dateInput);
+    const timeMs = date.getTime();
+    if (isNaN(timeMs) || timeMs <= 0) return '';
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    const day = date.getDate();
+    const hours = date.getHours();
+    const mins = String(date.getMinutes()).padStart(2, '0');
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+
+    return `${month} ${day}, ${displayHours}:${mins} ${period}`;
+  } catch {
+    return '';
+  }
+}
+
+export interface TimelineMilestone {
+  title: string;
+  timeLabel?: string;
+  status: 'completed' | 'current' | 'pending' | 'cancelled' | 'warning';
+  detail?: string;
+}
+
+/**
+ * Builds structured timeline milestones for an appointment notification.
+ */
+export function getAppointmentTimelineMilestones(appt: any): TimelineMilestone[] {
+  const milestones: TimelineMilestone[] = [];
+
+  // Milestone 1: Booking requested / placed
+  milestones.push({
+    title: 'Booked',
+    timeLabel: appt.created_at ? formatRelativeTime(appt.created_at) : 'Initiated',
+    status: 'completed',
+    detail: appt.created_at ? formatTimelineDate(appt.created_at) : undefined,
+  });
+
+  // Milestone 2: Salon review / confirmation or cancellation
+  if (appt.status === 'cancelled') {
+    milestones.push({
+      title: appt.cancelled_by === 'salon_owner' ? 'Salon Cancelled' : 'Cancelled',
+      timeLabel: appt.cancelled_at || appt.updated_at ? formatRelativeTime(appt.cancelled_at || appt.updated_at) : 'Cancelled',
+      status: 'cancelled',
+      detail: appt.cancellation_reason || undefined,
+    });
+  } else if (appt.status === 'confirmed') {
+    milestones.push({
+      title: 'Confirmed',
+      timeLabel: appt.updated_at ? formatRelativeTime(appt.updated_at) : 'Accepted',
+      status: 'completed',
+    });
+  } else {
+    milestones.push({
+      title: 'Awaiting Salon',
+      timeLabel: 'Pending',
+      status: 'current',
+    });
+  }
+
+  // Milestone 3: Scheduled service execution
+  if (appt.status !== 'cancelled') {
+    milestones.push({
+      title: 'Scheduled Visit',
+      timeLabel: `${appt.appointment_date} at ${formatTimeTo12Hour(appt.appointment_time)}`,
+      status: appt.status === 'completed' ? 'completed' : 'pending',
+    });
+  }
+
+  return milestones;
+}
+
+/**
+ * Builds structured timeline milestones for a product reservation order.
+ */
+export function getOrderTimelineMilestones(order: any): TimelineMilestone[] {
+  const milestones: TimelineMilestone[] = [];
+
+  // Milestone 1: Reservation placed
+  milestones.push({
+    title: 'Reserved',
+    timeLabel: order.created_at || order.order_date ? formatRelativeTime(order.created_at || order.order_date) : 'Placed',
+    status: 'completed',
+  });
+
+  // Milestone 2: Preparation / Ready or Cancelled
+  if (order.status === 'cancelled') {
+    milestones.push({
+      title: order.cancelled_by === 'salon_owner' ? 'Salon Cancelled' : 'Cancelled',
+      timeLabel: order.cancelled_at || order.updated_at ? formatRelativeTime(order.cancelled_at || order.updated_at) : 'Cancelled',
+      status: 'cancelled',
+      detail: order.cancellation_reason || undefined,
+    });
+  } else if (order.status === 'unclaimed') {
+    milestones.push({
+      title: 'Expired & Unclaimed',
+      timeLabel: order.unclaimed_at || order.updated_at ? formatRelativeTime(order.unclaimed_at || order.updated_at) : 'Expired',
+      status: 'cancelled',
+    });
+  } else if (order.status === 'ready_for_pickup') {
+    milestones.push({
+      title: 'Ready for Pickup',
+      timeLabel: order.updated_at ? formatRelativeTime(order.updated_at) : 'Prepared',
+      status: 'completed',
+    });
+  } else {
+    milestones.push({
+      title: 'Preparing',
+      timeLabel: 'In Progress',
+      status: 'current',
+    });
+  }
+
+  // Milestone 3: Store pickup
+  if (order.status !== 'cancelled' && order.status !== 'unclaimed') {
+    milestones.push({
+      title: 'In-Store Pickup',
+      timeLabel: `Pickup: ${order.pickup_date}`,
+      status: order.status === 'completed' ? 'completed' : 'pending',
+    });
+  }
+
+  return milestones;
+}

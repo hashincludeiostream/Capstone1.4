@@ -24,6 +24,10 @@ import {
   CalendarX,
   PackageX,
   User,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Activity,
 } from 'lucide-react';
 import {
   User as UserType,
@@ -36,7 +40,15 @@ import {
 } from '../types';
 import { NotificationBadge } from './common/NotificationBadge';
 import { useNotifications, SystemNotification } from '../context/NotificationContext';
-import { formatTimeTo12Hour, getAppointmentSortTimestamp } from '../lib/timeUtils';
+import {
+  formatTimeTo12Hour,
+  getAppointmentSortTimestamp,
+  formatRelativeTime,
+  formatTimelineDate,
+  getAppointmentTimelineMilestones,
+  getOrderTimelineMilestones,
+  TimelineMilestone,
+} from '../lib/timeUtils';
 
 export interface NotificationMenuProps {
   currentUser: UserType | null;
@@ -90,6 +102,141 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<NotificationCategory>('bookings');
   const [activeDotMenuId, setActiveDotMenuId] = useState<string | null>(null);
+  const [expandedTimelineIds, setExpandedTimelineIds] = useState<Set<string>>(new Set());
+  const [showMilestones, setShowMilestones] = useState<boolean>(true);
+
+  const toggleTimeline = (id: string) => {
+    setExpandedTimelineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const renderTimelineHeader = (timestamp?: string | number | null, fallbackLabel?: string) => {
+    const rel = formatRelativeTime(timestamp);
+    const full = formatTimelineDate(timestamp);
+    return (
+      <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-1">
+        <Clock className="w-3 h-3 text-pink-500 shrink-0" />
+        <span className="font-semibold text-gray-700">{rel || fallbackLabel || 'Recently'}</span>
+        {full && (
+          <>
+            <span className="text-gray-300">•</span>
+            <span className="text-gray-400 font-mono text-[9.5px]">{full}</span>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderMilestonesStepper = (itemId: string, milestones: TimelineMilestone[]) => {
+    if (!showMilestones || !milestones || milestones.length === 0) return null;
+    const isExpanded = expandedTimelineIds.has(itemId);
+
+    return (
+      <div className="mt-2 pt-1.5 border-t border-gray-100">
+        <div className="flex items-center justify-between text-[10px] text-gray-500">
+          <span className="font-semibold flex items-center gap-1 text-gray-600">
+            <History className="w-3 h-3 text-pink-600" />
+            <span>Timeline</span>
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTimeline(itemId);
+            }}
+            className="text-[10px] text-pink-600 hover:text-pink-800 font-semibold cursor-pointer flex items-center gap-0.5 hover:underline"
+          >
+            <span>{isExpanded ? 'Hide' : 'Details'}</span>
+            {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+          </button>
+        </div>
+
+        {/* 1-Line Visual Timeline Stepper */}
+        <div className="flex items-center gap-1 mt-1 overflow-x-auto scrollbar-none py-0.5 text-[9.5px]">
+          {milestones.map((m, idx) => {
+            const isCancelled = m.status === 'cancelled';
+            const isCompleted = m.status === 'completed';
+            const isCurrent = m.status === 'current';
+
+            return (
+              <React.Fragment key={idx}>
+                <div
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md font-medium shrink-0 transition-all ${
+                    isCancelled
+                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                      : isCompleted
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : isCurrent
+                      ? 'bg-amber-50 text-amber-800 border border-amber-300 ring-1 ring-amber-200'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}
+                  title={m.detail || m.timeLabel}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      isCancelled
+                        ? 'bg-rose-500'
+                        : isCompleted
+                        ? 'bg-emerald-500'
+                        : isCurrent
+                        ? 'bg-amber-500 animate-pulse'
+                        : 'bg-gray-400'
+                    }`}
+                  />
+                  <span>{m.title}</span>
+                  {m.timeLabel && <span className="opacity-75 text-[8.5px]">({m.timeLabel})</span>}
+                </div>
+                {idx < milestones.length - 1 && (
+                  <span className="text-gray-300 text-[10px] shrink-0 font-bold">➔</span>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* Detailed Timeline Steps */}
+        {isExpanded && (
+          <div className="mt-2 p-2 bg-stone-50/90 rounded-lg border border-stone-200/70 space-y-2 text-[11px] animate-in fade-in duration-100">
+            {milestones.map((m, idx) => (
+              <div key={idx} className="flex items-start gap-2 relative">
+                {idx < milestones.length - 1 && (
+                  <div className="absolute left-1.5 top-3.5 bottom-0 w-0.5 bg-gray-200" />
+                )}
+                <div
+                  className={`w-3.5 h-3.5 rounded-full mt-0.5 shrink-0 flex items-center justify-center text-[8px] font-bold text-white shadow-2xs ${
+                    m.status === 'cancelled'
+                      ? 'bg-rose-500 ring-2 ring-rose-200'
+                      : m.status === 'completed'
+                      ? 'bg-emerald-500 ring-2 ring-emerald-200'
+                      : m.status === 'current'
+                      ? 'bg-amber-500 ring-2 ring-amber-200'
+                      : 'bg-gray-400'
+                  }`}
+                >
+                  {idx + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-bold text-gray-900">{m.title}</span>
+                    {m.timeLabel && <span className="text-[10px] text-gray-500 font-medium">{m.timeLabel}</span>}
+                  </div>
+                  {m.detail && (
+                    <p className="text-[10px] text-gray-600 mt-0.5 bg-white/80 p-1 rounded border border-gray-100">
+                      {m.detail}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const {
     readItemIds,
@@ -707,6 +854,25 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
             )}
           </div>
 
+          {/* Timeline Sub-header Bar */}
+          <div className="px-3.5 py-1.5 bg-gradient-to-r from-stone-50 via-pink-50/40 to-stone-50 border-b border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
+            <div className="flex items-center gap-1.5 font-medium">
+              <History className="w-3 h-3 text-pink-600 shrink-0" />
+              <span className="font-bold text-gray-800">Timeline</span>
+              <span className="text-gray-300">•</span>
+              <span className="text-gray-500">LIFO Order • Most recent at top</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMilestones((prev) => !prev)}
+              className="text-[10px] text-pink-600 hover:text-pink-800 font-semibold cursor-pointer hover:underline flex items-center gap-1 shrink-0"
+              title="Toggle milestone timeline progress"
+            >
+              <Activity className="w-2.5 h-2.5 text-pink-500" />
+              <span>{showMilestones ? 'Milestones On' : 'Milestones Off'}</span>
+            </button>
+          </div>
+
           {/* Notifications Body */}
           <div className="min-h-0 flex-1 overflow-y-auto max-h-[460px] p-2.5 space-y-2 divide-y-0 scrollbar-thin scrollbar-thumb-pink-200">
             {/* ============================================================== */}
@@ -743,6 +909,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           }`}
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader(s.timestamp)}
                             <div className="flex items-center gap-1.5">
                               {isCancelledAlert ? (
                                 <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -811,6 +978,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               }`}
                             >
                               <div className="min-w-0 flex-1">
+                                {renderTimelineHeader(appt.updated_at || appt.cancelled_at || appt.created_at)}
                                 {isCancelledBySalon ? (
                                   <div>
                                     <div className="flex items-center gap-1.5 text-rose-800 font-bold text-xs truncate">
@@ -846,6 +1014,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                     </p>
                                   </div>
                                 )}
+                                {renderMilestonesStepper(itemId, getAppointmentTimelineMilestones(appt))}
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">
@@ -934,19 +1103,21 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   itemId
                                 )
                               }
-                              className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                 isItemRead
                                   ? 'border-amber-200/60 bg-amber-50/20 hover:bg-amber-100/40 text-amber-950'
                                   : 'border-amber-300 bg-amber-50/70 hover:bg-amber-100/60 text-amber-950 shadow-2xs'
                               }`}
                             >
                               <div className="min-w-0 flex-1">
+                                {renderTimelineHeader(appt.updated_at || appt.created_at)}
                                 <p className="text-xs font-bold text-amber-950 truncate">
                                   {appt.customer_name || 'Client'} • {appt.service_name}
                                 </p>
                                 <p className="text-[11px] text-amber-800 truncate mt-0.5">
                                   {appt.appointment_date} at {formatTimeTo12Hour(appt.appointment_time)}
                                 </p>
+                                {renderMilestonesStepper(itemId, getAppointmentTimelineMilestones(appt))}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
@@ -980,19 +1151,21 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   itemId
                                 )
                               }
-                              className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                 isItemRead
                                   ? 'border-gray-100 bg-white hover:bg-purple-50/30 text-gray-700'
                                   : 'border-purple-200 bg-purple-50/40 hover:bg-purple-100/50 text-purple-950 shadow-2xs'
                               }`}
                             >
                               <div className="min-w-0 flex-1">
+                                {renderTimelineHeader(appt.updated_at || appt.created_at)}
                                 <p className="text-xs font-bold text-gray-900 truncate">
                                   {appt.customer_name || 'Client'} • {appt.service_name}
                                 </p>
                                 <p className="text-[11px] text-gray-500 truncate mt-0.5">
                                   {appt.appointment_date} at {formatTimeTo12Hour(appt.appointment_time)}
                                 </p>
+                                {renderMilestonesStepper(itemId, getAppointmentTimelineMilestones(appt))}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
@@ -1027,13 +1200,14 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   itemId
                                 )
                               }
-                              className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                 isItemRead
                                   ? 'border-gray-100 bg-white text-gray-500'
                                   : 'border-rose-200 bg-rose-50/60 text-rose-950'
                               }`}
                             >
                               <div className="min-w-0 flex-1">
+                                {renderTimelineHeader(appt.cancelled_at || appt.updated_at || appt.created_at)}
                                 <p className="text-xs font-bold text-rose-950 truncate">
                                   {isCustomerCancelled ? 'Client Cancelled: ' : 'Cancelled: '}
                                   {appt.customer_name || 'Client'} • {appt.service_name}
@@ -1041,6 +1215,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                 <p className="text-[11px] text-rose-800 truncate mt-0.5">
                                   {appt.appointment_date} • {appt.cancellation_reason || 'Cancelled'}
                                 </p>
+                                {renderMilestonesStepper(itemId, getAppointmentTimelineMilestones(appt))}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
@@ -1175,6 +1350,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           }`}
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader(s.timestamp)}
                             <div className="flex items-center gap-1.5">
                               {isCancelledAlert ? (
                                 <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -1239,6 +1415,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           }`}
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader(order.cancelled_at || order.unclaimed_at || order.updated_at || order.created_at || order.order_date)}
                             <div className="flex items-center gap-1.5">
                               {isCancelled || isUnclaimed ? (
                                 <PackageX className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -1262,6 +1439,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                                   : 'Status: Cancelled'}
                               </p>
                             )}
+                            {renderMilestonesStepper(itemId, getOrderTimelineMilestones(order))}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <span
@@ -1307,15 +1485,17 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               itemId
                             )
                           }
-                          className="p-2 px-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100/50 transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                          className="p-2.5 px-3 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100/50 transition-all cursor-pointer flex items-center justify-between gap-2.5"
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader(order.updated_at || order.created_at || order.order_date)}
                             <p className="text-xs font-bold text-emerald-950 truncate">
                               Order #{order.order_number || order.id} • {order.customer_name}
                             </p>
                             <p className="text-[11px] text-emerald-800 truncate mt-0.5">
                               ₱{order.total_amount.toLocaleString()} • Pickup on {order.pickup_date}
                             </p>
+                            {renderMilestonesStepper(itemId, getOrderTimelineMilestones(order))}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -1365,6 +1545,48 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                   )}
                 </div>
 
+                {/* 3A. System Alerts */}
+                {alertSystemNotifs.length > 0 && (
+                  <div className="space-y-1">
+                    {alertSystemNotifs.map((s) => {
+                      const isItemRead = globalIsRead(s.id);
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => {
+                            if (s.linkTab) {
+                              handleItemNavigation(s.linkTab, s.linkTargetId, s.id);
+                            } else {
+                              markAsRead(s.id);
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-2.5 ${
+                            isItemRead
+                              ? 'bg-white border-gray-100 hover:border-amber-200 text-gray-600'
+                              : 'bg-amber-50/70 border-amber-300 hover:bg-amber-100/70 text-amber-950 shadow-2xs'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            {renderTimelineHeader(s.timestamp)}
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <p className="text-xs font-bold text-gray-900 truncate">
+                                {s.title}
+                              </p>
+                            </div>
+                            <p className="text-[11px] text-gray-600 mt-1 leading-normal">
+                              {s.message}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {renderDotMenu(s.id, s.title)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Admin Pending Salon Approvals */}
                 {currentUser?.user_type === 'admin' && activeAdminPendingSalons.length > 0 && (
                   <div className="space-y-1">
@@ -1380,9 +1602,10 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               itemId
                             )
                           }
-                          className="p-2 px-2.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                          className="p-2.5 px-3 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader((salon as any).updated_at || (salon as any).created_at)}
                             <p className="text-xs font-bold text-rose-950 truncate">
                               Verify: {salon.salon_name}
                             </p>
@@ -1417,9 +1640,10 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               itemId
                             )
                           }
-                          className="p-2 px-2.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                          className="p-2.5 px-3 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5"
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader((salon as any).updated_at || (salon as any).created_at)}
                             <p className="text-xs font-bold text-amber-950 truncate">
                               Branch: {salon.salon_name}
                             </p>
@@ -1467,7 +1691,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               );
                             }
                           }}
-                          className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                          className={`p-2.5 px-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                             isItemRead
                               ? 'bg-white border-gray-100 text-gray-600 opacity-75'
                               : isAlert
@@ -1478,6 +1702,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                           }`}
                         >
                           <div className="min-w-0 flex-1">
+                            {renderTimelineHeader((item as any).updated_at || item.created_at)}
                             <p className="text-xs font-bold text-gray-900 truncate">
                               {item.title}
                             </p>
@@ -1507,7 +1732,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
 
                 {activeAnnouncements.length === 0 &&
                   ownerPendingSalons.length === 0 &&
-                  activeAdminPendingSalons.length === 0 && (
+                  activeAdminPendingSalons.length === 0 &&
+                  alertSystemNotifs.length === 0 && (
                     <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl text-center">
                       No active system or promotional alerts at this time.
                     </p>
@@ -1545,6 +1771,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                         className="p-2.5 rounded-xl border border-gray-200 bg-stone-50/60 flex items-center justify-between gap-2.5"
                       >
                         <div className="min-w-0 flex-1">
+                          {renderTimelineHeader(item.timestamp, 'Trashed recently')}
                           <p className="text-xs font-bold text-gray-800 truncate">
                             {item.title}
                           </p>
