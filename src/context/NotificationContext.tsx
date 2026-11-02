@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { Announcement, Appointment, ProductOrder, Salon, User } from '../types';
 import { localStorage as safeLocalStorage } from '../lib/localStorage';
+import { fetchSystemNotifications } from '../lib/api';
 
 export type NotificationPriority = 'urgent' | 'normal' | 'low';
 
@@ -20,7 +21,14 @@ export interface SystemNotification {
     | 'booking_cancelled_by_customer'
     | 'booking_new'
     | 'order_status'
-    | 'system_alert';
+    | 'order_cancelled'
+    | 'order_cancelled_by_owner'
+    | 'order_cancelled_by_customer'
+    | 'order_unclaimed'
+    | 'order_ready'
+    | 'order_completed'
+    | 'system_alert'
+    | string;
   linkTab?: string;
   linkTargetId?: string;
   metadata?: any;
@@ -198,6 +206,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         priority: 'normal',
         linkTab: 'owner-appointments',
       },
+      {
+        id: 'sys-order-cancelled-sample',
+        category: 'orders',
+        title: 'Salon Cancelled Reservation ⚠️',
+        message: 'Luxe Glow Nail & Spa Lounge cancelled pickup reservation #NGH-PRD-10291 for 2 item(s). Reason: Distributor recall on batch.',
+        timestamp: new Date(Date.now() - 7200000).toISOString(),
+        recipient_role: 'customer',
+        type: 'order_cancelled_by_owner',
+        priority: 'urgent',
+        linkTab: 'customer-orders',
+      },
     ];
   });
 
@@ -335,6 +354,37 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       } catch (warnErr) {
         // quiet fallback
       }
+
+      // 3. Fetch server system notifications (including reservation cancellations)
+      try {
+        const serverNotifs = await fetchSystemNotifications({
+          user_id: currentUser.id,
+          role: currentUser.user_type,
+        });
+        if (Array.isArray(serverNotifs) && isMounted) {
+          serverNotifs.forEach((item: any) => {
+            const sysId = `sys-db-${item.id}`;
+            const exists = systemNotifications.some((s) => s.id === sysId || s.id === item.id);
+            if (!exists) {
+              addNotification({
+                id: sysId,
+                category: item.category || 'cart',
+                title: item.title,
+                message: item.message,
+                recipient_role: item.recipient_role || (currentUser.user_type as any),
+                recipient_user_id: item.recipient_user_id || currentUser.id,
+                priority: item.priority || 'normal',
+                type: item.type || 'order_cancelled',
+                linkTab: item.linkTab || (currentUser.user_type === 'salon_owner' ? 'owner-products' : 'customer-orders'),
+                linkTargetId: item.linkTargetId,
+                timestamp: item.created_at || new Date().toISOString(),
+              });
+            }
+          });
+        }
+      } catch (sysErr) {
+        // quiet fallback
+      }
     };
 
     checkScheduleAndMessages();
@@ -451,6 +501,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     if (typeOrCategory === 'alert' || typeOrCategory === 'urgent') return true;
     if (meta?.type === 'alert') return true;
     if (meta?.is_overdue_unclaimed) return true;
+    if (meta?.status === 'cancelled' || meta?.status === 'unclaimed') return true;
+    if (typeof typeOrCategory === 'string' && (typeOrCategory.includes('cancelled') || typeOrCategory.includes('unclaimed'))) return true;
+    if (meta?.type && typeof meta.type === 'string' && (meta.type.includes('cancelled') || meta.type.includes('unclaimed'))) return true;
     if (meta?.status === 'pending_pickup' && meta?.pickup_date && meta.pickup_date < new Date().toISOString().split('T')[0]) {
       return true;
     }
@@ -473,6 +526,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       if (!category || category === 'bookings' || category === 'all') {
         customerAppointments.forEach((a) => allIdsToAdd.push(`cust-appt-${a.id}`));
         ownerAppointments.forEach((a) => allIdsToAdd.push(`owner-appt-${a.id}`));
+        customerOrders.forEach((o) => allIdsToAdd.push(`cust-order-${o.id}`));
+        ownerProductOrders.forEach((o) => allIdsToAdd.push(`owner-order-${o.id}`));
       }
 
       if (!category || category === 'alerts' || category === 'all') {
@@ -598,14 +653,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     // 2. Customer orders
     if (currentUser?.user_type === 'customer') {
       customerOrders
-        .filter((o) => o.status === 'pending_pickup' || o.status === 'ready_for_pickup')
+        .filter((o) => o.status === 'pending_pickup' || o.status === 'ready_for_pickup' || o.status === 'cancelled' || o.status === 'unclaimed')
         .forEach((o) => {
           const key = `cust-order-${o.id}`;
           if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadCart = true;
+            unreadBookings = true;
             ordersUnreadCount++;
-            if (o.is_overdue_unclaimed) urgent++;
+            if (o.is_overdue_unclaimed || o.status === 'cancelled' || o.status === 'unclaimed') urgent++;
           }
         });
     }
@@ -619,6 +675,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           if (!readItemIds.has(key) && !isExcluded(key)) {
             unread++;
             unreadCart = true;
+            unreadBookings = true;
             ordersUnreadCount++;
           }
         });

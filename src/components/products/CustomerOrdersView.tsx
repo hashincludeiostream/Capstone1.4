@@ -17,6 +17,7 @@ import { ProductOrder, ProductOrderStatus, User } from '../../types';
 import { cancelProductOrder, updateProductOrderStatus } from '../../lib/api';
 import { scrollToElement } from '../../utils/scrollHelper';
 import { OrderCancellationModal } from '../cancellation/OrderCancellationModal';
+import { useNotifications } from '../../context/NotificationContext';
 
 interface CustomerOrdersViewProps {
   orders: ProductOrder[];
@@ -35,6 +36,7 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
   onOpenLogin,
   targetOrderId,
 }) => {
+  const { addNotification } = useNotifications();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [orderToCancel, setOrderToCancel] = useState<ProductOrder | null>(null);
 
@@ -77,11 +79,26 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({
     orderId: number,
     data: { cancellation_reason: string; cancellation_notes: string }
   ) => {
+    const targetOrder = orders.find((o) => o.id === orderId);
     await cancelProductOrder(orderId, {
       cancellation_reason: data.cancellation_reason,
       cancellation_notes: data.cancellation_notes,
       cancelled_by: 'customer',
     });
+
+    addNotification({
+      id: `sys-order-cancelled-${orderId}-${Date.now()}`,
+      category: 'cart',
+      title: `Order #${targetOrder?.order_number || orderId} Cancelled ⚠️`,
+      message: `Your reservation at ${targetOrder?.salon_name || 'the salon'} was cancelled. Reason: ${data.cancellation_reason}`,
+      recipient_role: 'customer',
+      recipient_user_id: currentUser?.id,
+      priority: 'normal',
+      type: 'order_cancelled_by_customer',
+      linkTab: 'customer-orders',
+      linkTargetId: `customer-order-${orderId}`,
+    });
+
     onRefreshOrders();
   };
 

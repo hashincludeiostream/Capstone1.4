@@ -4605,6 +4605,65 @@ async function startServer() {
         console.warn('Order cancellation email warning:', orderCancelEmailErr);
       }
 
+      // Automatically insert in-app system notifications for product order cancellation
+      try {
+        const [salonRows] = await db.execute('SELECT salon_name, address, phone FROM salons WHERE id = ?', [Number(updated.salon_id)]);
+        const salon = (salonRows as any[])[0];
+
+        // 1. Notification for Customer
+        const customerTitle = by === 'salon_owner'
+          ? 'Salon Cancelled Reservation ⚠️'
+          : `Order #${updated.order_number} Cancelled ⚠️`;
+        const customerMessage = by === 'salon_owner'
+          ? `${salon?.salon_name || 'The salon'} cancelled your product pickup reservation #${updated.order_number} for ${updated.total_items} item(s). Reason: ${reason}`
+          : `Your product pickup reservation #${updated.order_number} for ${updated.total_items} item(s) at ${salon?.salon_name || 'the salon'} was cancelled. ${reason ? `Reason: ${reason}` : ''}`;
+
+        await db.execute(
+          `INSERT INTO system_notifications (
+            category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+            priority, type, linkTab, linkTargetId, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            'orders',
+            customerTitle,
+            customerMessage,
+            'customer',
+            Number(updated.customer_id),
+            Number(updated.salon_id),
+            by === 'salon_owner' ? 'urgent' : 'normal',
+            by === 'salon_owner' ? 'order_cancelled_by_owner' : 'order_cancelled',
+            'customer-orders',
+            `customer-order-${updated.id}`,
+            new Date().toISOString(),
+          ]
+        );
+
+        // 2. Notification for Salon Owner if cancelled by customer
+        if (by === 'customer') {
+          await db.execute(
+            `INSERT INTO system_notifications (
+              category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+              priority, type, linkTab, linkTargetId, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              'orders',
+              'Customer Cancelled Reservation ⚠️',
+              `${updated.customer_name} cancelled product pickup reservation #${updated.order_number}. Items have been restocked to shelf inventory.`,
+              'salon_owner',
+              null,
+              Number(updated.salon_id),
+              'normal',
+              'order_cancelled_by_customer',
+              'owner-inventory',
+              `owner-order-${updated.id}`,
+              new Date().toISOString(),
+            ]
+          );
+        }
+      } catch (notifErr) {
+        console.warn('Order cancellation system notification warning:', notifErr);
+      }
+
       res.json({
         success: true,
         order: {
@@ -4726,6 +4785,38 @@ async function startServer() {
         }
 
         // Insert in-app system notification for the customer
+        const cancelledBy = updated.cancelled_by || (req.body && req.body.cancelled_by) || 'salon_owner';
+        const notifTitle =
+          status === 'cancelled'
+            ? (cancelledBy === 'salon_owner' ? 'Salon Cancelled Reservation ⚠️' : `Order #${updated.order_number} Cancelled ⚠️`)
+            : status === 'unclaimed'
+            ? `Order #${updated.order_number} Expired (Unclaimed) ⚠️`
+            : status === 'ready_for_pickup'
+            ? `Order #${updated.order_number} Ready for Pickup 🛍️`
+            : status === 'completed'
+            ? `Order #${updated.order_number} Completed 🎉`
+            : `Order #${updated.order_number} Status Updated`;
+
+        const notifMessage =
+          status === 'cancelled'
+            ? (cancelledBy === 'salon_owner'
+                ? `${salon?.salon_name || 'The salon'} cancelled your product pickup reservation #${updated.order_number} for ${updated.total_items} item(s). Reason: ${updated.cancellation_reason || 'Facility / inventory update'}`
+                : `Your product pickup reservation #${updated.order_number} at ${salon?.salon_name || 'the salon'} was cancelled.${updated.cancellation_reason ? ` Reason: ${updated.cancellation_reason}` : ''}`)
+            : status === 'unclaimed'
+            ? `Your pickup reservation #${updated.order_number} at ${salon?.salon_name || 'the salon'} expired because it was not claimed in time. Reserved items have been returned to shelf inventory.`
+            : `Your product reservation is ${status}. Total: ₱${Number(updated.total_amount || 0).toLocaleString()} at ${salon?.salon_name || 'the salon'}.`;
+
+        const notifType =
+          status === 'cancelled'
+            ? (cancelledBy === 'salon_owner' ? 'order_cancelled_by_owner' : 'order_cancelled')
+            : status === 'unclaimed'
+            ? 'order_unclaimed'
+            : status === 'ready_for_pickup'
+            ? 'order_ready'
+            : status === 'completed'
+            ? 'order_completed'
+            : 'order_status';
+
         await db.execute(
           `INSERT INTO system_notifications (
             category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
@@ -4733,15 +4824,15 @@ async function startServer() {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             'orders',
-            `Order #${updated.order_number} ${status === 'ready_for_pickup' ? 'Ready for Pickup 🛍️' : status === 'completed' ? 'Completed 🎉' : 'Status Updated'}`,
-            `Your product reservation is ${status}. Total: ₱${Number(updated.total_amount || 0).toLocaleString()} at ${salon?.salon_name}.`,
+            notifTitle,
+            notifMessage,
             'customer',
             Number(updated.customer_id),
             Number(updated.salon_id),
             status === 'cancelled' || status === 'unclaimed' ? 'urgent' : 'normal',
-            'order_status',
+            notifType,
             'customer-orders',
-            `order-${updated.id}`,
+            `customer-order-${updated.id}`,
             new Date().toISOString(),
           ]
         );
@@ -4807,6 +4898,32 @@ async function startServer() {
           'UPDATE product_orders SET status = ?, unclaimed_reason = ?, unclaimed_at = ?, restocked_items_count = ? WHERE id = ?',
           ['unclaimed', 'Scheduled in-store pickup window expired without customer claiming', unclaimedAt, restockedForOrder, order.id]
         );
+
+        // In-app alert for customer
+        try {
+          await db.execute(
+            `INSERT INTO system_notifications (
+              category, title, message, recipient_role, recipient_user_id, recipient_salon_id,
+              priority, type, linkTab, linkTargetId, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              'orders',
+              `Order #${order.order_number} Expired (Unclaimed) ⚠️`,
+              `Your pickup reservation #${order.order_number} was not claimed within the scheduled window. Reserved products have been returned to salon stock.`,
+              'customer',
+              Number(order.customer_id),
+              Number(order.salon_id),
+              'urgent',
+              'order_unclaimed',
+              'customer-orders',
+              `customer-order-${order.id}`,
+              unclaimedAt,
+            ]
+          );
+        } catch {
+          // ignore notification insert error in batch loop
+        }
+
         updatedCount++;
       }
 

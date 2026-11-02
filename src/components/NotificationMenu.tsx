@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Info,
   CalendarX,
+  PackageX,
   User,
 } from 'lucide-react';
 import {
@@ -286,17 +287,15 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
     0
   );
 
-  const activeCustomerOrders = customerOrders
-    .filter(
-      (o) =>
-        (o.status === 'pending_pickup' || o.status === 'ready_for_pickup') &&
-        !isExcluded(`cust-order-${o.id}`)
-    )
+  const displayedCustomerOrders = customerOrders
+    .filter((o) => !isExcluded(`cust-order-${o.id}`))
     .sort((a, b) => {
       const diff = getOrderRecency(b) - getOrderRecency(a);
       if (diff !== 0) return diff;
       return Number(b.id || 0) - Number(a.id || 0);
     });
+
+  const activeCustomerOrders = displayedCustomerOrders;
 
   const ownerPendingOrders = ownerProductOrders
     .filter((o) => o.status === 'pending_pickup' && !isExcluded(`owner-order-${o.id}`))
@@ -1140,21 +1139,83 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                   </div>
                 ) : null}
 
+                {/* 2A. System Alerts for Cart & Orders (e.g. Cancelled reservations) */}
+                {cartSystemNotifs.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-800 pb-0.5">
+                      <PackageX className="w-3 h-3 text-rose-600" />
+                      <span>Order Alerts &amp; Updates</span>
+                    </div>
+                    {cartSystemNotifs.map((s) => {
+                      const isItemRead = globalIsRead(s.id);
+                      const isCancelledAlert =
+                        s.type === 'order_cancelled' ||
+                        s.type === 'order_cancelled_by_owner' ||
+                        s.type === 'order_cancelled_by_customer' ||
+                        s.type === 'order_unclaimed' ||
+                        s.title.toLowerCase().includes('cancel') ||
+                        s.title.toLowerCase().includes('expired');
+
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => {
+                            if (s.linkTab) {
+                              handleItemNavigation(s.linkTab, s.linkTargetId, s.id);
+                            } else {
+                              markAsRead(s.id);
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-2.5 ${
+                            isItemRead
+                              ? 'bg-white border-gray-100 hover:border-pink-200 text-gray-600'
+                              : isCancelledAlert
+                              ? 'bg-rose-50/70 border-rose-300 hover:bg-rose-100/70 text-rose-950 shadow-2xs ring-1 ring-rose-200'
+                              : 'bg-emerald-50/60 border-emerald-300 hover:bg-emerald-100/50 text-emerald-950 shadow-2xs'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              {isCancelledAlert ? (
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              ) : (
+                                <ShoppingBag className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              )}
+                              <p className={`text-xs font-bold truncate ${isCancelledAlert ? 'text-rose-950' : 'text-gray-900'}`}>
+                                {s.title}
+                              </p>
+                            </div>
+                            <p className="text-[11px] text-gray-600 mt-1 leading-normal">
+                              {s.message}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {renderDotMenu(s.id, s.title)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Customer Placed Pickup Orders */}
-                {currentUser?.user_type === 'customer' && activeCustomerOrders.length > 0 && (
+                {currentUser?.user_type === 'customer' && displayedCustomerOrders.length > 0 && (
                   <div className="space-y-1 pt-1">
                     <div className="flex items-center justify-between pb-1 border-b border-gray-100">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900">
                         Pickup Reservations
                       </span>
                       <span className="text-[10px] text-gray-500 font-medium">
-                        {activeCustomerOrders.length} active
+                        {displayedCustomerOrders.length} total
                       </span>
                     </div>
 
-                    {activeCustomerOrders.map((order) => {
+                    {displayedCustomerOrders.map((order) => {
                       const itemId = `cust-order-${order.id}`;
                       const isReady = order.status === 'ready_for_pickup';
+                      const isCancelled = order.status === 'cancelled';
+                      const isUnclaimed = order.status === 'unclaimed';
                       const isItemRead = globalIsRead(itemId);
 
                       return (
@@ -1167,29 +1228,52 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                               itemId
                             )
                           }
-                          className={`p-2 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                             isItemRead
-                              ? 'bg-white border-gray-100 hover:border-emerald-200 text-gray-600'
-                              : 'bg-emerald-50/50 border-emerald-200 hover:bg-emerald-50 text-gray-900 shadow-2xs'
+                              ? 'bg-white border-gray-100 hover:border-pink-200 text-gray-600'
+                              : isCancelled || isUnclaimed
+                              ? 'bg-rose-50/70 border-rose-300 hover:bg-rose-100/70 text-rose-950 shadow-2xs ring-1 ring-rose-200'
+                              : isReady
+                              ? 'bg-emerald-50/60 border-emerald-300 hover:bg-emerald-100/50 text-emerald-950 shadow-2xs'
+                              : 'bg-amber-50/50 border-amber-200 hover:bg-amber-50 text-gray-900 shadow-2xs'
                           }`}
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-gray-900 truncate">
-                              Order #{order.order_number || order.id}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              {isCancelled || isUnclaimed ? (
+                                <PackageX className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              ) : (
+                                <Package className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                              )}
+                              <p className={`text-xs font-bold truncate ${isCancelled || isUnclaimed ? 'text-rose-950' : 'text-gray-900'}`}>
+                                Order #{order.order_number || order.id}
+                              </p>
+                            </div>
                             <p className="text-[11px] text-gray-500 truncate mt-0.5">
                               ₱{order.total_amount.toLocaleString()} • Pickup on {order.pickup_date}
+                              {order.salon_name ? ` • ${order.salon_name}` : ''}
                             </p>
+                            {(order.cancellation_reason || isCancelled || isUnclaimed) && (
+                              <p className="text-[10px] text-rose-700 italic truncate mt-0.5">
+                                {order.cancellation_reason
+                                  ? `Reason: ${order.cancellation_reason}`
+                                  : isUnclaimed
+                                  ? 'Status: Expired & unclaimed'
+                                  : 'Status: Cancelled'}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <span
                               className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                isReady
+                                isCancelled || isUnclaimed
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : isReady
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : 'bg-amber-100 text-amber-800'
                               }`}
                             >
-                              {isReady ? 'Ready' : 'Pending'}
+                              {isCancelled ? 'Cancelled' : isUnclaimed ? 'Unclaimed' : isReady ? 'Ready' : 'Pending'}
                             </span>
                             {renderDotMenu(itemId, `Order #${order.order_number || order.id}`)}
                           </div>
@@ -1246,8 +1330,9 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                 )}
 
                 {effectiveCartCount === 0 &&
-                  activeCustomerOrders.length === 0 &&
-                  ownerPendingOrders.length === 0 && (
+                  displayedCustomerOrders.length === 0 &&
+                  ownerPendingOrders.length === 0 &&
+                  cartSystemNotifs.length === 0 && (
                     <div className="p-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 text-center">
                       <p className="text-xs text-gray-500">
                         Your In-Store Reservation Cart is empty.

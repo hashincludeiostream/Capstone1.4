@@ -323,30 +323,25 @@ class InMemoryDatabase {
   }
 
   /**
-   * Pulls all live records from Cloud Firestore to ensure real-time parity with Firebase.
+   * Pulls records from Cloud Firestore to ensure parity with Firebase.
+   * Quota-safe: Skips unauthenticated private collections that would trigger permission-denied
+   * or exhaust the free-tier daily read limits.
    */
   public async syncFromFirestore(): Promise<number> {
-    const collectionsToSync: { table: string; col: string }[] = [
+    // Only attempt public catalog collections when running without server-side admin credentials
+    const publicCollectionsToSync: { table: string; col: string }[] = [
       { table: 'business_categories', col: 'categories' },
-      { table: 'users', col: 'users' },
       { table: 'salons', col: 'salons' },
       { table: 'services', col: 'services' },
       { table: 'technicians', col: 'technicians' },
-      { table: 'working_hours', col: 'working_hours' },
-      { table: 'appointments', col: 'appointments' },
-      { table: 'reviews', col: 'reviews' },
-      { table: 'reels', col: 'reels' },
+      { table: 'products', col: 'products' },
       { table: 'promotions', col: 'promotions' },
       { table: 'announcements', col: 'announcements' },
-      { table: 'products', col: 'products' },
-      { table: 'product_orders', col: 'product_orders' },
-      { table: 'transactions', col: 'transactions' },
-      { table: 'email_logs', col: 'email_logs' },
-      { table: 'messages', col: 'messages' },
+      { table: 'reels', col: 'reels' },
     ];
 
     let totalLoaded = 0;
-    for (const { table, col } of collectionsToSync) {
+    for (const { table, col } of publicCollectionsToSync) {
       try {
         const snap = await getDocs(collection(firestoreDb, col));
         if (!snap.empty) {
@@ -368,15 +363,19 @@ class InMemoryDatabase {
           this.markQuotaExceeded();
           break;
         }
-        console.warn(`[Firestore Sync] Could not pull collection "${col}":`, msg);
+        console.warn(`[Firestore Sync] Could not pull public collection "${col}":`, msg);
       }
     }
 
     // Protect core seed salons and ensure full services & staff for all branches
     this.ensureSalonDefaults();
 
-    console.log(`🔥 [Firestore] Successfully synchronized ${totalLoaded} live documents into database layer.`);
-    this.saveToDisk();
+    if (totalLoaded > 0) {
+      console.log(`🔥 [Firestore] Successfully synchronized ${totalLoaded} public documents into database layer.`);
+      this.saveToDisk();
+    } else {
+      console.log('ℹ️ [Firestore] Operating with local persisted disk store (persisted_db.json).');
+    }
     return totalLoaded;
   }
 
