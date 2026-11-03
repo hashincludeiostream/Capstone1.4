@@ -104,8 +104,19 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
     // Subscribe to live appointment updates (owner confirmation, cancellation, etc.)
     const unsubscribe = subscribeToAppointments({ customer_id: currentUser.id }, (liveAppts) => {
-      if (liveAppts) {
-        setAppointments(liveAppts);
+      if (liveAppts && liveAppts.length > 0) {
+        setAppointments((prev) => {
+          const map = new Map<number, Appointment>();
+          prev.forEach((a) => map.set(Number(a.id), a));
+          liveAppts.forEach((a) => map.set(Number(a.id), a));
+          const merged = Array.from(map.values());
+          return merged.sort((a, b) => {
+            const timeB = getAppointmentSortTimestamp(b.appointment_date, b.appointment_time, b.updated_at || b.cancelled_at || b.created_at);
+            const timeA = getAppointmentSortTimestamp(a.appointment_date, a.appointment_time, a.updated_at || a.cancelled_at || a.created_at);
+            if (timeB !== timeA) return timeB - timeA;
+            return Number(b.id || 0) - Number(a.id || 0);
+          });
+        });
         onRefreshAppointments?.();
       }
     });

@@ -349,7 +349,7 @@ export async function createFirestoreProductOrder(order: any): Promise<any> {
   const orderId = String(order.id || Date.now());
   if (!isClientQuotaExceeded()) {
     try {
-      await setDoc(doc(db, 'product_orders', orderId), order);
+      await setDoc(doc(db, 'product_orders', orderId), order, { merge: true });
     } catch (err) {
       handleClientFirestoreError(err, 'create product order');
     }
@@ -365,11 +365,16 @@ export async function updateFirestoreProductOrderStatus(
   if (isClientQuotaExceeded()) return true;
   try {
     const ref = doc(db, 'product_orders', String(orderId));
-    await updateDoc(ref, {
-      status,
-      ...(extraData || {}),
-      updated_at: new Date().toISOString(),
-    });
+    await setDoc(
+      ref,
+      {
+        id: Number(orderId),
+        status,
+        ...(extraData || {}),
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    );
     return true;
   } catch (err) {
     handleClientFirestoreError(err, 'update product order status');
@@ -378,7 +383,7 @@ export async function updateFirestoreProductOrderStatus(
 }
 
 export async function createFirestoreSalon(data: Partial<Salon>): Promise<Salon> {
-  const newId = Date.now();
+  const newId = data.id !== undefined && data.id !== null ? Number(data.id) : Date.now();
   const salonRecord: Salon = {
     id: newId,
     owner_id: Number(data.owner_id || 1),
@@ -394,10 +399,10 @@ export async function createFirestoreSalon(data: Partial<Salon>): Promise<Salon>
     description: data.description || '',
     logo: data.logo || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=200&auto=format&fit=crop&q=80',
     banner: data.banner || 'https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=1200&auto=format&fit=crop&q=80',
-    avg_rating: 0,
-    review_count: 0,
-    is_active: true,
-    verification_status: 'verified',
+    avg_rating: Number(data.avg_rating) || 0,
+    review_count: Number(data.review_count) || 0,
+    is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
+    verification_status: data.verification_status || 'verified',
     category_id: data.category_id ? Number(data.category_id) : 1,
     category_name: data.category_name || 'Nail Services',
     latitude: data.latitude || 7.0898,
@@ -408,7 +413,7 @@ export async function createFirestoreSalon(data: Partial<Salon>): Promise<Salon>
 
   if (!isClientQuotaExceeded()) {
     try {
-      await setDoc(doc(db, 'salons', String(newId)), salonRecord);
+      await setDoc(doc(db, 'salons', String(newId)), salonRecord, { merge: true });
     } catch (err) {
       handleClientFirestoreError(err, 'create salon');
     }
@@ -417,7 +422,7 @@ export async function createFirestoreSalon(data: Partial<Salon>): Promise<Salon>
 }
 
 export async function createFirestoreService(data: Partial<Service>): Promise<Service> {
-  const newId = Date.now();
+  const newId = data.id !== undefined && data.id !== null ? Number(data.id) : Date.now();
   const serviceRecord: Service = {
     id: newId,
     salon_id: Number(data.salon_id),
@@ -428,14 +433,14 @@ export async function createFirestoreService(data: Partial<Service>): Promise<Se
     price: Number(data.price || 0),
     duration: Number(data.duration || 60),
     duration_minutes: Number(data.duration || 60),
-    is_active: true,
+    is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
     image_url: data.image_url || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=500&auto=format&fit=crop&q=80',
     difficulty_level: data.difficulty_level || 'Intermediate',
   };
 
   if (!isClientQuotaExceeded()) {
     try {
-      await setDoc(doc(db, 'services', String(newId)), serviceRecord);
+      await setDoc(doc(db, 'services', String(newId)), serviceRecord, { merge: true });
     } catch (err) {
       handleClientFirestoreError(err, 'create service');
     }
@@ -444,7 +449,7 @@ export async function createFirestoreService(data: Partial<Service>): Promise<Se
 }
 
 export async function createFirestoreReview(data: Partial<Review>): Promise<Review> {
-  const newId = Date.now();
+  const newId = data.id !== undefined && data.id !== null ? Number(data.id) : Date.now();
   const reviewRecord: Review = {
     id: newId,
     salon_id: Number(data.salon_id),
@@ -454,12 +459,12 @@ export async function createFirestoreReview(data: Partial<Review>): Promise<Revi
     rating: Number(data.rating || 5),
     comment: data.comment || '',
     service_name: data.service_name || 'Nail Service',
-    created_at: new Date().toISOString(),
+    created_at: data.created_at || new Date().toISOString(),
   };
 
   if (!isClientQuotaExceeded()) {
     try {
-      await setDoc(doc(db, 'reviews', String(newId)), reviewRecord);
+      await setDoc(doc(db, 'reviews', String(newId)), reviewRecord, { merge: true });
     } catch (err) {
       handleClientFirestoreError(err, 'create review');
     }

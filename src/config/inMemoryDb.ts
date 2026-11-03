@@ -323,47 +323,87 @@ class InMemoryDatabase {
   }
 
   /**
-   * Pulls records from Cloud Firestore to ensure parity with Firebase.
-   * Quota-safe: Skips unauthenticated private collections that would trigger permission-denied
-   * or exhaust the free-tier daily read limits.
+   * Pulls and intelligently merges records from Cloud Firestore to ensure parity with Firebase.
+   * Non-destructive: Never discards local records; merges by ID and pushes any un-synced local records to Firestore.
    */
   public async syncFromFirestore(): Promise<number> {
-    // Only attempt public catalog collections when running without server-side admin credentials
-    const publicCollectionsToSync: { table: string; col: string }[] = [
+    const collectionsToSync: { table: string; col: string }[] = [
       { table: 'business_categories', col: 'categories' },
       { table: 'salons', col: 'salons' },
       { table: 'services', col: 'services' },
       { table: 'technicians', col: 'technicians' },
+      { table: 'working_hours', col: 'working_hours' },
       { table: 'products', col: 'products' },
       { table: 'promotions', col: 'promotions' },
       { table: 'announcements', col: 'announcements' },
       { table: 'reels', col: 'reels' },
+      { table: 'reviews', col: 'reviews' },
+      { table: 'appointments', col: 'appointments' },
+      { table: 'product_orders', col: 'product_orders' },
+      { table: 'users', col: 'users' },
     ];
 
     let totalLoaded = 0;
-    for (const { table, col } of publicCollectionsToSync) {
+    for (const { table, col } of collectionsToSync) {
       try {
         const snap = await getDocs(collection(firestoreDb, col));
+        if (!Array.isArray(this.tables[table])) {
+          this.tables[table] = [];
+        }
+
+        const localMap = new Map<string, any>();
+        // Index existing local documents
+        for (const item of this.tables[table]) {
+          if (item && item.id !== undefined && item.id !== null) {
+            localMap.set(String(item.id), item);
+          }
+        }
+
+        const firestoreIds = new Set<string>();
+
         if (!snap.empty) {
-          const docs: any[] = [];
           snap.forEach((d) => {
             const data = d.data();
             const idVal = data.id !== undefined ? (isNaN(Number(data.id)) ? data.id : Number(data.id)) : (isNaN(Number(d.id)) ? d.id : Number(d.id));
-            docs.push({ ...data, id: idVal });
+            const fireDoc = { ...data, id: idVal };
+            const docIdStr = String(idVal);
+            firestoreIds.add(docIdStr);
+
+            const existingLocal = localMap.get(docIdStr);
+            if (!existingLocal) {
+              localMap.set(docIdStr, fireDoc);
+              totalLoaded++;
+            } else {
+              // Both local and cloud have this record: keep newest or merge
+              const fireTime = (fireDoc as any).updated_at ? new Date((fireDoc as any).updated_at).getTime() : 0;
+              const localTime = (existingLocal as any).updated_at ? new Date((existingLocal as any).updated_at).getTime() : 0;
+              if (fireTime >= localTime) {
+                localMap.set(docIdStr, { ...existingLocal, ...fireDoc });
+                totalLoaded++;
+              } else {
+                // Local edit is newer; push to Firestore
+                this.syncToFirestore(table, 'set', existingLocal.id, existingLocal);
+              }
+            }
           });
-          if (docs.length > 0) {
-            this.tables[table] = docs;
-            totalLoaded += docs.length;
+        }
+
+        // Push any local documents that aren't yet in Firestore up to the cloud
+        for (const [idStr, localItem] of localMap.entries()) {
+          if (!firestoreIds.has(idStr)) {
+            this.syncToFirestore(table, 'set', localItem.id, localItem);
           }
         }
+
+        this.tables[table] = Array.from(localMap.values());
       } catch (err: any) {
         const msg = err?.message || String(err);
         if (msg.includes('Quota limit exceeded') || msg.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
-          console.warn('[Firestore Sync] Cloud Firestore free tier quota limit reached. Falling back to local persisted store.');
+          console.warn('[Firestore Sync] Cloud Firestore free tier quota limit reached. Falling back to local store.');
           this.markQuotaExceeded();
           break;
         }
-        console.warn(`[Firestore Sync] Could not pull public collection "${col}":`, msg);
+        console.warn(`[Firestore Sync] Could not pull collection "${col}":`, msg);
       }
     }
 
@@ -371,10 +411,11 @@ class InMemoryDatabase {
     this.ensureSalonDefaults();
 
     if (totalLoaded > 0) {
-      console.log(`🔥 [Firestore] Successfully synchronized ${totalLoaded} public documents into database layer.`);
+      console.log(`🔥 [Firestore] Successfully synchronized and merged ${totalLoaded} documents into database layer.`);
       this.saveToDisk();
     } else {
-      console.log('ℹ️ [Firestore] Operating with local persisted disk store (persisted_db.json).');
+      console.log('ℹ️ [Firestore] Operating with synchronized database layer (disk + Firestore).');
+      this.saveToDisk();
     }
     return totalLoaded;
   }
@@ -394,14 +435,14 @@ class InMemoryDatabase {
 
   private markQuotaExceeded() {
     this.firestoreQuotaExceeded = true;
-    this.quotaExceededUntil = Date.now() + 30 * 60 * 1000; // 30 min circuit break
+    this.quotaExceededUntil = Date.now() + 15 * 60 * 1000; // 15 min circuit break
     console.warn('⚠️ [Firestore Quota Circuit-Breaker] Daily write quota reached. Circuit-breaker active: mutations will safely persist to local store.');
   }
 
   /**
    * Asynchronously persists mutations to Cloud Firestore.
    */
-  private syncToFirestore(tableName: string, action: 'set' | 'delete', id: number | string, data?: any) {
+  public syncToFirestore(tableName: string, action: 'set' | 'delete', id: number | string, data?: any) {
     if (this.isQuotaExceeded()) {
       return;
     }
@@ -416,7 +457,7 @@ class InMemoryDatabase {
             return;
           }
           if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable')) {
-            console.warn(`[Firestore] Sync note for "${colName}/${id}":`, msg);
+            console.warn(`[Firestore] Sync delete note for "${colName}/${id}":`, msg);
           }
         });
       } else if (data) {
@@ -428,7 +469,7 @@ class InMemoryDatabase {
             return;
           }
           if (!msg.includes('UNAVAILABLE') && !msg.includes('unavailable')) {
-            console.warn(`[Firestore] Sync note for "${colName}/${id}":`, msg);
+            console.warn(`[Firestore] Sync set note for "${colName}/${id}":`, msg);
           }
         });
       }
@@ -900,11 +941,39 @@ class InMemoryDatabase {
 
     if (colMatch) {
       const columns = colMatch[1].split(',').map((c) => c.trim().replace(/[`]/g, ''));
-      columns.forEach((col, index) => {
-        if (index < params.length) {
-          record[col] = params[index];
-        }
-      });
+      const valMatch = sql.match(/VALUES\s*\(([\s\S]+?)\)/i);
+      if (valMatch) {
+        const rawVals = valMatch[1].split(/,(?![^(]*\))/).map((s) => s.trim());
+        let pIdx = 0;
+        columns.forEach((col, idx) => {
+          if (idx < rawVals.length) {
+            const raw = rawVals[idx];
+            if (raw === '?') {
+              if (pIdx < params.length) {
+                record[col] = params[pIdx++];
+              }
+            } else if (/^\d+(\.\d+)?$/.test(raw)) {
+              record[col] = Number(raw);
+            } else if (/^'([^']*)'$/.test(raw)) {
+              record[col] = raw.slice(1, -1);
+            } else if (raw.toLowerCase() === 'null') {
+              record[col] = null;
+            } else if (raw.toLowerCase() === 'true') {
+              record[col] = 1;
+            } else if (raw.toLowerCase() === 'false') {
+              record[col] = 0;
+            } else if (pIdx < params.length) {
+              record[col] = params[pIdx++];
+            }
+          }
+        });
+      } else {
+        columns.forEach((col, index) => {
+          if (index < params.length) {
+            record[col] = params[index];
+          }
+        });
+      }
     }
 
     // Guard against duplicate appointment insertions
